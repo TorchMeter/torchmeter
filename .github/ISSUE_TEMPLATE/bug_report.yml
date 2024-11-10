@@ -1,0 +1,91 @@
+name: Bug Report
+description: File a bug report.
+title: "[🐞 Bug]: "
+labels: ["bug", "triage"]
+
+body:
+
+  - type: markdown
+    attributes:
+      value: |
+        **Thanks for taking the time to fill out this bug report!**
+
+  - type: checkboxes
+    attributes:
+      label: Is there an existing issue for this?
+      description: Search for existing issues for the bug you encountered.
+      options:
+        - label: I have searched, and found nothing match my bug.
+          required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: |
+        What did you do, and what did you encounter?
+        It is best to include a screenshot, gif or screen recording of your issue.
+      placeholder: Tell us what you see!
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-expected
+    attributes:
+      label: Expected result?
+      description: Briefly describe your expected results.
+      placeholder: Describe what you want!
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Steps to Reproduce
+      description: |
+        Please describe exactly how to reproduce the bug.
+      value: |
+        <details>
+        <summary>Steps</summary>
+
+        1. 
+        2. 
+        3. 
+
+        </details>
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Your package version
+      description: Use `pip show <package-name>` to get the version.
+    validations:
+      required: true
+  
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System?
+      multiple: true
+      options:
+        - Windows
+        - Linux
+        - macOS
+
+  - type: textarea
+    id: appendix
+    attributes:
+      label: Appendix
+      description: Any addition information helping to resolve this issue is welcome.
+      value: |
+        <details>
+        <summary>Details</summary>
+
+        1. 
+        2. 
+        3. 
+
+        </details>
+    validations:
+      required: false

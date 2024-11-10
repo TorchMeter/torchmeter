@@ -1,0 +1,78 @@
+name: Feature Request
+description: File a feature request.
+title: "[🧩 Feature Request]: "
+labels: ["enhancement", "triage"]
+
+body:
+
+  - type: markdown
+    attributes:
+      value: |
+        > **Thanks for taking the time to submit a feature request!**
+
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: Feature Description
+      description: |
+        Please describe the feature you would like to see implemented.
+      placeholder: Tell us what you want!
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: |
+        Describe a use case or scenario where this feature would be beneficial.
+      placeholder: Describe the use case!
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Alternatives
+      description: |
+        Are there any existing solutions or alternatives to the feature you are requesting?
+      placeholder: List alternatives!
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: |
+        How important is this feature to you and the project?
+      options:
+        - High
+        - Medium
+        - Low
+      default: 2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: |
+        Choose the category that best fits this feature request.
+      options:
+        - UI/UX
+        - Functionality
+        - Performance
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: appendix
+    attributes:
+      label: Appendix
+      description: Any additional information or context that would help in evaluating this feature request.
+      placeholder: Additional details!
+    validations:
+      required: false

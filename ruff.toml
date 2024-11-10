@@ -1,0 +1,48 @@
+# See https://docs.astral.sh/ruff/settings for help
+
+target-version = "py37" # Always generate Python 3.6-compatible code.
+line-length = 120 # Allow lines to be as long as 120.
+
+[format]
+docstring-code-format = true # Enable reformatting of code snippets in docstrings.
+
+[lint]
+# Skip unused variable rules
+ignore = [
+    "ANN101",  # Missing type annotation for `self` in method
+    "ANN102",  # Missing type annotation for `cls` in classmethod
+    "ANN401",  # Dynamically typed expressions (typing.Any) are disallowed
+    "C901",    # function is too complex (12 > 10)
+    "COM812",  # Trailing comma missing
+    "D",       # Docstring rules
+    "EM101",   # Exception must not use a string literal, assign to variable first
+    "EM102",   # Exception must not use an f-string literal, assign to variable first
+    "ERA001",  # Found commented-out code
+    "FBT001",  # Boolean positional arg in function definition
+    "FBT002",  # Boolean default value in function definition
+    "FBT003",  # Boolean positional value in function call
+    "FIX002",  # Line contains TODO
+    "ISC001",  # Isort
+    "PLR0911", # Too many return statements (11 > 6)
+    "PLR2004", # Magic value used in comparison, consider replacing 2 with a constant variable
+    "PLR0912", # Too many branches
+    "PLR0913", # Too many arguments to function call
+    "PLR0915", # Too many statements
+    "S101",    # Use of `assert` detected
+    "S311",    # Standard pseudo-random generators are not suitable for cryptographic purposes
+    "T201",    # print() found
+    "T203",    # pprint() found
+    "TD002",  # Missing author in TODO; try: `# TODO(<author_name>): ...`
+    "TD003",  # Missing issue link on the line following this TODO
+    "TD005",  # Missing issue description after `TODO`
+    "TRY003", # Avoid specifying long messages outside the exception class
+    "PLW2901", # `for` loop variable `name` overwritten by assignment target
+    "SLF001",  # Private member accessed: `_modules`
+]
+
+[lint.isort]
+length-sort = true # sort imports by their string length
+combine-as-imports = true
+known-first-party = ["<your_package_name>"]
+lines-after-imports = 1 # Use a single line after each import block.
+single-line-exclusions = ["os", "json", "re"]
