@@ -1,6 +1,5 @@
 global-exclude *.py[cod] 
 global-exclude *.gitkeep *.gitignore *.gitattributes *.gitmodules
-global-exclude *.egg-info *.dist-info
 global-exclude *.exe *.bin
 global-exclude *.so *.dylib *.dll *.lib
 global-exclude *.o *.a *.so.* *.dylib.* *.dll.*
@@ -8,4 +7,7 @@ global-exclude *.o *.a *.so.* *.dylib.* *.dll.*
 include *.md
 include *.toml
 include *.txt
-include *.sh
+
+graft examples
+prune *.egg-info 
+prune *.dist-info

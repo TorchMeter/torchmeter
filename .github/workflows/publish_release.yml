@@ -1,119 +1,112 @@
-# Modify from https://packaging.python.org/en/latest/guides/publishing-package-distribution-releases-using-github-actions-ci-cd-workflows/
-# The tasks defined in this workflow are strictly follow the steps in README.md
-
-# workflow name
 name: 📤 Publish and Release 🗳
 
-# trigger event, receive a single event or list of events, i.e. [push, pull_request]
 on:
   push:
     tags:
-      - "v*.*.*" # only trigger when push a tag with pattern "v*.*.*"
+      - "v*.*.*" 
 
 env:
-  FORCE_COLOR: 1 # force color output
+  FORCE_COLOR: 1 
 
-# Declare task list
 jobs:
-    Build-distribution-packages:  # task 1: build
-        name: 📦 Build distribution   # task 1 description
-        runs-on: ubuntu-latest       # operating system
+    Build-distribution-packages:  
+        name: 📦 Build distribution   
+        runs-on: ubuntu-latest       
 
-        steps: # Declare task steps
-        - name: Fetch repository    # Step 1: pull the repository to the runner
+        steps: 
+        - name: Fetch repository    
           uses: actions/checkout@v4 
         
-        - name: Install Python       # Step 2: install python
+        - name: Install Python       
           uses: actions/setup-python@v5 
           with:
-              python-version: "3.x" # Step 2 parameters: python version
+              python-version: "3.x" 
         
-        - name: Install packages used for building  # Step 3: Install dependencies used for package building
-          run: |   # concrete commands, `|` is used to indicate a multi-line command
+        - name: Install packages used for building  
+          run: |   
               python3 -m pip install setuptools build wheel isort ruff --user
               python3 -m pip install twine check-manifest --user
         
-        - name: Build distribution packages  # Step 4: Build Python distribution packages.
+        - name: Build distribution packages  
           run: python3 -m build -v -n .
         
-        - name: Execute validation script    # Step 5: validate metadate of the packages
+        - name: Execute validation script    
           run: |
             chmod +x ./check_meta.sh
             bash ./check_meta.sh
 
-        - name: Check MANIFEST.in            # Step 6: update MANIFEST.in
-          run: |
-            check-manifest -u -v
-
-        - name: Store the building results   # Step 7: Upload building results to the Github server, in order to expose to other job.
+        - name: Store the building results   
           uses: actions/upload-artifact@v4
           with:
             name: build-results
             path: dist/
             if-no-files-found: error
 
-    Publish-PyPI: # task 2: publish to PyPI 
+    Publish-PyPI: 
         name: 📤 Publish to PyPI
         runs-on: ubuntu-latest
         
-        needs: Build-distribution-packages # wait for task 1 to finish
+        needs: Build-distribution-packages 
       
         environment:
           name: pypi
-          url: https://pypi.org/p/<package-name>  # Replace <package-name> with your PyPI project name
+          url: https://pypi.org/p/torchmeter  
           
         permissions:
-          id-token: write  # IMPORTANT: mandatory for trusted publishing
+          id-token: write  
       
         steps: 
         - name: Download all the dists
           uses: actions/download-artifact@v4
           with:
-            name: build-results # should be the same as the name in task 1
+            name: build-results 
             path: dist/
         
         - name: Upload to PyPI
           uses: pypa/gh-action-pypi-publish@release/v1
+          with: 
+            skip-existing: true
 
-    Publish-TestPyPI: # task 3: publish to TestPyPI 
+    Publish-TestPyPI: 
       name: 📤 Publish to TestPyPI
       runs-on: ubuntu-latest
 
-      needs: Build-distribution-packages # wait for task 1 to finish
+      needs: Build-distribution-packages 
   
       environment:
         name: testpypi
-        url: https://test.pypi.org/p/<package-name>  # Replace <package-name> with your PyPI project name
+        url: https://test.pypi.org/p/torchmeter 
   
       permissions:
-        id-token: write  # IMPORTANT: mandatory for trusted publishing
+        id-token: write 
   
       steps:
       - name: Download all the dists
         uses: actions/download-artifact@v4
         with:
-          name: build-results # should be the same as the name in task 1
+          name: build-results 
           path: dist/
 
       - name: Upload to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+          skip-existing: true
 
-    Github-Release: # task 4: create a Github Release
+    Github-Release: 
         name: 🗳 Create a Release
         runs-on: ubuntu-latest
 
-        needs: Build-distribution-packages # wait for task 3 to finish
+        needs: Build-distribution-packages
 
         permissions:
-          contents: write  # IMPORTANT: mandatory for making GitHub Releases
+          contents: write 
   
         steps:              
         - name: Fetch repository
           uses: actions/checkout@v4
           
-        - name: Generate Changelog # this step is to get the first entry divided by '---' in CHANGELOG.md
+        - name: Generate Changelog 
           run: |
             awk -v RS="---" 'NR==1{gsub(/\n+$/, ""); print}' CHANGELOG.md > ${{ github.workspace }}-RELEASE.txt 
             cat ${{ github.workspace }}-RELEASE.txt
@@ -127,7 +120,7 @@ jobs:
         - name: Create GitHub Release
           env:
             GITHUB_TOKEN: ${{ github.token }}
-          run: >-   # multi-line command 
+          run: >-  
             gh release create
             '${{ github.ref_name }}'
             --repo '${{ github.repository }}'
@@ -136,8 +129,6 @@ jobs:
         - name: Upload artifact to GitHub Release
           env:
             GITHUB_TOKEN: ${{ github.token }}
-          # Upload to GitHub Release using the `gh` CLI.
-          # `dist/` contains the built packages
           run: >-
             gh release upload
             '${{ github.ref_name }}' dist/**

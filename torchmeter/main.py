@@ -1,10 +1,8 @@
-<!-- # v0.0.0 -->
+def welcome():
+    print('''
+Welcome to TorchMeter ⏲️ !!!
 
-![](https://img.shields.io/badge/Version-v0.0.0-green)
-
-Welcome to `TorchMeter` ⏲️ !!!
-
-`Torchmeter` is an all-in-one tool for Pytorch model analysis, 
+Torchmeter is an all-in-one tool for Pytorch model analysis, 
 measuring Params, FLOPs/MACs(aka. MACC or MADD), Memory cost, Inference time and Throughput!!
 🚀🚀🚀
 
@@ -16,5 +14,4 @@ Subscribe to repo below for more updates and new features!!
 https://github.com/Ahzyuan/torchmeter
 
 Looking forward to your star if this project does help you ⭐⭐⭐
-
----
+''')

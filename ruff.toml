@@ -43,6 +43,6 @@ ignore = [
 [lint.isort]
 length-sort = true # sort imports by their string length
 combine-as-imports = true
-known-first-party = ["<your_package_name>"]
+known-first-party = ["torchmeter"]
 lines-after-imports = 1 # Use a single line after each import block.
 single-line-exclusions = ["os", "json", "re"]
