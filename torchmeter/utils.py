@@ -1,8 +1,24 @@
+import os
 import sys
 from rich import print
 from inspect import signature
 from functools import partial
-from typing import Any, Callable, Iterable, List, Tuple
+from typing import Any, Callable, Iterable, List, Optional, Tuple
+
+def perfect_savepath(origin_path:str, 
+                     target_ext:Optional[str],
+                     default_filename:str='Data'):
+    dir, file = os.path.split(origin_path)
+    if '.' in file: # specify a file path
+        os.makedirs(dir, exist_ok=True)
+        save_dir = dir
+        save_file = os.path.join(dir, os.path.splitext(file)[0]+f'.{target_ext}')
+    else: # specify a dir path
+        os.makedirs(origin_path, exist_ok=True)
+        save_dir = origin_path
+        save_file = os.path.join(origin_path, f'{default_filename}.{target_ext}')
+    
+    return save_dir, save_file
 
 def check_args(func:Callable, *required_args:Tuple[str]) -> List:
     """

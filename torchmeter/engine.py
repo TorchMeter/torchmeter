@@ -1,24 +1,24 @@
-import re
+import re,pdb
 import time
 import warnings
-import torch.nn as nn
-from rich import print
 from copy import deepcopy
-from rich.tree import Tree
 from collections import OrderedDict
 from typing import Any, Dict, List, Optional, Tuple
 
-from .utils import dfs_task, Verboser
-from .display import TreeRenderer, render_segments_perline
+import torch.nn as nn
+from rich import print
+from rich.tree import Tree
 
-class Statistics:
-    def __init__(self):
-        pass
+from torchmeter.utils import dfs_task, Verboser
+from torchmeter.statistic import ParamsMeter
+from torchmeter.display import render_perline, TreeRenderer, TabularRenderer
+
+__all__ = ('OperationNode', 'OperationTree')
 
 class OperationNode:
    
-    renderer:TreeRenderer = TreeRenderer()
-    time_sep:float = 0.2
+    time_sep:float = 0.15
+    statistics:Tuple[str] = ('param', ) # all statistics stored as attributes
 
     def __init__(self, 
                  module:nn.Module,
@@ -46,22 +46,31 @@ class OperationNode:
         self.repeat_body:List[Tuple[str, str]] = [] # the ids and names of the nodes in the same repeat block
         
         # display info 
+        self.tree_renderer:TreeRenderer = TreeRenderer(node=self)
+        self.tb_renderer:TabularRenderer = TabularRenderer(node=self)
         self.display_root:Tree = None # set in `OperationTree.__build()`
         self.neat_display = False # whether to display the node as a tree or as a line when disolving this obj to a string
-        self.fold_repeat = True
+        self.fold_repeat = True # TODO: move to a supper level
         self.render_when_repeat = False # whether to render when enable `fold_repeat` in `render_as_tree`, set in `OperationTree.__build()`
         self.is_folded = False # whether the node is folded in a repeat block, set in `OperationTree.__build()`
 
         self.level_args:List[Dict[str, str]] = []
         self.repeat_block_args:Dict[str, Any] = {}
 
-        # statistics info
+        # statistic info (all read-only)
+        self.__param = ParamsMeter(opnode=self)
+
+        # other info
         for key, value in kwargs.items():
             if key in self.__dict__:
                 setattr(self, key, value)
             else:
                 warnings.warn(f'`{key}` is not a valid attribute of `OperationNode`, ignored.')
-    
+
+    @property
+    def param(self) -> ParamsMeter:
+        return self.__param
+
     def __copy__(self):
         new_obj = OperationNode(self.operation)
         new_obj.__dict__ = self.__dict__
@@ -74,25 +83,19 @@ class OperationNode:
         return new_obj
     
     def __repr__(self):
-        if self.neat_display:
-            op_str = str(self.type) if self.operation._modules else str(self.operation)
-            return f"{self.node_id} {self.name}: {op_str}"
-        else:
-            rendered_tree = self.renderer.render_fold_tree if self.fold_repeat else self.renderer.render_unfold_tree
+        op_str = str(self.type) if self.operation._modules else str(self.operation)
+        if not self.neat_display:
+            rendered_tree:Tree = self.tree_renderer.render_fold_tree if self.fold_repeat else self.tree_renderer.render_unfold_tree
             
             if rendered_tree is None:
-                rendered_tree = self.renderer.render(node=self,
-                                                     fold_repeat=self.fold_repeat,
-                                                     level_args=self.level_args,
-                                                     repeat_block_args=self.repeat_block_args)
+                rendered_tree = self.tree_renderer(fold_repeat=self.fold_repeat,
+                                                   level_args=self.level_args,
+                                                   repeat_block_args=self.repeat_block_args)
             
-            if self.time_sep:
-                render_segments_perline(self.renderer.console.render(rendered_tree),
-                                        time_sep=self.time_sep)
-            else:
-                print(rendered_tree)
+            render_perline(renderable=rendered_tree,
+                           time_sep=self.time_sep)
             
-            return ''
+        return f"{self.node_id} {self.name}: {op_str}"
     
 class OperationTree:
 
@@ -109,7 +112,7 @@ class OperationTree:
                       enter_args={'end':''}) as vb:
             start = time.time()
             # all_nodes: List[OperationNode], a list holding all operation nodes but the root
-            self.all_nodes, *_ = dfs_task(dfs_subject=self.root, 
+            self.nonroot_nodes, *_ = dfs_task(dfs_subject=self.root, 
                                           adj_func=lambda x:x.childs.values(),
                                           task_func=OperationTree.__build,
                                           visited_signal_func=lambda x:x.addr,
@@ -126,7 +129,7 @@ class OperationTree:
             'title': '[i]Repeat [[b u]{{repeat_time}}[/b u]] Times[/]',
             'title_align': 'center',
             'highlight': True,
-            'repeat_footer': 'Repeat time: {{repeat_time}}',
+            # 'repeat_footer': 'Repeat time: {{repeat_time}}',
             'style': 'dark_goldenrod',
             'border_style': 'dim',
             'expand': False
@@ -202,6 +205,7 @@ class OperationTree:
             all_nodes.append(child)
             if not module._modules: # if module doen't have child modules
                 child.is_leaf = True
+                child.param.measure()
             
             subject.childs[module_idx] = child
             copy_childs.append(child)
@@ -264,8 +268,6 @@ class OperationTree:
         return self.root.__repr__()
             
 if __name__ == '__main__':
-    import torch.nn as nn
-    from copy import deepcopy
     from torchvision import models
 
     class TestNet(nn.Module):
@@ -308,9 +310,18 @@ if __name__ == '__main__':
             pass
     
     # model = TestNet()
-    model = models.resnet34()
+    model = models.alexnet()
     
     optree = OperationTree(model)
     
-    print(optree)
+    # print(optree)
+    print(optree.root.param)
+    optree.root.param.profile(show=True,
+                              newcol_name='Percentage',
+                              newcol_func=lambda col_dict,all_num=optree.root.param.total_num.val: f'{col_dict["Numeric_Num"]/all_num*100:.2f} %',
+                              newcol_dependcol=['Numeric_Num'],
+                              newcol_type=str,)
+                            #   newcol_idx=0,
+                            #   save_csv=r'C:\Users\Administrater\Desktop',
+                            #   save_excel=r'C:\Users\Administrater\Desktop')
     
