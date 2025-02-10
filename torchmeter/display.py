@@ -5,7 +5,7 @@ from copy import copy,deepcopy
 from operator import attrgetter
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from polars import DataFrame, struct
+from polars import DataFrame, struct, Object
 from rich import print, get_console
 from rich.rule import Rule
 from rich.tree import Tree
@@ -766,9 +766,17 @@ class TabularRenderer:
         for col in tb.columns:
             col.__dict__.update(self.col_args)
         
+        def val2str(val_name:str, val:Any):
+            if val is not None:
+                return str(val)
+            elif df[val_name].dtype == Object: # UpperLinkData is None
+                return 'Not Supported'
+            else:
+                return '-'
+
         # fill table
-        for vals in df.iter_rows():
-            str_vals = list(map(str, vals))
+        for vals_dict in df.iter_rows(named=True):
+            str_vals = [val2str(k,v) for k,v in vals_dict.items()]
             tb.add_row(*str_vals)
         
         return tb
