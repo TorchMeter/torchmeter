@@ -1,5 +1,5 @@
 import re
-import time,pdb
+import time
 import warnings
 from copy import copy,deepcopy
 from operator import attrgetter
@@ -241,7 +241,7 @@ class TreeRenderer:
     def __init__(self, 
                  node:"OperationNode", # noqa # type: ignore 
                  loop_algebras:str='xyijkabcdefghlmnopqrstuvwz'):
-        self.opnode = node
+        self.opnode = deepcopy(node)
         self.loop_algebras:str = loop_algebras
 
         self.render_unfold_tree = None
@@ -447,11 +447,13 @@ class TreeRenderer:
         assert isinstance(repeat_block_args, dict), f"Argument `repeat_block_args` must be a dict, but got {type(repeat_block_args)}"
         
         # check, clean and apply `level_args`, 
-        self.tree_level_args = level_args
+        if level_args:
+            self.tree_level_args = level_args
         del level_args
         
         # check, clean and apply `repeat_block_args`
-        self.repeat_block_args = repeat_block_args
+        if repeat_block_args:
+            self.repeat_block_args = repeat_block_args
         del repeat_block_args
         
         # task_func for `dfs_task`

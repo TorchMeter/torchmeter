@@ -14,11 +14,55 @@ class Meter:
                  model: Union[nn.Module, str],
                  device:str='cpu',
                  fold_repeat:bool=True,
+                 render_time_sep:float=0.15,
                  verbose:bool=True):
         
-        self.__device = torch.device(device)
+        assert render_time_sep >= 0, f'`render_time_sep` must be a non-negative number, but got {render_time_sep}.'
+
         self.fold_repeat = fold_repeat
+        self.render_time_sep = render_time_sep
         self.verbose = verbose
+        self.__device = torch.device(device)
+        self.__tree_levels_args = {
+            '0':  {'label': '[b light_coral]<name>[/]', 
+                   'guide_style':'light_coral'}
+        }
+        self.__tree_rpblk_args = { 
+            'title': '[i]Repeat [[b]<repeat_time>[/b]] Times[/]',
+            'title_align': 'center',
+            'highlight': True,
+            'style': 'dark_goldenrod',
+            'border_style': 'dim',
+            'expand': False
+        }
+        self.tb_col_args = {
+            'justify': 'center',
+            'vertical': 'middle',
+            'overflow': 'fold'
+        }
+        self.tb_args = {
+            'style': 'spring_green4',
+            'highlight': True,
+
+            'title': None,
+            'title_style': 'bold',
+            'title_justify': 'center',
+            'title_align': 'center',
+
+            'show_header': True,
+            'header_style': 'bold',
+
+            'show_footer': False,
+            'footer_style': 'italic',
+
+            'show_lines': False,
+
+            'show_edge': True,
+            'safe_box': True,
+
+            'expand': False,
+            'leading': 0,
+        }
 
         if isinstance(model, str):
             self.model = torch.load(model, map_location=self.__device)
@@ -39,29 +83,95 @@ class Meter:
     @property
     def device(self):
         return self.__device
+    
+    @device.setter
+    def device(self, new_device:str):
+        self.__device = torch.device(new_device)
+        self.model.to(self.__device)
+
+    @property
+    def tree_levels_args(self):
+        return self.__tree_levels_args
+    
+    @tree_levels_args.setter
+    def tree_levels_args(self, custom_args:Dict[str, Any]) -> None:
+        self.__tree_levels_args = custom_args
+        self.tree_renderer.render_fold_tree = None
+        self.tree_renderer.render_unfold_tree = None
+
+    @property
+    def tree_repeat_block_args(self):
+        return self.__tree_rpblk_args
+    
+    @tree_repeat_block_args.setter
+    def tree_repeat_block_args(self, custom_args:Dict[str, Any]) -> None:
+        self.__tree_rpblk_args = custom_args
+        self.tree_renderer.render_fold_tree = None
+        self.tree_renderer.render_unfold_tree = None
 
     @property
     def structure(self):
         rendered_tree = self.tree_renderer.render_fold_tree if self.fold_repeat else self.tree_renderer.render_unfold_tree
         
         if rendered_tree is None:
-            rendered_tree = self.tree_renderer(fold_repeat=self.fold_repeat)
+            rendered_tree = self.tree_renderer(fold_repeat=self.fold_repeat,
+                                               level_args=self.tree_levels_args,
+                                               repeat_block_args=self.tree_repeat_block_args)
         
         # render_perline(renderable=rendered_tree)
         return rendered_tree
 
     @property
     def param(self):
+        for node in self.optree.nonroot_nodes:
+            if node.is_leaf:
+                node.param.measure()
         return self.optree.root.param
     
-    @property
-    def cal(self):
-        return self.optree.root.cal
-    
-    @device.setter
-    def device(self, new_device:str):
-        self.__device = torch.device(new_device)
-        self.model.to(self.__device)
+    def restore_settings(self):
+        self.tree_levels_args = {
+            '0':  {'label': '[b light_coral]<name>[/]', # default display setting for root node
+                   'guide_style':'light_coral'}
+        }
+
+        self.tree_repeat_block_args = { 
+            'title': '[i]Repeat [[b]<repeat_time>[/b]] Times[/]',
+            'title_align': 'center',
+            'highlight': True,
+            'style': 'dark_goldenrod',
+            'border_style': 'dim',
+            'expand': False
+        }
+
+        self.tb_col_args = {
+            'justify': 'center',
+            'vertical': 'middle',
+            'overflow': 'fold'
+        }
+
+        self.tb_args = {
+            'style': 'spring_green4',
+            'highlight': True,
+
+            'title': None,
+            'title_style': 'bold',
+            'title_justify': 'center',
+            'title_align': 'center',
+
+            'show_header': True,
+            'header_style': 'bold',
+
+            'show_footer': False,
+            'footer_style': 'italic',
+
+            'show_lines': False,
+
+            'show_edge': True,
+            'safe_box': True,
+
+            'expand': False,
+            'leading': 0,
+        }
 
     def profile(self, 
                 stat, 
@@ -87,7 +197,9 @@ class Meter:
         
         """
 
-        tb, data = self.tb_renderer(stat_name=stat.name, **tb_kwargs)
+        tb, data = self.tb_renderer(stat_name=stat.name, 
+                                    table_settings=tb_kwargs.get('table_settings', self.tb_args),
+                                    column_settings=tb_kwargs.get('column_settings', self.tb_col_args))
 
         if no_tree:
             tree = None
@@ -111,7 +223,10 @@ class Meter:
             canvas['left'].size = tree_width + 2
 
         if show:
-            render_perline(canvas)
+            if self.render_time_sep:
+                render_perline(canvas, time_sep=self.render_time_sep)
+            else:
+                print(canvas)
 
         return tb, data
 

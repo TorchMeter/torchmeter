@@ -1,4 +1,4 @@
-import re,pdb
+import re
 import time
 import warnings
 from copy import deepcopy
@@ -6,19 +6,16 @@ from collections import OrderedDict
 from typing import Any, Dict, List, Optional, Tuple
 
 import torch.nn as nn
-from rich import print
 from rich.tree import Tree
 
 from torchmeter.utils import dfs_task, Verboser
 from torchmeter.statistic import ParamsMeter
-from torchmeter.display import render_perline, TreeRenderer, TabularRenderer
 
 __all__ = ('OperationNode', 'OperationTree')
 
 class OperationNode:
    
-    time_sep:float = 0.15
-    statistics:Tuple[str] = ('param',) # all statistics stored as attributes
+    statistics:Tuple[str] = ('param', 'cal') # all statistics stored as attributes
 
     def __init__(self, 
                  module:nn.Module,
@@ -104,26 +101,7 @@ class OperationTree:
                                           visited_signal_func=lambda x:x.addr,
                                           visited=[])
             vb.exit_text = f'[b blue][green]{time.time()-start:.3f}[/green] seconds\n[/]'
-        
-        self.display_args:List[dict] = [
-            {'level': 0,
-             'label': '[b light_coral]{{name}}[/]', # default display setting for root node
-             'guide_style':'light_coral'}
-        ] 
-        
-        self.repeat_block_args = {
-            'title': '[i]Repeat [[b u]{{repeat_time}}[/b u]] Times[/]',
-            'title_align': 'center',
-            'highlight': True,
-            # 'repeat_footer': 'Repeat time: {{repeat_time}}',
-            'style': 'dark_goldenrod',
-            'border_style': 'dim',
-            'expand': False
-        }
-        
-    def save(self, path, format='csv'):
-        pass
-    
+            
     @staticmethod
     def __build(subject:"OperationNode",
                 pre_res:Tuple[List["OperationNode"], Optional[Tree]]=([],)) \
@@ -191,7 +169,6 @@ class OperationTree:
             all_nodes.append(child)
             if not module._modules: # if module doen't have child modules
                 child.is_leaf = True
-                child.param.measure()
             
             subject.childs[module_idx] = child
             copy_childs.append(child)
