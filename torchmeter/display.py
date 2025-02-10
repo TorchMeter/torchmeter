@@ -5,15 +5,16 @@ from copy import copy,deepcopy
 from operator import attrgetter
 from typing import Any, Callable, Dict, List, Optional, Union
 
-from polars import DataFrame, struct, Object
 from rich import print, get_console
 from rich.rule import Rule
 from rich.tree import Tree
-from rich.table import Table, Column
 from rich.panel import Panel
-from rich.box import HEAVY_EDGE, ROUNDED
 from rich.segment import Segment
+from rich.table import Table, Column
+from rich.box import HEAVY_EDGE, ROUNDED
 from rich.console import Group, RenderableType
+from polars import DataFrame, struct, col
+from polars import Object as pl_object, List as pl_list
 
 from torchmeter.utils import dfs_task, perfect_savepath
 
@@ -21,7 +22,7 @@ def render_perline(renderable: Union[RenderableType, List[List[Segment]]],
                    line_prefix:'str'='',
                    line_suffix:'str'='',
                    row_separator:'str'='',
-                   console:"rich.console.Console"=None, # noqa
+                   console=None, 
                    time_sep:float=0.15) -> None:
     """
     Output a renderable object line by line. \n
@@ -741,8 +742,8 @@ class TabularRenderer:
                   col_idx:int = -1) -> DataFrame:
         assert len(used_cols) > 0, 'You need to specify the columns used in the function for creating new columns, \
                                      and pass them to `newcol_dependcol` as a list.'
-        for col in used_cols:
-            assert col in df.columns, f'Column {col} is not in the table.'
+        for used_name in used_cols:
+            assert used_name in df.columns, f'Column `{used_name}` is not in the table.\nValid columns are {df.columns}.'
 
         final_cols = df.columns[:]
         col_idx = (col_idx if col_idx >= 0 else len(df.columns)+col_idx+1) % (len(df.columns)+1)
@@ -763,13 +764,13 @@ class TabularRenderer:
         tb.__dict__.update(self.tb_args)
 
         # apply column settings to all columns
-        for col in tb.columns:
-            col.__dict__.update(self.col_args)
+        for tb_col in tb.columns:
+            tb_col.__dict__.update(self.col_args)
         
         def val2str(val_name:str, val:Any):
             if val is not None:
                 return str(val)
-            elif df[val_name].dtype == Object: # UpperLinkData is None
+            elif df[val_name].dtype == pl_object: # UpperLinkData is None
                 return 'Not Supported'
             else:
                 return '-'
@@ -861,7 +862,17 @@ class TabularRenderer:
             _, csv_path = perfect_savepath(origin_path=save_csv,
                                            target_ext='csv',
                                            default_filename=f'{self.opnode.name}_{stat_name}') 
-            data.write_csv(file=csv_path)
+            
+            # list column -> str
+            ls_cols = [col_name for col_name in data.columns if data[col_name].dtype == pl_list]
+            if ls_cols:
+                data.with_columns([
+                    col(col_name).map_elements(lambda s: str(s.to_list()), return_dtype=str)
+                    for col_name in ls_cols
+                ]).write_csv(file=csv_path)
+            else:
+                data.write_csv(file=csv_path)
+
             print(f'{stat_name.capitalize()} data saved to [b magenta]{csv_path}[/]')
         
         if save_excel:
