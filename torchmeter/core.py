@@ -10,6 +10,7 @@ from torchmeter.engine import OperationTree
 from torchmeter.display import TreeRenderer, TabularRenderer, render_perline
 
 class Meter:
+
     def __init__(self, 
                  model: Union[nn.Module, str],
                  device:str='cpu',
@@ -71,13 +72,19 @@ class Meter:
         else:
             raise TypeError(f'model must be a torch.nn.Module or a path to a model, but got {type(model)}')
 
+        self.ipt = {'args':tuple(), 'kwargs':dict()} # TODO: self.ipt_infer()
+
         self.optree = OperationTree(self.model, verbose=verbose)
         self.optree.root.fold_repeat = fold_repeat
 
         self.tree_renderer = TreeRenderer(self.optree.root)
         self.tb_renderer = TabularRenderer(self.optree.root)
 
+        self.__measure_param = False
+        self.__measure_cal = False
+
     def __call__(self, *args, **kwargs):
+        self.ipt = {'args': args, 'kwargs': kwargs}
         return self.model(*args, **kwargs)
     
     @property
@@ -123,11 +130,33 @@ class Meter:
 
     @property
     def param(self):
-        for node in self.optree.nonroot_nodes:
-            if node.is_leaf:
-                node.param.measure()
+        if not self.__measure_param:
+            for node in self.optree.all_nodes:
+                if node.is_leaf:
+                    node.param.measure()
+
+            self.__measure_param = True
+
         return self.optree.root.param
     
+    @property
+    def cal(self):
+        if not self.__measure_cal:
+            if len(self.ipt['args']) + len(self.ipt['kwargs']) == 0:
+                raise ValueError("Input unknown! You should perform at least one feed-forward inference before measuring calculation!") 
+
+            hook_ls = [node.cal.measure() for node in self.optree.all_nodes if node.is_leaf]
+
+            # feed forwad
+            self.model(*self.ipt['args'], **self.ipt['kwargs']) 
+
+            # remove hooks after measurement
+            list(map(lambda x:x.remove(), hook_ls)) 
+
+            self.__measure_cal = True
+        
+        return self.optree.root.cal
+
     def restore_settings(self):
         self.tree_levels_args = {
             '0':  {'label': '[b light_coral]<name>[/]', # default display setting for root node
@@ -197,9 +226,10 @@ class Meter:
         
         """
 
-        tb, data = self.tb_renderer(stat_name=stat.name, 
-                                    table_settings=tb_kwargs.get('table_settings', self.tb_args),
-                                    column_settings=tb_kwargs.get('column_settings', self.tb_col_args))
+        tb_kwargs['table_settings'] = tb_kwargs.get('table_settings', self.tb_args)
+        tb_kwargs['column_settings'] = tb_kwargs.get('column_settings', self.tb_col_args)
+
+        tb, data = self.tb_renderer(stat_name=stat.name, **tb_kwargs)
 
         if no_tree:
             tree = None
@@ -276,14 +306,15 @@ if __name__ == '__main__':
     model = models.alexnet()
     
     metered_model = Meter(model, device='cpu')
+    metered_model(torch.randn(1,3,224,224))
     
     # print(metered_model.structure)
-    # print(metered_model.param)
-    metered_model.profile(metered_model.param,
+    print(metered_model.cal)
+    metered_model.profile(metered_model.cal,
                           show=True,
                           newcol_name='Percentage',
-                          newcol_func=lambda col_dict,all_num=metered_model.param.total_num.val: f'{col_dict["Numeric_Num"]/all_num*100:.2f} %',
-                          newcol_dependcol=['Numeric_Num'],
+                          newcol_func=lambda col_dict,all_num=metered_model.cal.Flops.val: f'{col_dict["FLOPs"]*100/all_num:.2f} %',
+                          newcol_dependcol=['FLOPs'],
                           newcol_type=str,)
                         #   newcol_idx=0,
                         #   save_csv=r'C:\Users\Administrater\Desktop',
