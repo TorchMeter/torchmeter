@@ -18,7 +18,7 @@ __all__ = ('OperationNode', 'OperationTree')
 class OperationNode:
    
     time_sep:float = 0.15
-    statistics:Tuple[str] = ('param', ) # all statistics stored as attributes
+    statistics:Tuple[str] = ('param',) # all statistics stored as attributes
 
     def __init__(self, 
                  module:nn.Module,
@@ -46,10 +46,7 @@ class OperationNode:
         self.repeat_body:List[Tuple[str, str]] = [] # the ids and names of the nodes in the same repeat block
         
         # display info 
-        self.tree_renderer:TreeRenderer = TreeRenderer(node=self)
-        self.tb_renderer:TabularRenderer = TabularRenderer(node=self)
         self.display_root:Tree = None # set in `OperationTree.__build()`
-        self.neat_display = False # whether to display the node as a tree or as a line when disolving this obj to a string
         self.fold_repeat = True # TODO: move to a supper level
         self.render_when_repeat = False # whether to render when enable `fold_repeat` in `render_as_tree`, set in `OperationTree.__build()`
         self.is_folded = False # whether the node is folded in a repeat block, set in `OperationTree.__build()`
@@ -83,18 +80,7 @@ class OperationNode:
         return new_obj
     
     def __repr__(self):
-        op_str = str(self.type) if self.operation._modules else str(self.operation)
-        if not self.neat_display:
-            rendered_tree:Tree = self.tree_renderer.render_fold_tree if self.fold_repeat else self.tree_renderer.render_unfold_tree
-            
-            if rendered_tree is None:
-                rendered_tree = self.tree_renderer(fold_repeat=self.fold_repeat,
-                                                   level_args=self.level_args,
-                                                   repeat_block_args=self.repeat_block_args)
-            
-            render_perline(renderable=rendered_tree,
-                           time_sep=self.time_sep)
-            
+        op_str = str(self.type) if self.operation._modules else str(self.operation)            
         return f"{self.node_id} {self.name}: {op_str}"
     
 class OperationTree:
@@ -266,62 +252,4 @@ class OperationTree:
     
     def __repr__(self):
         return self.root.__repr__()
-            
-if __name__ == '__main__':
-    from torchvision import models
-
-    class TestNet(nn.Module):
-        def __init__(self):
-            super(TestNet, self).__init__()
-            
-            conv = nn.ModuleList([nn.Conv2d(3,30,3,stride=1) for _ in range(7)])
-            self.conv = nn.Sequential(conv,deepcopy(conv))
-            self.maxpool = nn.MaxPool2d(2)
-            self.br1 = nn.ModuleList([nn.LayerNorm(30),
-                                      nn.BatchNorm2d(30),
-                                      nn.ModuleList([nn.Linear(2,10) for _ in range(3)]),
-                                      nn.BatchNorm2d(30),
-                                      nn.ModuleList([nn.Linear(2,10) for _ in range(3)]),
-                                      nn.SELU()])
-            self.blank1 = nn.Identity()
-            self.br2 = nn.ModuleList([nn.LayerNorm(30),
-                                      nn.BatchNorm2d(30),
-                                      nn.ModuleList([nn.Linear(2,10) for _ in range(3)]),
-                                      nn.BatchNorm2d(30),
-                                      nn.ModuleList([nn.Linear(2,10) for _ in range(3)]),
-                                      nn.SELU()])
-            self.blank2 = nn.Identity()
-            self.avgpool = nn.AvgPool2d(2)
-            self.layer1 = nn.Sequential(
-                nn.Conv2d(30,60,3,stride=1),
-                nn.BatchNorm2d(60),
-                nn.ReLU(),
-                nn.Conv2d(60,30,1),
-                nn.BatchNorm2d(30),
-                nn.ReLU()
-            )
-            
-            self.layer2 = deepcopy(self.layer1)
-            self.layer3 = deepcopy(self.layer1)
-            
-            self.fc = nn.Linear(30,10)
-        
-        def forward(self,x):
-            pass
-    
-    # model = TestNet()
-    model = models.alexnet()
-    
-    optree = OperationTree(model)
-    
-    # print(optree)
-    print(optree.root.param)
-    optree.root.param.profile(show=True,
-                              newcol_name='Percentage',
-                              newcol_func=lambda col_dict,all_num=optree.root.param.total_num.val: f'{col_dict["Numeric_Num"]/all_num*100:.2f} %',
-                              newcol_dependcol=['Numeric_Num'],
-                              newcol_type=str,)
-                            #   newcol_idx=0,
-                            #   save_csv=r'C:\Users\Administrater\Desktop',
-                            #   save_excel=r'C:\Users\Administrater\Desktop')
     
