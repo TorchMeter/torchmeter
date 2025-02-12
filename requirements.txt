@@ -1,3 +1,5 @@
 rich
 torch
 torchvision
+xlsxwriter
+polars
