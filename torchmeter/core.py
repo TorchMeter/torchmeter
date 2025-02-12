@@ -204,7 +204,8 @@ class Meter:
 
     def profile(self, 
                 stat, 
-                show=False, no_tree=False, 
+                show=True, no_tree=False, 
+                force_preset=False,
                 **tb_kwargs):
         """To render a tabular profile of the statistics
         
@@ -212,6 +213,7 @@ class Meter:
             stat
             show
             no_tree
+            force_preset: if True, force to use the preset table settings (i.e. self.tb_args)
             tb_kwargs
                 - fields:List[str]=[],
                 - table_settings:Dict[str, Any]={},
@@ -230,33 +232,37 @@ class Meter:
         tb_kwargs['column_settings'] = tb_kwargs.get('column_settings', self.tb_col_args)
 
         tb, data = self.tb_renderer(stat_name=stat.name, **tb_kwargs)
-
+        tree = None if no_tree else self.structure
+        
+        console = get_console()
+        tree_width = console.measure(tree).maximum if tree is not None else 0
+        desirable_tb_width = console.measure(tb).maximum
+        actual_tb_width = console.width - tree_width - 2 # 2 is the gap between tree and table
+        
+        if actual_tb_width <= 5: # 5 is the minimum width of table
+            raise ValueError("The width of the terminal is too small, try to maximize the window and try again.")
+        
+        # when some cells in the table is overflown, we need to show a line between rows
+        if actual_tb_width < desirable_tb_width and not force_preset:
+            tb.show_lines = True 
+        
         if no_tree:
-            tree = None
             canvas = tb
         else:
-            tree = self.structure
-
-            console = get_console()
-            tree_width = console.measure(tree).maximum
+            canvas = Layout()
+            canvas.split_row(Layout(tree, name='left', size=tree_width + 2),
+                             Layout(tb, name='right'))
+            
+            temp_options = console.options.update_width(actual_tb_width) 
             tree_height = len(console.render_lines(tree))
-            temp_options = console.options.update_width(console.width - tree_width - 2) # 2 is the gap between tree and table
             tb_height = len(console.render_lines(tb, options=temp_options))
             console.height = max(tree_height, tb_height)
-
-            canvas = Layout()
-            canvas.split_row(Layout(tree, name='left'),
-                             Layout(tb, name='right'))
-
-            if console.width <= tree_width:
-                raise ValueError("The width of the terminal is too small, try to maximize the window and try again.")
-            canvas['left'].size = tree_width + 2
 
         if show:
             if self.render_time_sep:
                 render_perline(canvas, time_sep=self.render_time_sep)
             else:
-                print(canvas)
+                console.print(canvas)
 
         return tb, data
 
