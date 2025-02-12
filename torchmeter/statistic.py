@@ -1,5 +1,5 @@
 from functools import reduce
-from enum import IntEnum, unique
+from enum import IntEnum, IntFlag, unique
 from collections import namedtuple
 from abc import ABC, abstractmethod
 from operator import attrgetter, mul
@@ -10,16 +10,22 @@ import torch.nn as nn
 OPN_TYPE = TypeVar("OperationNode")
 
 @unique
-class Unit(IntEnum):
+class DecimalUnit(IntEnum):
     T:int = 1e12
     G:int = 1e9
     M:int = 1e6
     K:int = 1e3
 
-def auto_unit(val:Union[int, float], suffix:str='') -> str:
-    for unit in list(Unit):
+class BinaryUnit(IntFlag):
+    TiB:int = 2**40
+    GiB:int = 2**30
+    MiB:int = 2**20
+    KiB:int = 2**10
+
+def auto_unit(val:Union[int, float], unit_system=DecimalUnit) -> str:
+    for unit in list(unit_system):
         if val >= unit:
-            return f'{val / unit:.2f} {unit.name + suffix}'
+            return f'{val / unit:.2f} {unit.name}'
 
 class UpperLinkData:
 
