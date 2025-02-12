@@ -14,7 +14,7 @@ from rich.table import Table, Column
 from rich.box import HEAVY_EDGE, ROUNDED
 from rich.console import Group, RenderableType
 from polars import DataFrame, struct, col
-from polars import Object as pl_object, List as pl_list
+from polars import Int64 as pl_int64, Float64 as pl_float64, List as pl_list
 
 from torchmeter.utils import dfs_task, perfect_savepath
 
@@ -770,7 +770,7 @@ class TabularRenderer:
         def val2str(val_name:str, val:Any):
             if val is not None:
                 return str(val)
-            elif df[val_name].dtype == pl_object: # UpperLinkData is None
+            elif df[val_name].dtype in (pl_int64, pl_float64): # UpperLinkData is None
                 return 'Not Supported'
             else:
                 return '-'

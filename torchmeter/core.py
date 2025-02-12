@@ -309,7 +309,7 @@ if __name__ == '__main__':
             pass
     
     # model = TestNet()
-    model = models.alexnet()
+    model = models.resnet18()
     
     metered_model = Meter(model, device='cpu')
     metered_model(torch.randn(1,3,224,224))
@@ -319,7 +319,7 @@ if __name__ == '__main__':
     metered_model.profile(metered_model.cal,
                           show=True,
                           newcol_name='Percentage',
-                          newcol_func=lambda col_dict,all_num=metered_model.cal.Flops.val: f'{col_dict["FLOPs"]*100/all_num:.2f} %',
+                          newcol_func=lambda col_dict,all_num=metered_model.cal.Flops.val: f'{col_dict["FLOPs"]*100/all_num:.3f} %',
                           newcol_dependcol=['FLOPs'],
                           newcol_type=str,)
                         #   newcol_idx=0,
