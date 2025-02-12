@@ -1,2 +1,5 @@
-tqdm
 rich
+torch
+torchvision
+xlsxwriter
+polars
