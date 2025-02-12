@@ -1,7 +1,8 @@
+from functools import reduce
 from enum import IntFlag, unique
-from operator import attrgetter
 from collections import namedtuple
 from abc import ABC, abstractmethod
+from operator import attrgetter, mul
 from typing import Any, Dict, List, NamedTuple, Optional, TypeVar, Tuple, Union
 
 from rich import print
@@ -55,7 +56,7 @@ class Statistics(ABC):
 
     @property
     @abstractmethod
-    def st_name(self) -> str:
+    def name(self) -> str:
         """The registered name of the statistics in OperationNode"""
         ...
 
@@ -91,20 +92,10 @@ class Statistics(ABC):
         if opparent is None:
             link_data = UpperLinkData(val=init_val)
         else:
-            upper_getter = attrgetter(f'{self.st_name}.{attr_name}')
+            upper_getter = attrgetter(f'{self.name}.{attr_name}')
             link_data = UpperLinkData(val=init_val, 
                                       parent_data=upper_getter(opparent))
         return link_data
-
-    def profile(self, show=False, **kwargs):
-        """To render a tabular profile of the statistics"""
-
-        tb, data = self.tb_renderer(stat_name=self.st_name, **kwargs)
-
-        if show:
-            print(tb)
-
-        return tb, data
 
     def __repr__(self):
         repr_str = self.val.__class__.__name__ + '\n'
@@ -114,8 +105,8 @@ class Statistics(ABC):
         for field in self.ov_fields:
             field_val = getattr(self.val, field, 'N/A')
             if isinstance(field_val, UpperLinkData):
-                field_val = str(field_val) # get the value
-                repr_str += '• ' + f"{field.rjust(max_len)} = {field_val} = {auto_unit(int(field_val))}\n"
+                field_val = float(field_val.val) # get the value
+                repr_str += '• ' + f"{field.rjust(max_len)} = {field_val} = {auto_unit(field_val)}\n"
             else:
                 repr_str += '• ' + f"{field.rjust(max_len)} = {field_val}\n"
 
@@ -124,13 +115,15 @@ class Statistics(ABC):
 class ParamsMeter(Statistics):
 
     detail_val_container:NamedTuple = namedtuple(typename='Params_INFO', 
+                                                 defaults=(None,)*5,
                                                  field_names=['Operation_Id', 
                                                               'Operation_Type',
                                                               'Param_Name', 
                                                               'Requires_Grad', 
-                                                              'Numeric_Num'])
+                                                              'Numeric_Num'],)
     
     overview_val_container:NamedTuple = namedtuple(typename='Params_INFO', 
+                                                   defaults=(None,)*5,
                                                    field_names=['Operation_Id', 
                                                                 'Operation_Type',
                                                                 'Operation_Name', 
@@ -148,10 +141,8 @@ class ParamsMeter(Statistics):
         self.__reg_num = self.init_linkdata(attr_name='reg_num', init_val=0, opparent=_opparent)
         self.__total_num = self.init_linkdata(attr_name='total_num', init_val=0, opparent=_opparent)
 
-        self.tb_renderer = opnode.tb_renderer
-
     @property
-    def st_name(self) -> str:
+    def name(self) -> str:
         return 'param'
 
     @property
@@ -183,8 +174,6 @@ class ParamsMeter(Statistics):
         if not self._model._parameters:
             self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
                                                             Operation_Type=self._opnode.type,
-                                                            Param_Name='-',
-                                                            Requires_Grad='-',
                                                             Numeric_Num=0))
         else:
             for param_name, param_val in self._model.named_parameters(): 
@@ -205,41 +194,218 @@ class ParamsMeter(Statistics):
         
         self.is_measured = True
 
+class CalMeter(Statistics):
+
+    detail_val_container:NamedTuple = namedtuple(typename='Calculation_INFO', 
+                                                 defaults=(None,)*9,
+                                                 field_names=['Operation_Id', 
+                                                              'Operation_Name', 
+                                                              'Operation_Type',
+                                                              'Kernel_Size',  # Kernel_Size([H,W])
+                                                              'Bias', 
+                                                              'Input_Shape',  # Input_Shape([B,C,H,W])'
+                                                              'Output_Shape',  # Output_Shape([B,C,H,W])'
+                                                              'MACs', 
+                                                              'FLOPs'])
+    
+    overview_val_container:NamedTuple = namedtuple(typename='Calculation_INFO', 
+                                                   defaults=(None,)*5,
+                                                   field_names=['Operation_Id', 
+                                                                'Operation_Type',
+                                                                'Operation_Name', 
+                                                                'MACs', 
+                                                                'FLOPs'])
+
+    def __init__(self, opnode: OPN_TYPE):
+        self._opnode = opnode
+        self._model = opnode.operation
+        
+        self.__stat_ls = [] # record all parameters' information
+        self.is_measured = True if self._model._modules else False # only measure the leaf nodes
+
+        _opparent = opnode.parent
+        self.__Macs = self.init_linkdata(attr_name='Macs', init_val=0, opparent=_opparent)
+        self.__Flops = self.init_linkdata(attr_name='Flops', init_val=0, opparent=_opparent)
+
+    @property
+    def name(self) -> str:
+        return 'cal'
+
+    @property
+    def Macs(self) -> UpperLinkData :
+        return self.__Macs
+    
+    @property
+    def Flops(self) -> UpperLinkData:
+        return self.__Flops
+
+    @property
+    def detail_val(self) -> List[NamedTuple]:
+        self.measure()
+        return self.__stat_ls
+    
+    @property
+    def val(self) -> NamedTuple:
+        self.measure()
+        return self.overview_val_container(Operation_Id=self._opnode.node_id,
+                                           Operation_Type=self._opnode.type,
+                                           Operation_Name=self._opnode.name,
+                                           MACs=self.Macs,
+                                           FLOPs=self.Flops)
+
+    def measure(self):
+        if self.is_measured:
+            return
+        
+        hook = self.__regist_hook(self._model) # torch.utils.hooks.RemovableHandle
+
+        self.is_measured = True
+
+        return hook
+
+    def __regist_hook(self, module):
+        if isinstance(module, (nn.Conv1d, nn.Conv2d, nn.Conv3d)):
+            h = module.register_forward_hook(self.__conv_hook)
+
+        elif isinstance(module, (nn.Sigmoid, nn.Tanh, nn.ReLU, nn.ReLU6, nn.SiLU, nn.PReLU, nn.RReLU, nn.LeakyReLU)):
+            h = module.register_forward_hook(self.__activate_hook)
+
+        elif isinstance(module, (nn.BatchNorm1d, nn.BatchNorm2d, nn.BatchNorm3d)):
+            h = module.register_forward_hook(self.__BN_hook)
+
+        elif isinstance(module, nn.Linear):
+            h = module.register_forward_hook(self.__linear_hook)
+
+        elif isinstance(module, (nn.MaxPool1d, nn.AvgPool1d, nn.MaxPool2d, nn.AvgPool2d, nn.MaxPool3d, nn.AvgPool3d)):
+            h = module.register_forward_hook(self.__pool_hook)
+
+        else:
+            h = module.register_forward_hook(self.__not_support_hook)
+
+        return h
+    
+    def __conv_hook(self, module, input, output):
+        c_in = input[0].shape[1]
+        n = c_in * reduce(mul, module.kernel_size)
+        m = output.numel()
+        is_bias = 1 if module.bias is not None else 0
+
+        FLOPs = m*(2*n-1+is_bias)
+        MACs = m*n
+        self.__Macs += MACs
+        self.__Flops += FLOPs
+        
+        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                        Operation_Name=self._opnode.name,
+                                                        Operation_Type=self._opnode.type,
+                                                        Kernel_Size=list(module.kernel_size),
+                                                        Bias=bool(is_bias),
+                                                        Input_Shape=list(input[0].shape),
+                                                        Output_Shape=[len(output)]+list(output[0].shape),
+                                                        MACs=self.Macs.val,
+                                                        FLOPs=self.Flops.val)
+        )
+    
+    def __linear_hook(self, module, input, output):
+        k = module.in_features
+        l = module.out_features # noqa
+        is_bias = 1 if module.bias is not None else 0
+        n = k
+
+        FLOPs = l*(2*n-1 + is_bias)
+        MACs = l*n
+        self.__Macs += MACs
+        self.__Flops += FLOPs
+
+        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                        Operation_Name=self._opnode.name,
+                                                        Operation_Type=self._opnode.type,
+                                                        Bias=bool(is_bias),
+                                                        Input_Shape=list(input[0].shape),
+                                                        Output_Shape=[len(output)]+list(output[0].shape),
+                                                        MACs=self.Macs.val,
+                                                        FLOPs=self.Flops.val)
+        )
+
+    def __BN_hook(self, module, input, output):
+        FLOPs = 4*input[0].numel()
+        MACs = 0.5*FLOPs
+        self.__Macs += MACs
+        self.__Flops += FLOPs
+
+        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                        Operation_Name=self._opnode.name,
+                                                        Operation_Type=self._opnode.type,
+                                                        Input_Shape=list(input[0].shape),
+                                                        Output_Shape=[len(output)]+list(output[0].shape),
+                                                        MACs=self.Macs.val,
+                                                        FLOPs=self.Flops.val)
+        )
+
+    def __activate_hook(self, module, input, output):
+        k = input[0].numel()
+        if isinstance(module, (nn.Sigmoid, nn.PReLU, nn.RReLU, nn.LeakyReLU)):
+            FLOPs = 4*k
+            MACs = 2*k
+
+        elif isinstance(module, nn.Tanh):
+            FLOPs = 9*k
+            MACs = 5*k
+
+        elif isinstance(module, (nn.ReLU, nn.ReLU6)):
+            FLOPs = k
+            MACs = k
+
+        else: # SiLU
+            FLOPs = 5*k
+            MACs = 3*k
+
+        self.__Macs += MACs
+        self.__Flops += FLOPs
+
+        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                        Operation_Name=self._opnode.name,
+                                                        Operation_Type=self._opnode.type,
+                                                        Input_Shape=list(input[0].shape),
+                                                        Output_Shape=[len(output)]+list(output[0].shape),
+                                                        MACs=self.Macs.val,
+                                                        FLOPs=self.Flops.val)
+        )
+
+    def __pool_hook(self, module, input, output):
+        k = module.kernel_size
+        k = (k,) if isinstance(k, int) else k
+        n = reduce(mul, k)-1
+        m = output.numel()
+
+        if isinstance(module, (nn.MaxPool1d, nn.MaxPool2d, nn.MaxPool3d)):
+            FLOPs = n*m
+        else: # avgpool
+            FLOPs = (2*n+1)*m
+        MACs = n*m
+
+        self.__Macs += MACs
+        self.__Flops += FLOPs
+
+        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                        Operation_Name=self._opnode.name,
+                                                        Operation_Type=self._opnode.type,
+                                                        Kernel_Size=list(k) if len(k)>1 else [k[0]]*2,
+                                                        Input_Shape=list(input[0].shape),
+                                                        Output_Shape=[len(output)]+list(output[0].shape),
+                                                        MACs=self.Macs.val,
+                                                        FLOPs=self.Flops.val)
+        )
+
+    def __not_support_hook(self, module, input, output):
+        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                        Operation_Name=self._opnode.name,
+                                                        Operation_Type=self._opnode.type,
+                                                        Input_Shape=list(input[0].shape),
+                                                        Output_Shape=[len(output)]+list(output[0].shape))
+        )
 # ----------------------------------------------------------------------
 '''
-def cal_FandM(self, print_tb=True, save_path=None):  # to calculate FLOPs and MACs
-    if save_path:
-        assert save_path[-4:]=='.csv','Strongly recommend using csv format!'
-
-    tb_fields=['Module','Kernel Size([H,W])','Bias','Output Shape','MACs','FLOPs']
-    tb_title='Input: tensor({})'.format(list(self.input.shape))
-    self.clear_data()
-
-    for module_name,module in self.model.named_children():
-        if module._modules:
-            self.modules_dict.update(self.unfold_layer(module,module_name))
-        else:
-            self.modules_dict.update({str(id(module)):(module_name,module)})  # 展开模型所有sequential、modulelist、moduledict等，以 {层地址:(层名，层)}的形式存为字典
-
-    handle_list=list(map(lambda x:self.regist_hook(x[1]),self.modules_dict.values()))
-    logits=self.model(self.input)
-    list(map(lambda x:x.remove(),handle_list))
-
-    tb=self.draw_table(tb_fields,self.FandM_data)
-    tb.title=tb_title
-    tb.add_autoindex('Forward Step')
-
-    if print_tb:
-        print(tb)
-
-    if save_path:
-        with open(save_path,'w') as w:
-            w.writelines(tb.get_csv_string().replace('\n',''))
-
-    word_length=len('Total FLOPs')
-    print('# '+'Total MACs'.rjust(word_length)+' : {}  =  {} M  =  {} G'.format(int(self.total_macs),self.total_macs/1e6,self.total_macs/1e9))
-    print('# '+'Total FLOPs'.rjust(word_length)+' : {}  =  {} M  =  {} G'.format(int(self.total_flops),self.total_flops/1e6,self.total_flops/1e9))
-
 def count_memory(self, optimizer_type, print_tb=True, save_path=None):  # to calculate MAC
     if save_path:
         assert save_path[-4:]=='.csv','Strongly recommend using csv format!'

@@ -9,7 +9,7 @@ import torch.nn as nn
 from rich.tree import Tree
 
 from torchmeter.utils import dfs_task, Verboser
-from torchmeter.statistic import ParamsMeter
+from torchmeter.statistic import ParamsMeter, CalMeter
 
 __all__ = ('OperationNode', 'OperationTree')
 
@@ -53,6 +53,7 @@ class OperationNode:
 
         # statistic info (all read-only)
         self.__param = ParamsMeter(opnode=self)
+        self.__cal = CalMeter(opnode=self)
 
         # other info
         for key, value in kwargs.items():
@@ -64,6 +65,10 @@ class OperationNode:
     @property
     def param(self) -> ParamsMeter:
         return self.__param
+
+    @property
+    def cal(self) -> CalMeter:
+        return self.__cal
 
     def __copy__(self):
         new_obj = OperationNode(self.operation)
@@ -95,12 +100,14 @@ class OperationTree:
                       enter_args={'end':''}) as vb:
             start = time.time()
             # all_nodes: List[OperationNode], a list holding all operation nodes but the root
-            self.nonroot_nodes, *_ = dfs_task(dfs_subject=self.root, 
-                                          adj_func=lambda x:x.childs.values(),
-                                          task_func=OperationTree.__build,
-                                          visited_signal_func=lambda x:x.addr,
-                                          visited=[])
+            nonroot_nodes, *_ = dfs_task(dfs_subject=self.root, 
+                                         adj_func=lambda x:x.childs.values(),
+                                         task_func=OperationTree.__build,
+                                         visited_signal_func=lambda x:x.addr,
+                                         visited=[])
             vb.exit_text = f'[b blue][green]{time.time()-start:.3f}[/green] seconds\n[/]'
+
+        self.all_nodes = [self.root] + nonroot_nodes
             
     @staticmethod
     def __build(subject:"OperationNode",
