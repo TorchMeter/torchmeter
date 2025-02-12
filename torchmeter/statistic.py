@@ -1,5 +1,5 @@
 from functools import reduce
-from enum import IntFlag, unique
+from enum import IntEnum, unique
 from collections import namedtuple
 from abc import ABC, abstractmethod
 from operator import attrgetter, mul
@@ -10,11 +10,11 @@ import torch.nn as nn
 OPN_TYPE = TypeVar("OperationNode")
 
 @unique
-class Unit(IntFlag):
-    T:int = 2**40
-    G:int = 2**30
-    M:int = 2**20
-    K:int = 2**10
+class Unit(IntEnum):
+    T:int = 1e12
+    G:int = 1e9
+    M:int = 1e6
+    K:int = 1e3
 
 def auto_unit(val:Union[int, float], suffix:str='') -> str:
     for unit in list(Unit):
