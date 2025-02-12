@@ -3,13 +3,9 @@ from enum import IntFlag, unique
 from collections import namedtuple
 from abc import ABC, abstractmethod
 from operator import attrgetter, mul
-from typing import Any, Dict, List, NamedTuple, Optional, TypeVar, Tuple, Union
+from typing import List, NamedTuple, Optional, TypeVar, Tuple, Union
 
-from rich import print
-import numpy as np
-from polars import col
 import torch.nn as nn
-from tqdm import tqdm
 
 OPN_TYPE = TypeVar("OperationNode")
 
@@ -20,10 +16,10 @@ class Unit(IntFlag):
     M:int = 2**20
     K:int = 2**10
 
-def auto_unit(val:int) -> str:
+def auto_unit(val:Union[int, float], suffix:str='') -> str:
     for unit in list(Unit):
         if val >= unit:
-            return f'{val / unit:.2f} {unit.name}'
+            return f'{val / unit:.2f} {unit.name + suffix}'
 
 class UpperLinkData:
 
@@ -138,20 +134,20 @@ class ParamsMeter(Statistics):
         self.is_measured = True if self._model._modules else False # only measure the leaf nodes
 
         _opparent = opnode.parent
-        self.__reg_num = self.init_linkdata(attr_name='reg_num', init_val=0, opparent=_opparent)
-        self.__total_num = self.init_linkdata(attr_name='total_num', init_val=0, opparent=_opparent)
+        self.__RegNum = self.init_linkdata(attr_name='RegNum', init_val=0, opparent=_opparent)
+        self.__TotalNum = self.init_linkdata(attr_name='TotalNum', init_val=0, opparent=_opparent)
 
     @property
     def name(self) -> str:
         return 'param'
 
     @property
-    def reg_num(self) -> UpperLinkData :
-        return self.__reg_num
+    def RegNum(self) -> UpperLinkData :
+        return self.__RegNum
     
     @property
-    def total_num(self) -> UpperLinkData:
-        return self.__total_num
+    def TotalNum(self) -> UpperLinkData:
+        return self.__TotalNum
 
     @property
     def detail_val(self) -> List[NamedTuple]:
@@ -164,8 +160,8 @@ class ParamsMeter(Statistics):
         return self.overview_val_container(Operation_Id=self._opnode.node_id,
                                            Operation_Type=self._opnode.type,
                                            Operation_Name=self._opnode.name,
-                                           Total_Params=self.total_num,
-                                           Learnable_Params=self.reg_num)
+                                           Total_Params=self.TotalNum,
+                                           Learnable_Params=self.RegNum)
 
     def measure(self) -> None:
         if self.is_measured:
@@ -182,7 +178,7 @@ class ParamsMeter(Statistics):
                 p_reg = False
                 if param_val.requires_grad:
                     p_reg = True
-                    self.__reg_num += p_num
+                    self.__RegNum += p_num
 
                 self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
                                                                 Operation_Type=self._opnode.type,
@@ -190,7 +186,7 @@ class ParamsMeter(Statistics):
                                                                 Requires_Grad=p_reg,
                                                                 Numeric_Num=p_num))
                 
-                self.__total_num += p_num
+                self.__TotalNum += p_num
         
         self.is_measured = True
 
@@ -220,7 +216,7 @@ class CalMeter(Statistics):
         self._opnode = opnode
         self._model = opnode.operation
         
-        self.__stat_ls = [] # record all parameters' information
+        self.__stat_ls = [] # record the flops and macs information of each operation
         self.is_measured = True if self._model._modules else False # only measure the leaf nodes
 
         _opparent = opnode.parent
