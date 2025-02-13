@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Any, Optional, Tuple, List, Dict, Union, Callable
+from typing import Any, Dict, Union
 
 import torch
 import torch.nn as nn
@@ -82,6 +82,7 @@ class Meter:
 
         self.__measure_param = False
         self.__measure_cal = False
+        self.__measure_mem = False
 
     def __call__(self, *args, **kwargs):
         self.ipt = {'args': args, 'kwargs': kwargs}
@@ -156,6 +157,24 @@ class Meter:
             self.__measure_cal = True
         
         return self.optree.root.cal
+
+    @property
+    def mem(self):
+        if not self.__measure_mem:
+            if len(self.ipt['args']) + len(self.ipt['kwargs']) == 0:
+                raise ValueError("Input unknown! You should perform at least one feed-forward inference before measuring the memory cost!") 
+
+            hook_ls = [node.mem.measure() for node in self.optree.all_nodes if node.is_leaf]
+
+            # feed forwad
+            self.model(*self.ipt['args'], **self.ipt['kwargs']) 
+
+            # remove hooks after measurement
+            list(map(lambda x:x.remove(), hook_ls))
+
+            self.__measure_mem = True
+
+        return self.optree.root.mem
 
     def restore_settings(self):
         self.tree_levels_args = {
@@ -315,13 +334,13 @@ if __name__ == '__main__':
     metered_model(torch.randn(1,3,224,224))
     
     # print(metered_model.structure)
-    print(metered_model.cal)
-    metered_model.profile(metered_model.cal,
-                          show=True,
-                          newcol_name='Percentage',
-                          newcol_func=lambda col_dict,all_num=metered_model.cal.Flops.val: f'{col_dict["FLOPs"]*100/all_num:.3f} %',
-                          newcol_dependcol=['FLOPs'],
-                          newcol_type=str,)
+    print(metered_model.mem)
+    metered_model.profile(metered_model.mem,
+                          show=True,)
+                        #   newcol_name='Percentage',
+                        #   newcol_func=lambda col_dict,all_num=metered_model.mem.TotalCost.val: f'{col_dict["Total"]*100/all_num:.3f} %',
+                        #   newcol_dependcol=['Total'],
+                        #   newcol_type=str,
                         #   newcol_idx=0,
-                        #   save_csv=r'C:\Users\Administrater\Desktop',
-                        #   save_excel=r'C:\Users\Administrater\Desktop')
+                        #   save_csv='.',
+                        #   save_excel='.')

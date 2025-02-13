@@ -8,6 +8,7 @@ from typing import Any, Callable, Iterable, List, Optional, Tuple
 def perfect_savepath(origin_path:str, 
                      target_ext:Optional[str],
                      default_filename:str='Data'):
+    origin_path = os.path.abspath(origin_path)
     dir, file = os.path.split(origin_path)
     if '.' in file: # specify a file path
         os.makedirs(dir, exist_ok=True)
