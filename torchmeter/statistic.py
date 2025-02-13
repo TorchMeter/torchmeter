@@ -15,17 +15,20 @@ class DecimalUnit(IntEnum):
     G:int = 1e9
     M:int = 1e6
     K:int = 1e3
+    B:int = 1e0
 
 class BinaryUnit(IntFlag):
     TiB:int = 2**40
     GiB:int = 2**30
     MiB:int = 2**20
     KiB:int = 2**10
+    B:int   = 2**0
 
-def auto_unit(val:Union[int, float], unit_system=DecimalUnit) -> str:
+def auto_unit(val:Union[int, float], unit_system=DecimalUnit) -> Union[str, None]:
     for unit in list(unit_system):
         if val >= unit:
             return f'{val / unit:.2f} {unit.name}'
+    return None
 
 class UpperLinkData:
 
@@ -103,12 +106,14 @@ class Statistics(ABC):
         repr_str = self.val.__class__.__name__ + '\n'
 
         max_len = max((len(f) for f in self.ov_fields))
+        
+        unit_system = BinaryUnit if repr_str.startswith('Memory') else DecimalUnit
 
         for field in self.ov_fields:
             field_val = getattr(self.val, field, 'N/A')
             if isinstance(field_val, UpperLinkData):
                 field_val = float(field_val.val) # get the value
-                repr_str += '• ' + f"{field.rjust(max_len)} = {field_val} = {auto_unit(field_val)}\n"
+                repr_str += '• ' + f"{field.rjust(max_len)} = {field_val} = {auto_unit(field_val, unit_system)}\n"
             else:
                 repr_str += '• ' + f"{field.rjust(max_len)} = {field_val}\n"
 
@@ -406,6 +411,114 @@ class CalMeter(Statistics):
                                                         Input_Shape=list(input[0].shape),
                                                         Output_Shape=[len(output)]+list(output[0].shape))
         )
+
+class MemMeter(Statistics):
+
+    detail_val_container:NamedTuple = namedtuple(typename='Memory_INFO', 
+                                                 defaults=(None,)*7,
+                                                 field_names=['Operation_Id', 
+                                                              'Operation_Name', 
+                                                              'Operation_Type',
+                                                              'Param_Cost', 
+                                                              'Buffer_Cost', 
+                                                              'FeatureMap_Cost',  
+                                                              'Total'])
+    
+    overview_val_container:NamedTuple = namedtuple(typename='Memory_INFO', 
+                                                   defaults=(None,)*7,
+                                                   field_names=['Operation_Id', 
+                                                                'Operation_Type',
+                                                                'Operation_Name', 
+                                                                'Param_Cost', 
+                                                                'Buffer_Cost', 
+                                                                'FeatureMap_Cost',  
+                                                                'Total'])
+
+    def __init__(self, opnode: OPN_TYPE):
+        self._opnode = opnode
+        self._model = opnode.operation
+        
+        self.__stat_ls = [] # record the memory cost of each operation
+        self.is_measured = True if self._model._modules else False # only measure the leaf nodes
+
+        _opparent = opnode.parent
+        self.__ParamCost = self.init_linkdata(attr_name='ParamCost', init_val=0, opparent=_opparent)
+        self.__BufferCost = self.init_linkdata(attr_name='BufferCost', init_val=0, opparent=_opparent)
+        self.__FeatureMapCost = self.init_linkdata(attr_name='FeatureMapCost', init_val=0, opparent=_opparent)
+        self.__TotalCost = self.init_linkdata(attr_name='TotalCost', init_val=0, opparent=_opparent)
+
+    @property
+    def name(self) -> str:
+        return 'mem'
+
+    @property
+    def ParamCost(self) -> UpperLinkData :
+        return self.__ParamCost
+    
+    @property
+    def BufferCost(self) -> UpperLinkData:
+        return self.__BufferCost
+
+    @property
+    def FeatureMapCost(self) -> UpperLinkData:
+        return self.__FeatureMapCost
+    
+    @property
+    def TotalCost(self) -> UpperLinkData:
+        return self.__TotalCost
+    
+    @property
+    def detail_val(self) -> List[NamedTuple]:
+        self.measure()
+        return self.__stat_ls
+    
+    @property
+    def val(self) -> NamedTuple:
+        self.measure()
+        return self.overview_val_container(Operation_Id=self._opnode.node_id,
+                                           Operation_Type=self._opnode.type,
+                                           Operation_Name=self._opnode.name,
+                                           Param_Cost=self.__ParamCost,
+                                           Buffer_Cost=self.__BufferCost,
+                                           FeatureMap_Cost=self.__FeatureMapCost,
+                                           Total=self.__TotalCost)
+
+    def measure(self):
+        if self.is_measured:
+            return
+        
+        hook = self._model.register_forward_hook(self.__hook_func)
+        # TODO: measure backward cost (deal with the gradient)
+        
+        self.is_measured = True
+
+        return hook
+
+    def __hook_func(self, module, input, output):
+        param_cost = 0 # byte
+        for param in module.parameters():
+            param_cost += param.numel() * param.element_size()
+        self.__ParamCost += param_cost
+        
+        buffer_cost = 0 # byte
+        for buffer in module.buffers():
+            buffer_cost += buffer.numel() * buffer.element_size()
+        self.__BufferCost += buffer_cost
+        
+        feat_cost = output.numel() * output.element_size() # byte
+        self.__FeatureMapCost += feat_cost
+        
+        self.__TotalCost += param_cost + buffer_cost + feat_cost
+        
+        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                        Operation_Name=self._opnode.name,
+                                                        Operation_Type=self._opnode.type,
+                                                        Param_Cost=auto_unit(param_cost,unit_system=BinaryUnit), 
+                                                        Buffer_Cost=auto_unit(buffer_cost,unit_system=BinaryUnit), 
+                                                        FeatureMap_Cost=auto_unit(feat_cost,unit_system=BinaryUnit), 
+                                                        Total=auto_unit(param_cost + buffer_cost + feat_cost,
+                                                                        unit_system=BinaryUnit)))
+        
 # ----------------------------------------------------------------------
 '''
 def count_memory(self, optimizer_type, print_tb=True, save_path=None):  # to calculate MAC
