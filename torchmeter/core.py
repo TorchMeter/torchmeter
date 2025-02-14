@@ -1,10 +1,10 @@
-from copy import deepcopy
 from typing import Any, Dict, Union
 
 import torch
 import torch.nn as nn
+from tqdm import tqdm
+from rich import get_console
 from rich.layout import Layout
-from rich import print, get_console
 
 from torchmeter.engine import OperationTree
 from torchmeter.display import TreeRenderer, TabularRenderer, render_perline
@@ -85,8 +85,9 @@ class Meter:
         self.__measure_mem = False
 
     def __call__(self, *args, **kwargs):
-        self.ipt = {'args': args, 'kwargs': kwargs}
-        return self.model(*args, **kwargs)
+        self.ipt = {'args': tuple(x.to(self.device) for x in args if isinstance(x, torch.Tensor)), 
+                    'kwargs': {k:v.to(self.device) for k,v in kwargs.items() if isinstance(v, torch.Tensor)}}
+        return self.model(*self.ipt['args'], **self.ipt['kwargs'])
     
     @property
     def device(self):
@@ -96,6 +97,8 @@ class Meter:
     def device(self, new_device:str):
         self.__device = torch.device(new_device)
         self.model.to(self.__device)
+        self.ipt = {'args': tuple(x.to(self.device) for x in self.ipt['args'] if isinstance(x, torch.Tensor)), 
+                    'kwargs': {k:v.to(self.device) for k,v in self.ipt['kwargs'].items() if isinstance(v, torch.Tensor)}}
 
     @property
     def tree_levels_args(self):
@@ -176,6 +179,27 @@ class Meter:
 
         return self.optree.root.mem
 
+    def ittp(self, warmup:int=50, repeat:int=50):
+        if len(self.ipt['args']) + len(self.ipt['kwargs']) == 0:
+            raise ValueError("Input unknown! You should perform at least one feed-forward inference before measuring the inference time or throughput!") 
+
+        for i in tqdm(range(warmup), desc='Warming Up'):
+            self.model(*self.ipt['args'], **self.ipt['kwargs'])
+
+        pb = tqdm(total=len(self.optree.all_nodes), desc='Measuring Inference Time & Throughput', unit='module')
+        hook_ls = [node.ittp.measure(device=self.device, 
+                                     repeat=repeat,
+                                     global_process=pb) 
+                    for node in self.optree.all_nodes]
+
+        # feed forwad
+        self.model(*self.ipt['args'], **self.ipt['kwargs']) 
+
+        # remove hooks after measurement
+        list(map(lambda x:x.remove(), hook_ls))
+
+        return self.optree.root.ittp
+        
     def restore_settings(self):
         self.tree_levels_args = {
             '0':  {'label': '[b light_coral]<name>[/]', # default display setting for root node
@@ -286,6 +310,9 @@ class Meter:
         return tb, data
 
 if __name__ == '__main__':
+    from copy import deepcopy
+
+    from rich import print
     from torchvision import models
 
     class TestNet(nn.Module):
@@ -334,8 +361,8 @@ if __name__ == '__main__':
     metered_model(torch.randn(1,3,224,224))
     
     # print(metered_model.structure)
-    print(metered_model.mem)
-    metered_model.profile(metered_model.mem,
+    print(metered_model.ittp(repeat=100))
+    metered_model.profile(metered_model.ittp(),
                           show=True,)
                         #   newcol_name='Percentage',
                         #   newcol_func=lambda col_dict,all_num=metered_model.mem.TotalCost.val: f'{col_dict["Total"]*100/all_num:.3f} %',

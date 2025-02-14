@@ -9,13 +9,13 @@ import torch.nn as nn
 from rich.tree import Tree
 
 from torchmeter.utils import dfs_task, Verboser
-from torchmeter.statistic import ParamsMeter, CalMeter, MemMeter
+from torchmeter.statistic import ParamsMeter, CalMeter, MemMeter, ITTPMeter
 
 __all__ = ('OperationNode', 'OperationTree')
 
 class OperationNode:
    
-    statistics:Tuple[str] = ('param', 'cal', 'mem') # all statistics stored as attributes
+    statistics:Tuple[str] = ('param', 'cal', 'mem', 'ittp') # all statistics stored as attributes
 
     def __init__(self, 
                  module:nn.Module,
@@ -55,6 +55,7 @@ class OperationNode:
         self.__param = ParamsMeter(opnode=self)
         self.__cal = CalMeter(opnode=self)
         self.__mem = MemMeter(opnode=self)
+        self.__ittp = ITTPMeter(opnode=self)
 
         # other info
         for key, value in kwargs.items():
@@ -74,6 +75,10 @@ class OperationNode:
     @property
     def mem(self) -> MemMeter:
         return self.__mem
+    
+    @property
+    def ittp(self) -> ITTPMeter:
+        return self.__ittp
 
     def __copy__(self):
         new_obj = OperationNode(self.operation)
