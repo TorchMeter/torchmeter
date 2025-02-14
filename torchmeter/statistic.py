@@ -653,7 +653,7 @@ class ITTPMeter(Statistics):
             for _ in range(repeat):
                 start_time = start_timer() if device.type == 'cpu' else start_timer.record()
 
-                module(input[0])
+                module(*input)
 
                 end_time = end_timer() if device.type == 'cpu' else end_timer.record()
 
@@ -667,8 +667,8 @@ class ITTPMeter(Statistics):
                 self.__InferTime.append(it) 
                 self.__Throughput.append(tp)
 
-        if global_process is not None:
-            global_process.update(1)
+                if global_process is not None:
+                    global_process.update(1)
 
         self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
                                                         Operation_Name=self._opnode.name,

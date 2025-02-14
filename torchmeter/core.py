@@ -83,6 +83,8 @@ class Meter:
         self.__measure_param = False
         self.__measure_cal = False
         self.__measure_mem = False
+        self.ittp_warmup = 50
+        self.ittp_benchmark_time = 100
 
     def __call__(self, *args, **kwargs):
         self.ipt = {'args': tuple(x.to(self.device) for x in args if isinstance(x, torch.Tensor)), 
@@ -179,16 +181,19 @@ class Meter:
 
         return self.optree.root.mem
 
-    def ittp(self, warmup:int=50, repeat:int=50):
+    @property
+    def ittp(self):
         if len(self.ipt['args']) + len(self.ipt['kwargs']) == 0:
             raise ValueError("Input unknown! You should perform at least one feed-forward inference before measuring the inference time or throughput!") 
 
-        for i in tqdm(range(warmup), desc='Warming Up'):
+        for i in tqdm(range(self.ittp_warmup), desc='Warming Up'):
             self.model(*self.ipt['args'], **self.ipt['kwargs'])
 
-        pb = tqdm(total=len(self.optree.all_nodes), desc='Measuring Inference Time & Throughput', unit='module')
+        pb = tqdm(total=self.ittp_benchmark_time*len(self.optree.all_nodes), 
+                  desc='Benchmark Inference Time & Throughput', 
+                  unit='time')
         hook_ls = [node.ittp.measure(device=self.device, 
-                                     repeat=repeat,
+                                     repeat=self.ittp_benchmark_time,
                                      global_process=pb) 
                     for node in self.optree.all_nodes]
 
@@ -310,60 +315,18 @@ class Meter:
         return tb, data
 
 if __name__ == '__main__':
-    from copy import deepcopy
-
     from rich import print
     from torchvision import models
 
-    class TestNet(nn.Module):
-        def __init__(self):
-            super(TestNet, self).__init__()
-            
-            conv = nn.ModuleList([nn.Conv2d(3,30,3,stride=1) for _ in range(7)])
-            self.conv = nn.Sequential(conv,deepcopy(conv))
-            self.maxpool = nn.MaxPool2d(2)
-            self.br1 = nn.ModuleList([nn.LayerNorm(30),
-                                      nn.BatchNorm2d(30),
-                                      nn.ModuleList([nn.Linear(2,10) for _ in range(3)]),
-                                      nn.BatchNorm2d(30),
-                                      nn.ModuleList([nn.Linear(2,10) for _ in range(3)]),
-                                      nn.SELU()])
-            self.blank1 = nn.Identity()
-            self.br2 = nn.ModuleList([nn.LayerNorm(30),
-                                      nn.BatchNorm2d(30),
-                                      nn.ModuleList([nn.Linear(2,10) for _ in range(3)]),
-                                      nn.BatchNorm2d(30),
-                                      nn.ModuleList([nn.Linear(2,10) for _ in range(3)]),
-                                      nn.SELU()])
-            self.blank2 = nn.Identity()
-            self.avgpool = nn.AvgPool2d(2)
-            self.layer1 = nn.Sequential(
-                nn.Conv2d(30,60,3,stride=1),
-                nn.BatchNorm2d(60),
-                nn.ReLU(),
-                nn.Conv2d(60,30,1),
-                nn.BatchNorm2d(30),
-                nn.ReLU()
-            )
-            
-            self.layer2 = deepcopy(self.layer1)
-            self.layer3 = deepcopy(self.layer1)
-            
-            self.fc = nn.Linear(30,10)
-        
-        def forward(self,x):
-            pass
-    
-    # model = TestNet()
     model = models.resnet18()
     
     metered_model = Meter(model, device='cpu')
     metered_model(torch.randn(1,3,224,224))
     
     # print(metered_model.structure)
-    print(metered_model.ittp(repeat=100))
-    metered_model.profile(metered_model.ittp(),
-                          show=True,)
+    print(metered_model.ittp)
+    metered_model.profile(metered_model.ittp,
+                          show=True)
                         #   newcol_name='Percentage',
                         #   newcol_func=lambda col_dict,all_num=metered_model.mem.TotalCost.val: f'{col_dict["Total"]*100/all_num:.3f} %',
                         #   newcol_dependcol=['Total'],
