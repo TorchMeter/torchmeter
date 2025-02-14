@@ -1,11 +1,16 @@
-from functools import reduce
-from enum import IntEnum, IntFlag, unique
+from time import perf_counter
 from collections import namedtuple
 from abc import ABC, abstractmethod
 from operator import attrgetter, mul
-from typing import List, NamedTuple, Optional, TypeVar, Tuple, Union
+from functools import reduce, partial
+from enum import Enum, IntEnum, IntFlag, unique
+from typing import Any, Callable, List, NamedTuple, Optional, TypeVar, Tuple, Union
 
+import numpy as np
 import torch.nn as nn
+from torch import no_grad
+from torch.cuda import Event as cuda_event
+from torch.cuda import synchronize as cuda_sync
 
 OPN_TYPE = TypeVar("OperationNode")
 
@@ -17,6 +22,7 @@ class DecimalUnit(IntEnum):
     K:int = 1e3
     B:int = 1e0
 
+@unique
 class BinaryUnit(IntFlag):
     TiB:int = 2**40
     GiB:int = 2**30
@@ -24,10 +30,29 @@ class BinaryUnit(IntFlag):
     KiB:int = 2**10
     B:int   = 2**0
 
+@unique
+class TimeUnit(Enum):
+    h:int  = 60**2
+    min:int = 60**1
+    s:int  = 60**0
+    ms:float = 1e-3
+    us:float = 1e-6
+    ns:float = 1e-9
+
+@unique
+class SpeedUnit(IntEnum):
+    TSamPS:int = 1e12
+    GSamPS:int = 1e9
+    MSamPS:int = 1e6
+    KSamPS:int = 1e3
+    SamPS:int  = 1e0
+
+UNIT_TYPE = Union[DecimalUnit, BinaryUnit, TimeUnit, SpeedUnit]
+
 def auto_unit(val:Union[int, float], unit_system=DecimalUnit) -> Union[str, None]:
     for unit in list(unit_system):
-        if val >= unit:
-            return f'{val / unit:.2f} {unit.name}'
+        if val >= unit.value:
+            return f'{val / unit.value:.2f} {unit.name}'
     return None
 
 class UpperLinkData:
@@ -49,6 +74,41 @@ class UpperLinkData:
     
     def __repr__(self):
         return str(self.val)
+
+class MetricsData:
+
+    __slots__ = ['vals',
+                 'reduce_func',
+                 'unit_sys']
+
+    def __init__(self, reduce_func:Optional[Callable]=np.mean, unit_system:Optional[UNIT_TYPE]=DecimalUnit):
+        self.vals = np.array([])
+        self.reduce_func = reduce_func if reduce_func is not None else lambda x:x
+        self.unit_sys = unit_system
+
+    @property
+    def metrics(self):
+        return self.reduce_func(self.vals) if self.vals.any() else 0.
+    
+    @property
+    def iqr(self):
+        if self.vals.any():
+            return np.percentile(self.vals, 75) - np.percentile(self.vals, 25)
+        else:
+            return 0.
+    
+    def append(self, new_val:Any):
+        self.vals = np.append(self.vals, new_val)
+
+    def clear(self):
+        self.vals = np.array([])
+
+    def __repr__(self):
+        if self.unit_sys is not None:
+            return f"{auto_unit(self.metrics, self.unit_sys)}" + ' ± ' + \
+                   f"{auto_unit(self.iqr, self.unit_sys)}"
+        else:
+            return f"{self.metrics} ± {self.iqr}"
 
 class Statistics(ABC):
 
@@ -106,13 +166,12 @@ class Statistics(ABC):
         repr_str = self.val.__class__.__name__ + '\n'
 
         max_len = max((len(f) for f in self.ov_fields))
-        
-        unit_system = BinaryUnit if repr_str.startswith('Memory') else DecimalUnit
 
         for field in self.ov_fields:
             field_val = getattr(self.val, field, 'N/A')
             if isinstance(field_val, UpperLinkData):
                 field_val = float(field_val.val) # get the value
+                unit_system = BinaryUnit if repr_str.startswith('Memory') else DecimalUnit
                 repr_str += '• ' + f"{field.rjust(max_len)} = {field_val} = {auto_unit(field_val, unit_system)}\n"
             else:
                 repr_str += '• ' + f"{field.rjust(max_len)} = {field_val}\n"
@@ -518,158 +577,103 @@ class MemMeter(Statistics):
                                                         FeatureMap_Cost=auto_unit(feat_cost,unit_system=BinaryUnit), 
                                                         Total=auto_unit(param_cost + buffer_cost + feat_cost,
                                                                         unit_system=BinaryUnit)))
-        
-# ----------------------------------------------------------------------
-'''
-def count_memory(self, optimizer_type, print_tb=True, save_path=None):  # to calculate MAC
-    if save_path:
-        assert save_path[-4:]=='.csv','Strongly recommend using csv format!'
 
-    tb_module_fields=['Module','Output Shape','Memory/MB']
-    tb_param_fields=['Param Id','Param(Requires_Grad)','Floats Num','Memory/MB']
-    tb_buffer_fields=['Buffer Id','Buffer','Floats Num','Memory/MB']
-    tb_optim_fields=['Item Id','Optimizer Item','Params Num(Shared)','Memory/MB'] # Params Num为不共享内存的参数，Shared为共享参数，总参数等于两者之和
-    tb_title='Input: tensor({},dtype=\'{}\')'.format(list(self.input.shape),str(self.input.dtype))
-    self.clear_data()
+class ITTPMeter(Statistics):
 
-    for module_name,module in self.model.named_children():
-        if module._modules:
-            self.modules_dict.update(self.unfold_layer(module,module_name))
-        else:
-            self.modules_dict.update({str(id(module)):(module_name,module)})  # 展开模型所有sequential、modulelist、moduledict等，以 {层地址:(层名，层)}的形式存为字典
-
-    for no,(name, parameter) in enumerate(self.model.named_parameters()): 
-        p_ptr=parameter.data_ptr()
-        if p_ptr in self.param_ptr:
-            self.neglect_id.append(id)
-            continue
-        
-        self.param_ptr.append(p_ptr)
-        p_num=parameter.numel()
-        p_memory=p_num*self.element_byte # 计算各参数的字节数
-        self.param_memory+=p_memory
-        p_reg=True if parameter.requires_grad else False
-        self.params_data.append([no+1,name+f'({p_reg})',p_num,'{:.4f}'.format(p_memory/1e6)])
-
-    def hook_func(module,input,output):
-        module_id=str(id(module))
-        module_name=self.modules_dict[module_id][0]
-        out_memory=output.numel()*self.element_byte # 计算中间层输出的字节数
-        self.feat_memory+=out_memory
-        self.modules_data.append([module_name,list(output.shape),'{:.4f}'.format(out_memory/1e6)])
-
-    handle_list=list(map(lambda x:x[1].register_forward_hook(hook_func),self.modules_dict.values()))
-    logits=self.model(self.input)
-    list(map(lambda x:x.remove(),handle_list))
-
-    for no,(name, buffer) in enumerate(self.model.named_buffers()): 
-        b_num=buffer.numel()
-        b_memory=b_num*self.element_byte # 计算各缓存参数的字节数
-        self.buffer_memory+=b_memory
-        self.buffers_data.append([no+1,name,b_num,'{:.4f}'.format(b_memory/1e6)])
-
-    optimizer=optimizer_type(self.model.parameters(),lr=1e-4)
-    optimizer.zero_grad()
-    logits.max().backward()
-    optimizer.step()
-    for param_group in optimizer.param_groups:
-        for param in param_group['params']:
-            if param.data_ptr() in self.param_ptr: 
-                self.shared_num+=1
-                continue
-            self.param_ptr.append(param.data_ptr())
-            self.op_param_num+=param.numel()
-            self.op_param_memory+=self.op_param_num*self.element_byte
-    self.op_data.append([1,'Param Groups',f'{self.op_param_num}({self.shared_num})','{:.4f}'.format(self.op_param_memory/1e6)])
-
-    self.shared_num=0
-    for param, state_dict in optimizer.state.items():
-        if param.data_ptr() in self.param_ptr: 
-            self.shared_num+=1
-        else:
-            self.param_ptr.append(param.data_ptr())
-            self.state_memory+=param.numel()*self.element_byte
-        for name,state_data in state_dict.items():
-            if isinstance(state_data,torch.Tensor):
-                self.state_num+=1
-                self.state_memory+=state_data.numel()*self.element_byte
-    self.op_data.append([2,'State',f'{self.state_num}({self.shared_num})','{:.4f}'.format(self.state_memory/1e6)])
-
-    tb=self.draw_table(tb_module_fields,self.modules_data)
-    tb.title=tb_title
-    tb.add_autoindex('Forward Step')
-
-    divider=['─'*len('Forward Step'),'─'*(len('Param(Requires_Grad)')+3),'─'*len('Param(Output Shape)'),'─'*len('Memory/MB)')]
-    tb.add_row(divider)
-    tb.add_row(tb_param_fields)
-    tb.add_row(divider)
-    tb.add_rows(self.params_data)
+    detail_val_container:NamedTuple = namedtuple(typename='InferTime_Throughput_INFO', 
+                                                 defaults=(None,)*5,
+                                                 field_names=['Operation_Id', 
+                                                              'Operation_Name', 
+                                                              'Operation_Type',
+                                                              'Infer_Time', 
+                                                              'Throughput'])
     
-    tb.add_row(divider)
-    tb.add_row(tb_buffer_fields)
-    tb.add_row(divider)
-    if self.buffers_data:
-        tb.add_rows(self.buffers_data)
-    else:
-        tb.add_row(['None','None','None','None'])
+    overview_val_container:NamedTuple = namedtuple(typename='InferTime_Throughput_INFO', 
+                                                   defaults=(None,)*5,
+                                                   field_names=['Operation_Id', 
+                                                                'Operation_Name',
+                                                                'Operation_Type',
+                                                                'Infer_Time', 
+                                                                'Throughput'])
+                                                                
+    def __init__(self, opnode: OPN_TYPE):
+        self._opnode = opnode
+        self._model = opnode.operation
+        
+        self.__stat_ls = [] # record the inference time and throughput of each operation
 
-    tb.add_row(divider)
-    tb.add_row(tb_optim_fields)
-    tb.add_row(divider)
-    tb.add_rows(self.op_data)
+        self.__InferTime = MetricsData(reduce_func=np.median, unit_system=TimeUnit)
+        self.__Throughput = MetricsData(reduce_func=np.median, unit_system=SpeedUnit)
 
-    if print_tb:
-        print(tb)
+    @property
+    def name(self) -> str:
+        return 'ittp'
 
-    if save_path:
-        with open(save_path,'w') as w:
-            w.writelines(tb.get_csv_string().replace('\n',''))
+    @property
+    def InferTime(self) -> MetricsData :
+        return self.__InferTime
+    
+    @property
+    def Throughput(self) -> MetricsData:
+        return self.__Throughput
 
-    word_length=len('Optimizer Params Memory')
-    print('# '+'Model Params Memory'.rjust(word_length)+' : {:e} MB'.format(self.param_memory/1e6)) # 参数+梯度的内存
-    print('# '+'Model Buffers Memory'.rjust(word_length)+' : {:e} MB'.format(self.buffer_memory/1e6))
-    print('# '+'Features Memory'.rjust(word_length)+' : {:e} MB'.format(self.feat_memory/1e6))
-    print('# '+'Optimizer Params Memory'.rjust(word_length)+' : {:e} MB'.format(self.op_param_memory/1e6)) 
-    print('# '+'Optimizer State Memory'.rjust(word_length)+' : {:e} MB'.format(self.state_memory/1e6))
-    print('# '+'Gradian Memory'.rjust(word_length)+' : {:e} MB'.format(self.param_memory/1e6))
-    print('# '+'Total Memory'.rjust(word_length)+' : {:e} MB'.format((self.feat_memory+self.op_param_memory+self.state_memory+self.param_memory*2+self.buffer_memory)/1e6))
+    @property
+    def detail_val(self) -> List[NamedTuple]:
+        return self.__stat_ls
+    
+    @property
+    def val(self) -> NamedTuple:
+        return self.overview_val_container(Operation_Id=self._opnode.node_id,
+                                           Operation_Type=self._opnode.type,
+                                           Operation_Name=self._opnode.name,
+                                           Infer_Time=self.__InferTime,
+                                           Throughput=self.__Throughput)
 
-def cal_ITTP(self, pick_device='cpu', warmup_iters=50, repeat=50): # to measure IT and TP
-    """
-    input_shape: (bs,channel,h,w) \n
-    warmup_iters: 预热时的前向传播数 \n
-    repeat: 重复测量多少次
-    """
-    device=torch.device(pick_device)
-    self.model.to(device)
-    input = torch.randn(self.input.shape).to(device)
+    def measure(self, device, repeat:int=50, global_process=None):
+        
+        hook = self._model.register_forward_hook(partial(self.__hook_func, 
+                                                         device=device, 
+                                                         repeat=repeat,
+                                                         global_process=global_process))
+        
+        return hook
 
-    for _ in tqdm(range(warmup_iters),desc='Warming Up'):  # warm up
-        self.model(input)
+    def __hook_func(self, module, input, output, device, repeat:int=50, global_process=None):
+        self.__InferTime.clear()
+        self.__Throughput.clear()
+        self.__stat_ls.clear()
+    
+        module._forward_hooks.clear()
+        module.eval()
 
-    IT_list=np.zeros(repeat)  # measure
-    if device.type!='cpu':
-        starter, ender = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
-    with torch.no_grad():
-        for rep in tqdm(range(repeat),desc='Measuring'):
-            if device.type=='cpu':
-                start_time=time()
-            else:
-                starter.record()
-            self.model(input)
-            if device.type=='cpu':
-                end_time=time()
-            else:
-                ender.record() 
-                torch.cuda.synchronize()  # WAIT FOR GPU SYNC
+        start_timer = perf_counter if device.type=='cpu' else cuda_event(enable_timing=True)
+        end_timer = perf_counter if device.type=='cpu' else cuda_event(enable_timing=True)
+                    
+        with no_grad():
+            for _ in range(repeat):
+                start_time = start_timer() if device.type == 'cpu' else start_timer.record()
 
-        IT_list[rep] = end_time-start_time if device.type=='cpu' else (starter.elapsed_time(ender))*1e-3 # 后者计时单位为ms
+                module(*input)
 
-    IT=IT_list.mean()
-    TP=1/IT
-    print('-'*15+'Result'+'-'*15)
-    print(f'Device: {pick_device}\nSample Shape: {self.input.shape}')
-    print('IT(Inference Time): {:.6f} s'.format(IT))
-    print('TP(Throughput): {:.6f} samples/s'.format(TP))
-'''
+                end_time = end_timer() if device.type == 'cpu' else end_timer.record()
+
+                if device.type == 'cpu':
+                    it = end_time-start_time
+                else:
+                    cuda_sync()  # WAIT FOR GPU SYNC
+                    it = start_timer.elapsed_time(end_timer)*1e-3 # ms -> s
+
+                tp = input[0].shape[0]/it
+                self.__InferTime.append(it) 
+                self.__Throughput.append(tp)
+
+                if global_process is not None:
+                    global_process.update(1)
+
+        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                        Operation_Name=self._opnode.name,
+                                                        Operation_Type=self._opnode.type,
+                                                        Infer_Time=str(self.__InferTime),
+                                                        Throughput=str(self.__Throughput)))
+
 
