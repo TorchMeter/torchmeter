@@ -1,9 +1,10 @@
 import re
+import os
 import time
 import warnings
 from copy import copy,deepcopy
 from operator import attrgetter
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union
 
 from rich import print, get_console
 from rich.rule import Rule
@@ -14,7 +15,7 @@ from rich.table import Table, Column
 from rich.box import HEAVY_EDGE, ROUNDED
 from rich.console import Group, RenderableType
 from polars import DataFrame, struct, col
-from polars import Int64 as pl_int64, Float64 as pl_float64, List as pl_list
+from polars import List as pl_list, Object as pl_object
 
 from torchmeter.utils import dfs_task, perfect_savepath
 
@@ -694,6 +695,10 @@ class TabularRenderer:
     def datas(self):
         return self.__stats_data
 
+    @property
+    def valid_export_format(self) -> Sequence[str]:
+        return ('csv', 'xlsx')
+
     @tb_args.setter
     def tb_args(self, custom_args:Dict[str, Any]):
         if not isinstance(custom_args, dict):
@@ -755,7 +760,7 @@ class TabularRenderer:
             .alias(col_name)
         ).select(final_cols)
 
-    def df2tb(self, df:DataFrame) -> Table:
+    def df2tb(self, df:DataFrame, show_raw:bool = False) -> Table:
         # create rich table
         tb_fields = df.columns
         tb = Table(*tb_fields)
@@ -767,17 +772,21 @@ class TabularRenderer:
         for tb_col in tb.columns:
             tb_col.__dict__.update(self.col_args)
         
-        def val2str(val_name:str, val:Any):
-            if val is not None:
-                return str(val)
-            elif df[val_name].dtype in (pl_int64, pl_float64): # UpperLinkData is None
-                return 'Not Supported'
-            else:
-                return '-'
-
+        # collect each column's none replacing string
+        col_none_str = {col_name:getattr(df[col_name].drop_nulls().first(), 'none_str', '-') 
+                        for col_name, col_type in df.schema.items()}
+        
         # fill table
         for vals_dict in df.iter_rows(named=True):
-            str_vals = [val2str(k,v) for k,v in vals_dict.items()]
+            str_vals = []
+            for col_name,col_val in vals_dict.items():
+                if col_val is None:
+                    str_vals.append(col_none_str[col_name])
+                elif show_raw:
+                    str_vals.append(str(getattr(col_val, 'raw_data', col_val)))
+                else:
+                    str_vals.append(str(col_val))
+            
             tb.add_row(*str_vals)
         
         return tb
@@ -789,8 +798,60 @@ class TabularRenderer:
             for stat in self.__stats_data.values():
                 stat.clear()
 
+    def export(self, 
+               df:DataFrame, 
+               save_path:str, 
+               format:Optional[str]=None,
+               file_suffix:str='',
+               raw_data:bool=False):
+        
+        # get save path
+        if format is None:
+            format = os.path.splitext(save_path)[-1]
+            assert '.' in format, 'File foramat unknown!\n' + \
+                                  f'Please specify a file path, not a dierectory path like {save_path}.\n' + \
+                                  f'Or specify a file format using `format=xxx`, now we support exporting to {self.valid_export_format} file.'
+                                  
+        format = format.strip('.')
+        assert format in self.valid_export_format, \
+                f'`{format}` file is not supported, now we only support exporting {self.valid_export_format} file.'
+        
+        _, file_path = perfect_savepath(origin_path=save_path,
+                                       target_ext=format,
+                                       default_filename=f'{self.opnode.name}_{file_suffix}') 
+        
+        # deal with invalid data
+        df = deepcopy(df)
+        
+        obj_cols = {col_name:df[col_name].drop_nulls().first().__class__ 
+                    for col_name, col_type in df.schema.items() if col_type == pl_object}
+        df = df.with_columns([
+            col(col_name).map_elements(lambda s: getattr(s,'raw_data',s.val) if raw_data else str(s),
+                                       return_dtype=float if raw_data else str)
+            for col_name, obj_cls in obj_cols.items()
+        ])            
+        
+        # export 
+        if format == 'csv':
+            # list column -> str
+            ls_cols = [col_name for col_name, col_type in df.schema.items() if col_type == pl_list]
+            df = df.with_columns([
+                col(col_name).map_elements(lambda s: str(s.to_list()), return_dtype=str)
+                for col_name in ls_cols
+            ])
+            df.write_csv(file=file_path)
+        elif format == 'xlsx':
+            df.write_excel(workbook=file_path, autofit=True)
+        
+        # output saving message
+        if file_suffix:
+            print(f'{file_suffix.capitalize()} data saved to [b magenta]{file_path}[/]')
+        else:
+            print(f'Data saved to [b magenta]{file_path}[/]')
+    
     def __call__(self,
                  stat_name:str, 
+                 raw_data:bool=False,
                  *, 
                  fields:List[str]=[],
                  table_settings:Dict[str, Any]={},
@@ -800,8 +861,8 @@ class TabularRenderer:
                  newcol_dependcol:List[str]=[],
                  newcol_type=None,
                  newcol_idx:int=-1,
-                 save_csv:str=None,
-                 save_excel:str=None): 
+                 save_to:Optional[str]=None,
+                 save_format:Optional[str]=None): 
         
         assert isinstance(newcol_idx, int), f'`newcol_idx` must be an integer, but got {type(newcol_idx)}.'
         assert stat_name in self.opnode.statistics, \
@@ -854,32 +915,21 @@ class TabularRenderer:
 
         self.tb_args = table_settings
         self.col_args = column_settings
-        tb = self.df2tb(df=data)
+        tb = self.df2tb(df=data, show_raw=raw_data)
 
         self.datas[stat_name] = data
 
-        if save_csv:
-            _, csv_path = perfect_savepath(origin_path=save_csv,
-                                           target_ext='csv',
-                                           default_filename=f'{self.opnode.name}_{stat_name}') 
+        if save_to:
+            save_to = os.path.abspath(save_to)  
+            if '.' not in os.path.basename(save_to):
+                assert save_format in self.valid_export_format, \
+                    f"Argument `save_format` must be one in {self.valid_export_format}, but got {save_format}\n" + \
+                    "Alternatively, you can set `save_to` to a concrete file path, like `path/to/file.xlsx`"
             
-            # list column -> str
-            ls_cols = [col_name for col_name in data.columns if data[col_name].dtype == pl_list]
-            if ls_cols:
-                data.with_columns([
-                    col(col_name).map_elements(lambda s: str(s.to_list()), return_dtype=str)
-                    for col_name in ls_cols
-                ]).write_csv(file=csv_path)
-            else:
-                data.write_csv(file=csv_path)
-
-            print(f'{stat_name.capitalize()} data saved to [b magenta]{csv_path}[/]')
-        
-        if save_excel:
-            _, excel_path = perfect_savepath(origin_path=save_excel,
-                                           target_ext='xlsx',
-                                           default_filename=f'{self.opnode.name}_{stat_name}') 
-            data.write_excel(workbook=excel_path, autofit=True)
-            print(f'{stat_name.capitalize()} data saved to [b magenta]{excel_path}[/]')
+            self.export(df=data,
+                        save_path=save_to,
+                        format=save_format,
+                        file_suffix=stat_name,
+                        raw_data=raw_data)
 
         return tb, data
