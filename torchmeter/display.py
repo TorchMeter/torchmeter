@@ -760,7 +760,7 @@ class TabularRenderer:
             .alias(col_name)
         ).select(final_cols)
 
-    def df2tb(self, df:DataFrame) -> Table:
+    def df2tb(self, df:DataFrame, show_raw:bool = False) -> Table:
         # create rich table
         tb_fields = df.columns
         tb = Table(*tb_fields)
@@ -778,8 +778,15 @@ class TabularRenderer:
         
         # fill table
         for vals_dict in df.iter_rows(named=True):
-            str_vals = [(str(col_val) if col_val is not None else col_none_str[col_name]) 
-                        for col_name,col_val in vals_dict.items()]
+            str_vals = []
+            for col_name,col_val in vals_dict.items():
+                if col_val is None:
+                    str_vals.append(col_none_str[col_name])
+                elif show_raw:
+                    str_vals.append(str(getattr(col_val, 'raw_data', col_val)))
+                else:
+                    str_vals.append(str(col_val))
+            
             tb.add_row(*str_vals)
         
         return tb
@@ -907,7 +914,7 @@ class TabularRenderer:
 
         self.tb_args = table_settings
         self.col_args = column_settings
-        tb = self.df2tb(df=data)
+        tb = self.df2tb(df=data, show_raw=raw_data)
 
         self.datas[stat_name] = data
 

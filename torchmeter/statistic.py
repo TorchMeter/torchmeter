@@ -653,7 +653,7 @@ class ITTPMeter(Statistics):
         self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
                                                         Operation_Name=self._opnode.name,
                                                         Operation_Type=self._opnode.type,
-                                                        Infer_Time=str(self.InferTime),
-                                                        Throughput=str(self.Throughput)))
+                                                        Infer_Time=self.InferTime,
+                                                        Throughput=self.Throughput))
 
 
