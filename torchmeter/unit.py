@@ -40,4 +40,4 @@ def auto_unit(val:Union[int, float], unit_system=DecimalUnit) -> Union[str, None
     for unit in list(unit_system):
         if val >= unit.value:
             return f'{val / unit.value:.2f} {unit.name}'
-    return None
+    return str(val)

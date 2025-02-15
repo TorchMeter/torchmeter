@@ -3,8 +3,7 @@ from collections import namedtuple
 from abc import ABC, abstractmethod
 from operator import attrgetter, mul
 from functools import reduce, partial
-from enum import Enum, IntEnum, IntFlag, unique
-from typing import Any, Callable, List, NamedTuple, Optional, TypeVar, Tuple, Union
+from typing import Any, Callable, List, NamedTuple, Optional, TypeVar, Tuple
 
 import numpy as np
 import torch.nn as nn
@@ -12,56 +11,24 @@ from torch import no_grad
 from torch.cuda import Event as cuda_event
 from torch.cuda import synchronize as cuda_sync
 
+from torchmeter.unit import UNIT_TYPE, auto_unit
+from torchmeter.unit import DecimalUnit, BinaryUnit, TimeUnit, SpeedUnit
+
 OPN_TYPE = TypeVar("OperationNode")
-
-@unique
-class DecimalUnit(IntEnum):
-    T:int = 1e12
-    G:int = 1e9
-    M:int = 1e6
-    K:int = 1e3
-    B:int = 1e0
-
-@unique
-class BinaryUnit(IntFlag):
-    TiB:int = 2**40
-    GiB:int = 2**30
-    MiB:int = 2**20
-    KiB:int = 2**10
-    B:int   = 2**0
-
-@unique
-class TimeUnit(Enum):
-    h:int  = 60**2
-    min:int = 60**1
-    s:int  = 60**0
-    ms:float = 1e-3
-    us:float = 1e-6
-    ns:float = 1e-9
-
-@unique
-class SpeedUnit(IntEnum):
-    TSamPS:int = 1e12
-    GSamPS:int = 1e9
-    MSamPS:int = 1e6
-    KSamPS:int = 1e3
-    SamPS:int  = 1e0
-
-UNIT_TYPE = Union[DecimalUnit, BinaryUnit, TimeUnit, SpeedUnit]
-
-def auto_unit(val:Union[int, float], unit_system=DecimalUnit) -> Union[str, None]:
-    for unit in list(unit_system):
-        if val >= unit.value:
-            return f'{val / unit.value:.2f} {unit.name}'
-    return None
 
 class UpperLinkData:
 
-    __slots__ = ['val', '__parent_data']
+    __slots__ = ['val', 'none_str',
+                 '__parent_data', '__unit_sys']
 
-    def __init__(self, val:int=0, parent_data:Optional["UpperLinkData"]=None):
+    def __init__(self, 
+                 val:int=0, parent_data:Optional["UpperLinkData"]=None,
+                 unit_sys:Optional[UNIT_TYPE]=None,
+                 none_str:str='-'):
         self.val = val
         self.__parent_data = parent_data    
+        self.__unit_sys = unit_sys
+        self.none_str = none_str # Use when there is a "None" in the column where this data is located while rendering the table.
     
     def __iadd__(self, other):
         self.val += other
@@ -73,18 +40,21 @@ class UpperLinkData:
             self.__parent_data += other
     
     def __repr__(self):
-        return str(self.val)
+        if self.__unit_sys is not None:
+            return auto_unit(self.val, self.__unit_sys)
+        else:
+            return str(self.val)
 
 class MetricsData:
 
     __slots__ = ['vals',
                  'reduce_func',
-                 'unit_sys']
+                 '__unit_sys']
 
-    def __init__(self, reduce_func:Optional[Callable]=np.mean, unit_system:Optional[UNIT_TYPE]=DecimalUnit):
+    def __init__(self, reduce_func:Optional[Callable]=np.mean, unit_sys:Optional[UNIT_TYPE]=DecimalUnit):
         self.vals = np.array([])
         self.reduce_func = reduce_func if reduce_func is not None else lambda x:x
-        self.unit_sys = unit_system
+        self.__unit_sys = unit_sys
 
     @property
     def metrics(self):
@@ -104,9 +74,9 @@ class MetricsData:
         self.vals = np.array([])
 
     def __repr__(self):
-        if self.unit_sys is not None:
-            return f"{auto_unit(self.metrics, self.unit_sys)}" + ' ± ' + \
-                   f"{auto_unit(self.iqr, self.unit_sys)}"
+        if self.__unit_sys is not None:
+            return f"{auto_unit(self.metrics, self.__unit_sys)}" + ' ± ' + \
+                   f"{auto_unit(self.iqr, self.__unit_sys)}"
         else:
             return f"{self.metrics} ± {self.iqr}"
 
@@ -153,13 +123,15 @@ class Statistics(ABC):
     def init_linkdata(self,
                       attr_name:str,
                       init_val:int=0,
-                      opparent:Optional["OperationNode"]=None): # noqa # type: ignore
+                      opparent:Optional[OPN_TYPE]=None,
+                      **kwargs) -> UpperLinkData:
         if opparent is None:
-            link_data = UpperLinkData(val=init_val)
+            link_data = UpperLinkData(val=init_val, **kwargs)
         else:
             upper_getter = attrgetter(f'{self.name}.{attr_name}')
             link_data = UpperLinkData(val=init_val, 
-                                      parent_data=upper_getter(opparent))
+                                      parent_data=upper_getter(opparent),
+                                      **kwargs)
         return link_data
 
     def __repr__(self):
@@ -170,9 +142,8 @@ class Statistics(ABC):
         for field in self.ov_fields:
             field_val = getattr(self.val, field, 'N/A')
             if isinstance(field_val, UpperLinkData):
-                field_val = float(field_val.val) # get the value
-                unit_system = BinaryUnit if repr_str.startswith('Memory') else DecimalUnit
-                repr_str += '• ' + f"{field.rjust(max_len)} = {field_val} = {auto_unit(field_val, unit_system)}\n"
+                numeric_val = float(field_val.val) # get the value
+                repr_str += '• ' + f"{field.rjust(max_len)} = {numeric_val} = {field_val}\n"
             else:
                 repr_str += '• ' + f"{field.rjust(max_len)} = {field_val}\n"
 
@@ -204,8 +175,8 @@ class ParamsMeter(Statistics):
         self.is_measured = True if self._model._modules else False # only measure the leaf nodes
 
         _opparent = opnode.parent
-        self.__RegNum = self.init_linkdata(attr_name='RegNum', init_val=0, opparent=_opparent)
-        self.__TotalNum = self.init_linkdata(attr_name='TotalNum', init_val=0, opparent=_opparent)
+        self.__RegNum = self.init_linkdata(attr_name='RegNum', init_val=0, opparent=_opparent, unit_sys=DecimalUnit)
+        self.__TotalNum = self.init_linkdata(attr_name='TotalNum', init_val=0, opparent=_opparent, unit_sys=DecimalUnit)
 
     @property
     def name(self) -> str:
@@ -234,7 +205,7 @@ class ParamsMeter(Statistics):
                                            Learnable_Params=self.RegNum)
 
     def measure(self) -> None:
-        if self.is_measured:
+        if self.is_measured: # TODO: non-leaf layer may have its own parameter
             return
         
         if not self._model._parameters:
@@ -290,8 +261,10 @@ class CalMeter(Statistics):
         self.is_measured = True if self._model._modules else False # only measure the leaf nodes
 
         _opparent = opnode.parent
-        self.__Macs = self.init_linkdata(attr_name='Macs', init_val=0, opparent=_opparent)
-        self.__Flops = self.init_linkdata(attr_name='Flops', init_val=0, opparent=_opparent)
+        self.__Macs = self.init_linkdata(attr_name='Macs', init_val=0, opparent=_opparent, 
+                                         unit_sys=DecimalUnit, none_str='Not Supported')
+        self.__Flops = self.init_linkdata(attr_name='Flops', init_val=0, opparent=_opparent, 
+                                          unit_sys=DecimalUnit, none_str='Not Supported')
 
     @property
     def name(self) -> str:
@@ -368,8 +341,8 @@ class CalMeter(Statistics):
                                                         Bias=bool(is_bias),
                                                         Input_Shape=list(input[0].shape),
                                                         Output_Shape=[len(output)]+list(output[0].shape),
-                                                        MACs=self.Macs.val,
-                                                        FLOPs=self.Flops.val)
+                                                        MACs=self.Macs,
+                                                        FLOPs=self.Flops)
         )
     
     def __linear_hook(self, module, input, output):
@@ -389,8 +362,8 @@ class CalMeter(Statistics):
                                                         Bias=bool(is_bias),
                                                         Input_Shape=list(input[0].shape),
                                                         Output_Shape=[len(output)]+list(output[0].shape),
-                                                        MACs=self.Macs.val,
-                                                        FLOPs=self.Flops.val)
+                                                        MACs=self.Macs,
+                                                        FLOPs=self.Flops)
         )
 
     def __BN_hook(self, module, input, output):
@@ -404,8 +377,8 @@ class CalMeter(Statistics):
                                                         Operation_Type=self._opnode.type,
                                                         Input_Shape=list(input[0].shape),
                                                         Output_Shape=[len(output)]+list(output[0].shape),
-                                                        MACs=self.Macs.val,
-                                                        FLOPs=self.Flops.val)
+                                                        MACs=self.Macs,
+                                                        FLOPs=self.Flops)
         )
 
     def __activate_hook(self, module, input, output):
@@ -434,8 +407,8 @@ class CalMeter(Statistics):
                                                         Operation_Type=self._opnode.type,
                                                         Input_Shape=list(input[0].shape),
                                                         Output_Shape=[len(output)]+list(output[0].shape),
-                                                        MACs=self.Macs.val,
-                                                        FLOPs=self.Flops.val)
+                                                        MACs=self.Macs,
+                                                        FLOPs=self.Flops)
         )
 
     def __pool_hook(self, module, input, output):
@@ -459,8 +432,8 @@ class CalMeter(Statistics):
                                                         Kernel_Size=list(k) if len(k)>1 else [k[0]]*2,
                                                         Input_Shape=list(input[0].shape),
                                                         Output_Shape=[len(output)]+list(output[0].shape),
-                                                        MACs=self.Macs.val,
-                                                        FLOPs=self.Flops.val)
+                                                        MACs=self.Macs,
+                                                        FLOPs=self.Flops)
         )
 
     def __not_support_hook(self, module, input, output):
@@ -501,10 +474,10 @@ class MemMeter(Statistics):
         self.is_measured = True if self._model._modules else False # only measure the leaf nodes
 
         _opparent = opnode.parent
-        self.__ParamCost = self.init_linkdata(attr_name='ParamCost', init_val=0, opparent=_opparent)
-        self.__BufferCost = self.init_linkdata(attr_name='BufferCost', init_val=0, opparent=_opparent)
-        self.__FeatureMapCost = self.init_linkdata(attr_name='FeatureMapCost', init_val=0, opparent=_opparent)
-        self.__TotalCost = self.init_linkdata(attr_name='TotalCost', init_val=0, opparent=_opparent)
+        self.__ParamCost = self.init_linkdata(attr_name='ParamCost', init_val=0, opparent=_opparent, unit_sys=BinaryUnit)
+        self.__BufferCost = self.init_linkdata(attr_name='BufferCost', init_val=0, opparent=_opparent, unit_sys=BinaryUnit)
+        self.__FeatureMapCost = self.init_linkdata(attr_name='FeatureMapCost', init_val=0, opparent=_opparent, unit_sys=BinaryUnit)
+        self.__TotalCost = self.init_linkdata(attr_name='TotalCost', init_val=0, opparent=_opparent, unit_sys=BinaryUnit)
 
     @property
     def name(self) -> str:
@@ -537,10 +510,10 @@ class MemMeter(Statistics):
         return self.overview_val_container(Operation_Id=self._opnode.node_id,
                                            Operation_Type=self._opnode.type,
                                            Operation_Name=self._opnode.name,
-                                           Param_Cost=self.__ParamCost,
-                                           Buffer_Cost=self.__BufferCost,
-                                           FeatureMap_Cost=self.__FeatureMapCost,
-                                           Total=self.__TotalCost)
+                                           Param_Cost=self.ParamCost,
+                                           Buffer_Cost=self.BufferCost,
+                                           FeatureMap_Cost=self.FeatureMapCost,
+                                           Total=self.TotalCost)
 
     def measure(self):
         if self.is_measured:
@@ -572,11 +545,10 @@ class MemMeter(Statistics):
         self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
                                                         Operation_Name=self._opnode.name,
                                                         Operation_Type=self._opnode.type,
-                                                        Param_Cost=auto_unit(param_cost,unit_system=BinaryUnit), 
-                                                        Buffer_Cost=auto_unit(buffer_cost,unit_system=BinaryUnit), 
-                                                        FeatureMap_Cost=auto_unit(feat_cost,unit_system=BinaryUnit), 
-                                                        Total=auto_unit(param_cost + buffer_cost + feat_cost,
-                                                                        unit_system=BinaryUnit)))
+                                                        Param_Cost=self.ParamCost if param_cost else None, 
+                                                        Buffer_Cost=self.BufferCost if buffer_cost else None, 
+                                                        FeatureMap_Cost=self.FeatureMapCost, 
+                                                        Total=self.TotalCost))
 
 class ITTPMeter(Statistics):
 
@@ -602,8 +574,8 @@ class ITTPMeter(Statistics):
         
         self.__stat_ls = [] # record the inference time and throughput of each operation
 
-        self.__InferTime = MetricsData(reduce_func=np.median, unit_system=TimeUnit)
-        self.__Throughput = MetricsData(reduce_func=np.median, unit_system=SpeedUnit)
+        self.__InferTime = MetricsData(reduce_func=np.median, unit_sys=TimeUnit)
+        self.__Throughput = MetricsData(reduce_func=np.median, unit_sys=SpeedUnit)
 
     @property
     def name(self) -> str:
@@ -673,7 +645,7 @@ class ITTPMeter(Statistics):
         self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
                                                         Operation_Name=self._opnode.name,
                                                         Operation_Type=self._opnode.type,
-                                                        Infer_Time=str(self.__InferTime),
-                                                        Throughput=str(self.__Throughput)))
+                                                        Infer_Time=str(self.InferTime),
+                                                        Throughput=str(self.Throughput)))
 
 

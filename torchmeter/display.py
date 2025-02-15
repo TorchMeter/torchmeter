@@ -13,8 +13,8 @@ from rich.segment import Segment
 from rich.table import Table, Column
 from rich.box import HEAVY_EDGE, ROUNDED
 from rich.console import Group, RenderableType
+from polars import List as pl_list
 from polars import DataFrame, struct, col
-from polars import Int64 as pl_int64, Float64 as pl_float64, List as pl_list
 
 from torchmeter.utils import dfs_task, perfect_savepath
 
@@ -767,17 +767,14 @@ class TabularRenderer:
         for tb_col in tb.columns:
             tb_col.__dict__.update(self.col_args)
         
-        def val2str(val_name:str, val:Any):
-            if val is not None:
-                return str(val)
-            elif df[val_name].dtype in (pl_int64, pl_float64): # UpperLinkData is None
-                return 'Not Supported'
-            else:
-                return '-'
-
+        # collect each column's none replacing string
+        col_none_str = {col_name:getattr(df[col_name].drop_nulls().first(), 'none_str', '-') 
+                        for col_name, col_type in df.schema.items()}
+        
         # fill table
         for vals_dict in df.iter_rows(named=True):
-            str_vals = [val2str(k,v) for k,v in vals_dict.items()]
+            str_vals = [(str(col_val) if col_val is not None else col_none_str[col_name]) 
+                        for col_name,col_val in vals_dict.items()]
             tb.add_row(*str_vals)
         
         return tb
