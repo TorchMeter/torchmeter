@@ -184,8 +184,8 @@ class ParamsMeter(Statistics):
         self.is_measured = True if self._model._modules else False # only measure the leaf nodes
 
         _opparent = opnode.parent
-        self.__RegNum = self.init_linkdata(attr_name='RegNum', init_val=0, opparent=_opparent, unit_sys=DecimalUnit)
-        self.__TotalNum = self.init_linkdata(attr_name='TotalNum', init_val=0, opparent=_opparent, unit_sys=DecimalUnit)
+        self.__RegNum = self.init_linkdata(attr_name='RegNum', init_val=0, opparent=_opparent, unit_sys=CountUnit)
+        self.__TotalNum = self.init_linkdata(attr_name='TotalNum', init_val=0, opparent=_opparent, unit_sys=CountUnit)
 
     @property
     def name(self) -> str:
