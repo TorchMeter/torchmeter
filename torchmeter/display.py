@@ -826,7 +826,8 @@ class TabularRenderer:
         obj_cols = {col_name:df[col_name].drop_nulls().first().__class__ 
                     for col_name, col_type in df.schema.items() if col_type == pl_object}
         df = df.with_columns([
-            col(col_name).map_elements(lambda s: getattr(s,'raw_data',s.val) if raw_data else str(s))
+            col(col_name).map_elements(lambda s: getattr(s,'raw_data',s.val) if raw_data else str(s),
+                                       return_dtype=float if raw_data else str)
             for col_name, obj_cls in obj_cols.items()
         ])            
         
