@@ -10,6 +10,13 @@ class DecimalUnit(IntEnum):
     B:int = 1e0
 
 @unique
+class CountUnit(IntEnum):
+    T:int = 1e12
+    G:int = 1e9
+    M:int = 1e6
+    K:int = 1e3
+
+@unique
 class BinaryUnit(IntFlag):
     TiB:int = 2**40
     GiB:int = 2**30
@@ -39,5 +46,8 @@ UNIT_TYPE = Union[DecimalUnit, BinaryUnit, TimeUnit, SpeedUnit]
 def auto_unit(val:Union[int, float], unit_system=DecimalUnit) -> Union[str, None]:
     for unit in list(unit_system):
         if val >= unit.value:
-            return f'{val / unit.value:.2f} {unit.name}'
+            if val % unit.value:
+                return f'{val / unit.value:.2f} {unit.name}'
+            else:
+                return f'{val // unit.value} {unit.name}'
     return str(val)

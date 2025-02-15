@@ -12,7 +12,7 @@ from torch.cuda import Event as cuda_event
 from torch.cuda import synchronize as cuda_sync
 
 from torchmeter.unit import UNIT_TYPE, auto_unit
-from torchmeter.unit import DecimalUnit, BinaryUnit, TimeUnit, SpeedUnit
+from torchmeter.unit import CountUnit, DecimalUnit, BinaryUnit, TimeUnit, SpeedUnit
 
 OPN_TYPE = TypeVar("OperationNode")
 
@@ -160,8 +160,9 @@ class Statistics(ABC):
 class ParamsMeter(Statistics):
 
     detail_val_container:NamedTuple = namedtuple(typename='Params_INFO', 
-                                                 defaults=(None,)*5,
+                                                 defaults=(None,)*6,
                                                  field_names=['Operation_Id', 
+                                                              'Operation_Name',
                                                               'Operation_Type',
                                                               'Param_Name', 
                                                               'Requires_Grad', 
@@ -170,8 +171,8 @@ class ParamsMeter(Statistics):
     overview_val_container:NamedTuple = namedtuple(typename='Params_INFO', 
                                                    defaults=(None,)*5,
                                                    field_names=['Operation_Id', 
+                                                                'Operation_Name',
                                                                 'Operation_Type',
-                                                                'Operation_Name', 
                                                                 'Total_Params', 
                                                                 'Learnable_Params'])
 
@@ -207,8 +208,8 @@ class ParamsMeter(Statistics):
     def val(self) -> NamedTuple:
         self.measure()
         return self.overview_val_container(Operation_Id=self._opnode.node_id,
-                                           Operation_Type=self._opnode.type,
                                            Operation_Name=self._opnode.name,
+                                           Operation_Type=self._opnode.type,
                                            Total_Params=self.TotalNum,
                                            Learnable_Params=self.RegNum)
 
@@ -218,8 +219,9 @@ class ParamsMeter(Statistics):
         
         if not self._model._parameters:
             self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                            Operation_Name=self._opnode.name,
                                                             Operation_Type=self._opnode.type,
-                                                            Numeric_Num=0))
+                                                            Numeric_Num=UpperLinkData(val=0, unit_sys=CountUnit)))
         else:
             for param_name, param_val in self._model.named_parameters(): 
                 p_num = param_val.numel()
@@ -230,10 +232,11 @@ class ParamsMeter(Statistics):
                     self.__RegNum += p_num
 
                 self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                                Operation_Name=self._opnode.name,
                                                                 Operation_Type=self._opnode.type,
                                                                 Param_Name=param_name,
                                                                 Requires_Grad=p_reg,
-                                                                Numeric_Num=p_num))
+                                                                Numeric_Num=UpperLinkData(val=p_num, unit_sys=CountUnit)))
                 
                 self.__TotalNum += p_num
         
