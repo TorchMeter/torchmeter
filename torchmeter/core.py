@@ -324,13 +324,14 @@ if __name__ == '__main__':
     metered_model(torch.randn(1,3,224,224))
     
     # print(metered_model.structure)
-    print(metered_model.ittp)
-    metered_model.profile(metered_model.ittp,
-                          show=True)
+    print(metered_model.mem)
+    metered_model.profile(metered_model.mem,
+                          show=True, no_tree=True,
+                          raw_data=False,)
                         #   newcol_name='Percentage',
                         #   newcol_func=lambda col_dict,all_num=metered_model.mem.TotalCost.val: f'{col_dict["Total"]*100/all_num:.3f} %',
                         #   newcol_dependcol=['Total'],
                         #   newcol_type=str,
                         #   newcol_idx=0,
-                        #   save_csv='.',
-                        #   save_excel='.')
+                        #   save_to='.',
+                        #   save_format='xlsx')
