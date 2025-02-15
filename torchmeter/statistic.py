@@ -30,6 +30,10 @@ class UpperLinkData:
         self.__unit_sys = unit_sys
         self.none_str = none_str # Use when there is a "None" in the column where this data is located while rendering the table.
     
+    @property
+    def raw_data(self):
+        return float(self.val)
+    
     def __iadd__(self, other):
         self.val += other
         self.__upper_update(other)
@@ -66,6 +70,10 @@ class MetricsData:
             return np.percentile(self.vals, 75) - np.percentile(self.vals, 25)
         else:
             return 0.
+    
+    @property
+    def raw_data(self):
+        return self.metrics
     
     def append(self, new_val:Any):
         self.vals = np.append(self.vals, new_val)
