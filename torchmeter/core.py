@@ -1,13 +1,17 @@
-from typing import Any, Dict, Union
+from inspect import signature
+from typing import Any, Dict, Tuple, Union
 
 import torch
 import torch.nn as nn
 from tqdm import tqdm
 from rich import get_console
+from rich.rule import Rule
 from rich.layout import Layout
+from rich.columns import Columns
 
 from torchmeter.engine import OperationTree
-from torchmeter.display import TreeRenderer, TabularRenderer, render_perline
+from torchmeter.display import TreeRenderer, TabularRenderer
+from torchmeter.display import indent_str, data_repr, render_perline
 
 class Meter:
 
@@ -276,16 +280,22 @@ class Meter:
         
         """
 
+        TREE_TABLE_GAP = 2 # the horizontal gap between tree and table
+        
         tb_kwargs['table_settings'] = tb_kwargs.get('table_settings', self.tb_args)
         tb_kwargs['column_settings'] = tb_kwargs.get('column_settings', self.tb_col_args)
 
         tb, data = self.tb_renderer(stat_name=stat.name, **tb_kwargs)
+        
+        if not show:
+            return tb, data
+        
         tree = None if no_tree else self.structure
         
         console = get_console()
         tree_width = console.measure(tree).maximum if tree is not None else 0
         desirable_tb_width = console.measure(tb).maximum
-        actual_tb_width = console.width - tree_width - 2 # 2 is the gap between tree and table
+        actual_tb_width = min(desirable_tb_width, console.width - tree_width - TREE_TABLE_GAP)
         
         if actual_tb_width <= 5: # 5 is the minimum width of table
             raise ValueError("The width of the terminal is too small, try to maximize the window and try again.")
@@ -294,23 +304,70 @@ class Meter:
         if actual_tb_width < desirable_tb_width and not force_preset:
             tb.show_lines = True 
         
+        # get main content(i.e. tree & statistics table)
         if no_tree:
-            canvas = tb
+            main_content = tb
+            main_content_height = len(console.render_lines(tb))
+            main_content_width = actual_tb_width
         else:
-            canvas = Layout()
-            canvas.split_row(Layout(tree, name='left', size=tree_width + 2),
-                             Layout(tb, name='right'))
+            main_content = Layout()
+            main_content.split_row(Layout(tree, name='left', size=tree_width + TREE_TABLE_GAP),
+                                   Layout(tb, name='right', size=actual_tb_width))
             
             temp_options = console.options.update_width(actual_tb_width) 
             tree_height = len(console.render_lines(tree))
             tb_height = len(console.render_lines(tb, options=temp_options))
-            console.height = max(tree_height, tb_height)
+            main_content_height = max(tree_height, tb_height)
+            main_content_width = tree_width + TREE_TABLE_GAP + actual_tb_width
 
-        if show:
-            if self.render_time_sep:
-                render_perline(canvas, time_sep=self.render_time_sep)
-            else:
-                console.print(canvas)
+        # get footer content
+        footer = Columns(title=Rule('[gray54]s u m m a r y[/]', characters='-', style='gray54'),
+                         equal=True, 
+                         expand=True)
+
+        forward_args:Tuple[str] = tuple(signature(self.model.forward).parameters.keys())
+        ipt_dict = {forward_args[args_idx]: anony_ipt for args_idx, anony_ipt in enumerate(self.ipt['args'])}
+        ipt_dict.update(self.ipt['kwargs'])
+        ipt_repr = [f"{args_name} = {data_repr(args_val)}" for args_name, args_val in ipt_dict.items()]
+        ipt_repr = ',\n'.join(ipt_repr) 
+
+        basic_info = '\n'.join([
+            '[dim]' + \
+            f'• [b]Model    :[/b] {self.optree.root.name}',
+            f'• [b]Device   :[/b] {self.device}',
+            f'• [b]Signature:[/b] forward(self, {','.join(forward_args)})',
+            f'• [b]Input    :[/b] \n{indent_str(ipt_repr, len('• Inp'), guideline=False)}' + \
+            '[/]'
+        ])
+
+        stat_info = ['[dim]' + f'• [b]Statistics:[/b] {stat.name}']
+        if stat.name == 'ittp':
+            stat_info.append(f'• [b]Benchmark Times:[/b] {self.ittp_benchmark_time}')
+        stat_info.extend([
+            f'• [b]{k}:[/b] {v}' for k, v in stat.crucial_info.items()
+        ])
+        stat_info[-1] += '[/]'
+        stat_info = '\n'.join(stat_info)
+        
+        footer.add_renderable(basic_info)
+        footer.add_renderable(stat_info)
+
+        temp_options = console.options.update_width(main_content_width)
+        footer_height = len(console.render_lines(footer, options=temp_options))
+        
+        # render profile
+        canvas = Layout()
+        canvas.split_column(Layout(main_content, name='top', size=main_content_height),
+                            Layout(footer, name='down', size=footer_height))
+        
+        console.width = main_content_width
+        console.height = main_content_height + footer_height
+        if self.render_time_sep:
+            render_perline(renderable=canvas, 
+                           console=console,
+                           time_sep=self.render_time_sep)
+        else:
+            console.print(canvas)
 
         return tb, data
 

@@ -3,7 +3,7 @@ from collections import namedtuple
 from abc import ABC, abstractmethod
 from operator import attrgetter, mul
 from functools import reduce, partial
-from typing import Any, Callable, List, NamedTuple, Optional, TypeVar, Tuple
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, TypeVar, Tuple
 
 import numpy as np
 import torch.nn as nn
@@ -115,6 +115,12 @@ class Statistics(ABC):
         """The list of namedtuple which will be rendered in table"""
         ...
 
+    @property
+    @abstractmethod
+    def crucial_info(self) -> Dict[str, str]:
+        """The dict of crucial information of the statistics, used in profile footer"""
+        ...
+
     @abstractmethod
     def measure(self):
         """To measure the statistics"""
@@ -213,6 +219,14 @@ class ParamsMeter(Statistics):
                                            Total_Params=self.TotalNum,
                                            Learnable_Params=self.RegNum)
 
+    @property
+    def crucial_info(self) -> Dict[str, str]:
+        res_dict = {'Learnable Parameters Num': str(self.RegNum),
+                    'Total Parameters Num': str(self.TotalNum)}
+        max_keylen = max([len(key) for key in res_dict.keys()])
+        res_dict = {key.ljust(max_keylen): value for key, value in res_dict.items()}
+        return res_dict
+
     def measure(self) -> None:
         if self.is_measured: # TODO: non-leaf layer may have its own parameter
             return
@@ -302,6 +316,14 @@ class CalMeter(Statistics):
                                            Operation_Name=self._opnode.name,
                                            MACs=self.Macs,
                                            FLOPs=self.Flops)
+
+    @property
+    def crucial_info(self) -> Dict[str, str]:
+        res_dict = {'FLOPs': str(self.Flops),
+                    'MACs(aka MACC, MADD)': str(self.Macs)}
+        max_keylen = max([len(key) for key in res_dict.keys()])
+        res_dict = {key.ljust(max_keylen): value for key, value in res_dict.items()}
+        return res_dict
 
     def measure(self):
         if self.is_measured:
@@ -516,6 +538,16 @@ class MemMeter(Statistics):
         return self.__stat_ls
     
     @property
+    def crucial_info(self) -> Dict[str, str]:
+        res_dict =  {'[b]Parameters[/] Memory Cost': f'{self.ParamCost}, {self.ParamCost.val*100/self.TotalCost.val:.2f} %',
+                     '[b]Buffers[/] Memory Cost': f'{self.BufferCost}, {self.BufferCost.val*100/self.TotalCost.val:.2f} %',
+                     '[b]FeatureMap[/] Memory Cost': f'{self.FeatureMapCost}, {self.FeatureMapCost.val*100/self.TotalCost.val:.2f} %',
+                     '[b]Total Memory Cost[/]': f'{self.TotalCost}'}
+        max_keylen = max([len(key) for key in res_dict.keys()])
+        res_dict = {key.ljust(max_keylen): value for key, value in res_dict.items()}
+        return res_dict
+                
+    @property
     def val(self) -> NamedTuple:
         self.measure()
         return self.overview_val_container(Operation_Id=self._opnode.node_id,
@@ -611,6 +643,14 @@ class ITTPMeter(Statistics):
                                            Operation_Name=self._opnode.name,
                                            Infer_Time=self.__InferTime,
                                            Throughput=self.__Throughput)
+
+    @property
+    def crucial_info(self) -> Dict[str, str]:
+        res_dict = {'Inference Elapse': str(self.InferTime),
+                    'Throughput': str(self.Throughput)}
+        max_keylen = max([len(key) for key in res_dict.keys()])
+        res_dict = {key.ljust(max_keylen): value for key, value in res_dict.items()}
+        return res_dict
 
     def measure(self, device, repeat:int=50, global_process=None):
         
