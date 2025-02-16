@@ -1,4 +1,5 @@
-from typing import Any, Dict, Union
+from inspect import signature
+from typing import Any, Dict, Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -324,18 +325,18 @@ class Meter:
                          equal=True, 
                          expand=True)
 
-        _ipt_repr = ''
-        for anony_ipt in self.ipt['args']:
-            _ipt_repr += f"{data_repr(anony_ipt)},\n"
-        for ipt_name, ipt_val in self.ipt['kwargs'].items():
-            _ipt_repr += f"{ipt_name}={data_repr(ipt_val)},\n"
-        _ipt_repr = _ipt_repr[:-2] # remove the last comma and newline
+        forward_args:Tuple[str] = tuple(signature(self.model.forward).parameters.keys())
+        ipt_dict = {forward_args[args_idx]: anony_ipt for args_idx, anony_ipt in enumerate(self.ipt['args'])}
+        ipt_dict.update(self.ipt['kwargs'])
+        ipt_repr = [f"{args_name} = {data_repr(args_val)}" for args_name, args_val in ipt_dict.items()]
+        ipt_repr = ',\n'.join(ipt_repr) 
 
         basic_info = '\n'.join([
             '[dim]' + \
-            f'• [b]Model :[/b] {self.optree.root.name}',
-            f'• [b]Device:[/b] {self.device}',
-            f'• [b]Input :[/b] \n{indent_str(_ipt_repr, len('• Inp'), guideline=False)}' + \
+            f'• [b]Model    :[/b] {self.optree.root.name}',
+            f'• [b]Device   :[/b] {self.device}',
+            f'• [b]Signature:[/b] forward(self, {','.join(forward_args)})',
+            f'• [b]Input    :[/b] \n{indent_str(ipt_repr, len('• Inp'), guideline=False)}' + \
             '[/]'
         ])
 
