@@ -19,6 +19,45 @@ from polars import List as pl_list, Object as pl_object
 
 from torchmeter.utils import dfs_task, perfect_savepath
 
+def data_repr(val:Any):
+    get_type = lambda val: type(val).__name__
+
+    item_repr = lambda val_type, val: (f"[dim]Shape[/]([b green]{list(val.shape)}[/])" if hasattr(val, 'shape') else f"[b green]{val}[/]") + f" [dim]<{val_type}>[/]"
+
+    def seq_repr(prefix, inner_repr:List[str]) -> str:
+        res = []
+        indent_num = len(f'{prefix}(')
+        for r in inner_repr:
+            if '\n' in r:
+                r_lines = r.split(',\n')
+                res.extend(['│' + ' '*(indent_num-1) + line for line in r_lines])
+            else:
+                res.append('│' + ' '*(indent_num-1) + r)
+        # mark end of sequence
+        res[-1] = '└─' + res[-1][2:]
+        # remove intendation for the first line
+        res[0] = res[0][indent_num:] 
+
+        res_repr = f'[dim]{prefix}[/](' 
+        res_repr += ',\n'.join(res)
+        res_repr += ')'
+
+        return res_repr
+
+    val_type = get_type(val)
+    if isinstance(val, (list, tuple, set)) and len(val) > 0:
+        inner_repr:List[str] = [data_repr(i) for i in val]
+        res_repr = seq_repr(prefix=val_type, 
+                       inner_repr=inner_repr)
+        return res_repr
+    elif isinstance(val, dict) and len(val) > 0:
+        inner_repr:List[str] = [f'{item_repr(get_type(k),k)}: {data_repr(v)}' for k, v in val.items()]
+        res_repr = seq_repr(prefix='dict', 
+                       inner_repr=inner_repr)
+        return res_repr
+    else:
+        return item_repr(val_type, val)
+
 def render_perline(renderable: Union[RenderableType, List[List[Segment]]],
                    line_prefix:'str'='',
                    line_suffix:'str'='',
