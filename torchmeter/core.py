@@ -1,5 +1,5 @@
 from inspect import signature
-from typing import Any, Dict, Tuple, Union
+from typing import Any, Dict, List, Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -208,7 +208,45 @@ class Meter:
         list(map(lambda x:x.remove(), hook_ls))
 
         return self.optree.root.ittp
+
+    @property
+    def overview(self):
+        ...
+
+    @property
+    def model_info(self):
+        forward_args:Tuple[str] = tuple(signature(self.model.forward).parameters.keys())
+        ipt_dict = {forward_args[args_idx]: anony_ipt for args_idx, anony_ipt in enumerate(self.ipt['args'])}
+        ipt_dict.update(self.ipt['kwargs'])
+        ipt_repr = [f"{args_name} = {data_repr(args_val)}" for args_name, args_val in ipt_dict.items()]
+        ipt_repr = ',\n'.join(ipt_repr) 
+
+        infos = '\n'.join([
+            '[dim]' + \
+            f'• [b]Model    :[/b] {self.optree.root.name}',
+            f'• [b]Device   :[/b] {self.device}',
+            f'• [b]Signature:[/b] forward(self, {','.join(forward_args)})',
+            f'• [b]Input    :[/b] \n{indent_str(ipt_repr, len('• Inp'), guideline=False)}' + \
+            '[/]'
+        ])
         
+        console = get_console()
+        return console.render_str(infos)
+
+    def stat_info(self,
+                  stat):
+        infos:List[str] = ['[dim]' + f'• [b]Statistics:[/b] {stat.name}']
+        if stat.name == 'ittp':
+            infos.append(f'• [b]Benchmark Times:[/b] {self.ittp_benchmark_time}')
+        infos.extend([
+            f'• [b]{k}:[/b] {v}' for k, v in stat.crucial_info.items()
+        ])
+        infos[-1] += '[/]'
+        infos = '\n'.join(infos)
+        
+        console = get_console()
+        return console.render_str(infos)
+
     def restore_settings(self):
         self.tree_levels_args = {
             '0':  {'label': '[b light_coral]<name>[/]', # default display setting for root node
@@ -324,33 +362,9 @@ class Meter:
         footer = Columns(title=Rule('[gray54]s u m m a r y[/]', characters='-', style='gray54'),
                          equal=True, 
                          expand=True)
-
-        forward_args:Tuple[str] = tuple(signature(self.model.forward).parameters.keys())
-        ipt_dict = {forward_args[args_idx]: anony_ipt for args_idx, anony_ipt in enumerate(self.ipt['args'])}
-        ipt_dict.update(self.ipt['kwargs'])
-        ipt_repr = [f"{args_name} = {data_repr(args_val)}" for args_name, args_val in ipt_dict.items()]
-        ipt_repr = ',\n'.join(ipt_repr) 
-
-        basic_info = '\n'.join([
-            '[dim]' + \
-            f'• [b]Model    :[/b] {self.optree.root.name}',
-            f'• [b]Device   :[/b] {self.device}',
-            f'• [b]Signature:[/b] forward(self, {','.join(forward_args)})',
-            f'• [b]Input    :[/b] \n{indent_str(ipt_repr, len('• Inp'), guideline=False)}' + \
-            '[/]'
-        ])
-
-        stat_info = ['[dim]' + f'• [b]Statistics:[/b] {stat.name}']
-        if stat.name == 'ittp':
-            stat_info.append(f'• [b]Benchmark Times:[/b] {self.ittp_benchmark_time}')
-        stat_info.extend([
-            f'• [b]{k}:[/b] {v}' for k, v in stat.crucial_info.items()
-        ])
-        stat_info[-1] += '[/]'
-        stat_info = '\n'.join(stat_info)
         
-        footer.add_renderable(basic_info)
-        footer.add_renderable(stat_info)
+        footer.add_renderable(self.model_info)
+        footer.add_renderable(self.stat_info(stat))
 
         temp_options = console.options.update_width(main_content_width)
         footer_height = len(console.render_lines(footer, options=temp_options))
