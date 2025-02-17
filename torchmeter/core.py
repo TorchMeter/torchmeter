@@ -1,4 +1,5 @@
 from inspect import signature
+from functools import partial
 from typing import Any, Dict, List, Tuple, Union
 
 import torch
@@ -8,6 +9,7 @@ from rich import get_console
 from rich.rule import Rule
 from rich.layout import Layout
 from rich.columns import Columns
+from rich.panel import Panel
 
 from torchmeter.engine import OperationTree
 from torchmeter.display import TreeRenderer, TabularRenderer
@@ -210,10 +212,6 @@ class Meter:
         return self.optree.root.ittp
 
     @property
-    def overview(self):
-        ...
-
-    @property
     def model_info(self):
         forward_args:Tuple[str] = tuple(signature(self.model.forward).parameters.keys())
         ipt_dict = {forward_args[args_idx]: anony_ipt for args_idx, anony_ipt in enumerate(self.ipt['args'])}
@@ -222,26 +220,23 @@ class Meter:
         ipt_repr = ',\n'.join(ipt_repr) 
 
         infos = '\n'.join([
-            '[dim]' + \
             f'• [b]Model    :[/b] {self.optree.root.name}',
             f'• [b]Device   :[/b] {self.device}',
             f'• [b]Signature:[/b] forward(self, {','.join(forward_args)})',
-            f'• [b]Input    :[/b] \n{indent_str(ipt_repr, len('• Inp'), guideline=False)}' + \
-            '[/]'
+            f'• [b]Input    :[/b] \n{indent_str(ipt_repr, len('• Inp'), guideline=False)}'
         ])
         
         console = get_console()
         return console.render_str(infos)
 
-    def stat_info(self,
-                  stat):
-        infos:List[str] = ['[dim]' + f'• [b]Statistics:[/b] {stat.name}']
+    def stat_info(self, stat):
+        infos:List[str] = [f'• [b]Statistics:[/b] {stat.name}']
         if stat.name == 'ittp':
             infos.append(f'• [b]Benchmark Times:[/b] {self.ittp_benchmark_time}')
         infos.extend([
             f'• [b]{k}:[/b] {v}' for k, v in stat.crucial_info.items()
         ])
-        infos[-1] += '[/]'
+                    
         infos = '\n'.join(infos)
         
         console = get_console()
@@ -291,6 +286,26 @@ class Meter:
             'expand': False,
             'leading': 0,
         }
+
+    def overview(self, *order:Tuple[str]):
+        """Overview of all statistics"""
+        
+        order = order or self.optree.root.statistics
+        
+        invalid_stat = tuple(filter(lambda x: not hasattr(self.optree.root, x), order))
+        assert len(invalid_stat) == 0, f"Invalid statistics: {invalid_stat}"
+        
+        container = Columns()
+        format_cell = partial(Panel, safe_box=True, expand=False, highlight=True)
+        
+        container.add_renderable(format_cell(self.model_info, title='[b]Model INFO[/]', border_style='orange1'))
+        container.renderables.extend([format_cell(self.stat_info(getattr(self, stat_name)), 
+                                                  title=f'[b]{stat_name.capitalize()} INFO[/]',
+                                                  border_style='cyan') 
+                                      for stat_name in order])
+        
+        console = get_console()
+        console.print(container)
 
     def profile(self, 
                 stat, 
@@ -363,8 +378,12 @@ class Meter:
                          equal=True, 
                          expand=True)
         
-        footer.add_renderable(self.model_info)
-        footer.add_renderable(self.stat_info(stat))
+        model_info = self.model_info
+        stat_info = self.stat_info(stat)
+        model_info.style = 'dim'
+        stat_info.style = 'dim'
+        footer.add_renderable(model_info)
+        footer.add_renderable(stat_info)
 
         temp_options = console.options.update_width(main_content_width)
         footer_height = len(console.render_lines(footer, options=temp_options))
