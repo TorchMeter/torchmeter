@@ -7,9 +7,10 @@ import torch.nn as nn
 from tqdm import tqdm
 from rich import get_console
 from rich.rule import Rule
+from rich.panel import Panel
 from rich.layout import Layout
 from rich.columns import Columns
-from rich.panel import Panel
+from rich.box import HORIZONTALS
 
 from torchmeter.engine import OperationTree
 from torchmeter.display import TreeRenderer, TabularRenderer
@@ -287,7 +288,7 @@ class Meter:
             'leading': 0,
         }
 
-    def overview(self, *order:Tuple[str]):
+    def overview(self, *order:Tuple[str]) -> Columns:
         """Overview of all statistics"""
         
         order = order or self.optree.root.statistics
@@ -295,8 +296,8 @@ class Meter:
         invalid_stat = tuple(filter(lambda x: not hasattr(self.optree.root, x), order))
         assert len(invalid_stat) == 0, f"Invalid statistics: {invalid_stat}"
         
-        container = Columns()
-        format_cell = partial(Panel, safe_box=True, expand=False, highlight=True)
+        container = Columns(expand=True, align='center')
+        format_cell = partial(Panel, safe_box=True, expand=False, highlight=True, box=HORIZONTALS)
         
         container.add_renderable(format_cell(self.model_info, title='[b]Model INFO[/]', border_style='orange1'))
         container.renderables.extend([format_cell(self.stat_info(getattr(self, stat_name)), 
@@ -304,8 +305,7 @@ class Meter:
                                                   border_style='cyan') 
                                       for stat_name in order])
         
-        console = get_console()
-        console.print(container)
+        return container
 
     def profile(self, 
                 stat, 
@@ -415,16 +415,17 @@ if __name__ == '__main__':
 
     model = models.resnet18()
     
-    metered_model = Meter(model, device='cpu')
+    metered_model = Meter(model, device='cuda:0')
     metered_model(torch.randn(1,3,224,224))
     
     # print(metered_model.structure)
-    print(metered_model.mem)
-    metered_model.profile(metered_model.mem,
-                          show=True, no_tree=False,
-                          raw_data=False,
-                          custom_cols={'Operation_Id': 'Operation ID'},
-                          pick_cols=['Operation_Id', 'Total'])
+    # print(metered_model.mem)
+    print(metered_model.overview())
+    # metered_model.profile(metered_model.mem,
+    #                       show=True, no_tree=False,
+    #                       raw_data=False,)
+                        #   custom_cols={'Operation_Id': 'Operation ID'},
+                        #   pick_cols=['Operation_Id', 'Total'])
                         #   newcol_name='Percentage',
                         #   newcol_func=lambda col_dict,all_num=metered_model.mem.TotalCost.val: f'{col_dict["Total"]*100/all_num:.3f} %',
                         #   newcol_dependcol=['Total'],
