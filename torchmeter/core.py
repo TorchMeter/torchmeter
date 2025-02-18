@@ -31,18 +31,6 @@ class Meter:
         self.render_time_sep = render_time_sep
         self.verbose = verbose
         self.__device = torch.device(device)
-        self.__tree_levels_args = {
-            '0':  {'label': '[b light_coral]<name>[/]', 
-                   'guide_style':'light_coral'}
-        }
-        self.__tree_rpblk_args = { 
-            'title': '[i]Repeat [[b]<repeat_time>[/b]] Times[/]',
-            'title_align': 'center',
-            'highlight': True,
-            'style': 'dark_goldenrod',
-            'border_style': 'dim',
-            'expand': False
-        }
         self.tb_col_args = {
             'justify': 'center',
             'vertical': 'middle',
@@ -111,23 +99,19 @@ class Meter:
 
     @property
     def tree_levels_args(self):
-        return self.__tree_levels_args
+        return self.tree_renderer.tree_level_args
     
     @tree_levels_args.setter
-    def tree_levels_args(self, custom_args:Dict[str, Any]) -> None:
-        self.__tree_levels_args = custom_args
-        self.tree_renderer.render_fold_tree = None
-        self.tree_renderer.render_unfold_tree = None
+    def tree_levels_args(self, custom_args:Union[List[Dict[str, Any]], Dict[Any, Dict[str, Any]]]) -> None:
+        self.tree_renderer.tree_level_args = custom_args
 
     @property
     def tree_repeat_block_args(self):
-        return self.__tree_rpblk_args
+        return self.tree_renderer.repeat_block_args
     
     @tree_repeat_block_args.setter
     def tree_repeat_block_args(self, custom_args:Dict[str, Any]) -> None:
-        self.__tree_rpblk_args = custom_args
-        self.tree_renderer.render_fold_tree = None
-        self.tree_renderer.render_unfold_tree = None
+        self.tree_renderer.repeat_block_args = custom_args
 
     @property
     def table_display_args(self):
@@ -150,9 +134,7 @@ class Meter:
         rendered_tree = self.tree_renderer.render_fold_tree if self.fold_repeat else self.tree_renderer.render_unfold_tree
         
         if rendered_tree is None:
-            rendered_tree = self.tree_renderer(fold_repeat=self.fold_repeat,
-                                               level_args=self.tree_levels_args,
-                                               repeat_block_args=self.tree_repeat_block_args)
+            rendered_tree = self.tree_renderer(fold_repeat=self.fold_repeat)
         
         # render_perline(renderable=rendered_tree)
         return rendered_tree
@@ -274,13 +256,13 @@ class Meter:
             'expand': False
         }
 
-        self.tb_col_args = {
+        self.table_column_args = {
             'justify': 'center',
             'vertical': 'middle',
             'overflow': 'fold'
         }
 
-        self.tb_args = {
+        self.table_display_args = {
             'style': 'spring_green4',
             'highlight': True,
 

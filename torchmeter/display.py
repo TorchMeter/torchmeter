@@ -432,6 +432,9 @@ class TreeRenderer:
                 _custom_args[level] = level_args_dict
                
         self.__levels_args = _custom_args
+        
+        self.render_fold_tree = None
+        self.render_unfold_tree = None
 
     @repeat_block_args.setter
     def repeat_block_args(self, custom_args:Dict[str, Any]) -> None:
@@ -458,12 +461,9 @@ class TreeRenderer:
         self.__rpblk_args.update(custom_args)
         self.__rpblk_args = {k:v for k, v in self.__rpblk_args.items() 
                                      if k in valid_setting_keys and k not in footer_key}
+        self.render_fold_tree = None
 
-    def __call__(self,
-                 *,
-                 fold_repeat:bool=True,
-                 level_args:Union[List[Dict[str, Any]], Dict[Any, Dict[str, Any]]]={},
-                 repeat_block_args:Dict[str, Any]={}) -> Tree:
+    def __call__(self, fold_repeat:bool=True) -> Tree:
         """Render the `OperationNode` object and its childs as a tree without polluting the original `OperationNode` object.
         
         see docs of the class(i.e. `torchmeter.display.TreeRenderer`) for details.
@@ -486,20 +486,7 @@ class TreeRenderer:
         ---
             see docs of the class(i.e. `torchmeter.display.TreeRenderer`) for details.
         """
-        
-        assert isinstance(level_args, (list, dict)), f"Argument `level_args` must be a dict or a list of dicts, but got {type(level_args)}"
-        assert isinstance(repeat_block_args, dict), f"Argument `repeat_block_args` must be a dict, but got {type(repeat_block_args)}"
-        
-        # check, clean and apply `level_args`, 
-        if level_args:
-            self.tree_level_args = level_args
-        del level_args
-        
-        # check, clean and apply `repeat_block_args`
-        if repeat_block_args:
-            self.repeat_block_args = repeat_block_args
-        del repeat_block_args
-        
+                
         # task_func for `dfs_task`
         def __apply_display_setting(subject:"OperationNode", # noqa # type: ignore
                                     pre_res=None) -> None:
