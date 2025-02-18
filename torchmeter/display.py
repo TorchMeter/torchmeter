@@ -876,8 +876,6 @@ class TabularRenderer:
                  raw_data:bool=False,
                  pick_cols:List[str]=[],
                  custom_cols:Dict[str, str]={},
-                 table_settings:Dict[str, Any]={},
-                 column_settings:Dict[str, Any]={},
                  newcol_name:str='',
                  newcol_func:Callable[[Dict[str, Any]], Any]=lambda col_dict: col_dict,
                  newcol_dependcol:List[str]=[],
@@ -949,8 +947,6 @@ class TabularRenderer:
                                   col_idx=newcol_idx)
             self.datas[stat_name] = data
 
-        self.tb_args = table_settings
-        self.col_args = column_settings
         tb = self.df2tb(df=data, show_raw=raw_data)
 
         if save_to:

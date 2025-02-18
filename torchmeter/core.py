@@ -85,7 +85,7 @@ class Meter:
         self.optree.root.fold_repeat = fold_repeat
 
         self.tree_renderer = TreeRenderer(self.optree.root)
-        self.tb_renderer = TabularRenderer(self.optree.root)
+        self.table_renderer = TabularRenderer(self.optree.root)
 
         self.__measure_param = False
         self.__measure_cal = False
@@ -128,6 +128,22 @@ class Meter:
         self.__tree_rpblk_args = custom_args
         self.tree_renderer.render_fold_tree = None
         self.tree_renderer.render_unfold_tree = None
+
+    @property
+    def table_display_args(self):
+        return self.table_renderer.tb_args
+
+    @table_display_args.setter
+    def table_display_args(self, custom_args:Dict[str, Any]) -> None:
+        self.table_renderer.tb_args = custom_args
+
+    @property
+    def table_column_args(self):
+        return self.table_renderer.col_args
+
+    @table_column_args.setter
+    def table_column_args(self, custom_args:Dict[str, Any]) -> None:
+        self.table_renderer.col_args = custom_args
 
     @property
     def structure(self):
@@ -335,10 +351,7 @@ class Meter:
 
         TREE_TABLE_GAP = 2 # the horizontal gap between tree and table
         
-        tb_kwargs['table_settings'] = tb_kwargs.get('table_settings', self.tb_args)
-        tb_kwargs['column_settings'] = tb_kwargs.get('column_settings', self.tb_col_args)
-
-        tb, data = self.tb_renderer(stat_name=stat.name, **tb_kwargs)
+        tb, data = self.table_renderer(stat_name=stat.name, **tb_kwargs)
         
         if not show:
             return tb, data
@@ -420,12 +433,17 @@ if __name__ == '__main__':
     
     # print(metered_model.structure)
     # print(metered_model.mem)
-    print(metered_model.overview())
-    # metered_model.profile(metered_model.mem,
-    #                       show=True, no_tree=False,
-    #                       raw_data=False,)
-                        #   custom_cols={'Operation_Id': 'Operation ID'},
-                        #   pick_cols=['Operation_Id', 'Total'])
+    metered_model.table_display_args = {'style':'red'}
+    metered_model.profile(metered_model.mem,
+                          show=True, no_tree=False,
+                          raw_data=False,
+                          custom_cols={'Operation_Id': 'Operation ID',
+                                       'Operation_Name': 'Operation Name',
+                                       'Param_Cost': 'Param Cost',
+                                       'FeatureMap_Cost': 'FeatureMap Cost'},
+                          pick_cols=['Operation_Id', 'Operation_Name', 
+                                     'Param_Cost','FeatureMap_Cost',
+                                     'Total'])
                         #   newcol_name='Percentage',
                         #   newcol_func=lambda col_dict,all_num=metered_model.mem.TotalCost.val: f'{col_dict["Total"]*100/all_num:.3f} %',
                         #   newcol_dependcol=['Total'],
