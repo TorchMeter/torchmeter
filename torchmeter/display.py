@@ -759,27 +759,6 @@ class TabularRenderer:
         self.__default_col_args.update(custom_args)
         self.__default_col_args = {k:v for k, v in self.__default_col_args.items() if k in valid_setting_keys}
 
-    @staticmethod
-    def __get_fields(stat:"Statistics", # noqa # type: ignore
-                     ipt_fields:List[str]):
-        """pick valid fields to display in the final table"""
-
-        valid_fields = stat.tb_fields
-
-        filted_fields = []
-        if ipt_fields: # filt out invalid fields
-            for field in ipt_fields:
-                if field not in valid_fields:
-                    warnings.warn(message=f'Field `{field}` not in the supported fields ({valid_fields}), \nwill be ignored.',
-                                  category=UserWarning)
-                    continue
-                filted_fields.append(field)
-        else:
-            # use all fields by default
-            filted_fields.extend(valid_fields)
-        
-        return filted_fields
-
     def __new_col(self, 
                   df:DataFrame,
                   col_name:str, 
@@ -893,9 +872,10 @@ class TabularRenderer:
     
     def __call__(self,
                  stat_name:str, 
-                 raw_data:bool=False,
                  *, 
-                 fields:List[str]=[],
+                 raw_data:bool=False,
+                 pick_cols:List[str]=[],
+                 custom_cols:Dict[str, str]={},
                  table_settings:Dict[str, Any]={},
                  column_settings:Dict[str, Any]={},
                  newcol_name:str='',
@@ -905,16 +885,18 @@ class TabularRenderer:
                  newcol_idx:int=-1,
                  save_to:Optional[str]=None,
                  save_format:Optional[str]=None): 
+        """render rich tabel according to the statistics dataframe.
+        Note that `pick_cols` work before `custom_col`
+        """
         
         assert isinstance(newcol_idx, int), f'`newcol_idx` must be an integer, but got {type(newcol_idx)}.'
         assert stat_name in self.opnode.statistics, \
             f"`{stat_name}` not in the supported statistics {self.opnode.statistics}"
         
         stat:"Statistic" = getattr(self.opnode, stat_name) # noqa # type: ignore
+        data:DataFrame = self.datas[stat_name]
 
-        # initialize the statistics data sheet
-        valid_fields = self.__get_fields(stat, fields)
-        data:DataFrame = self.__stats_data[stat_name]
+        valid_fields = data.columns or stat.tb_fields
     
         def __fill_cell(subject:"OperationNode", # noqa # type: ignore
                         pre_res=None):
@@ -934,18 +916,30 @@ class TabularRenderer:
                 val_collector.append(['-']*len(valid_fields))
 
         # only when the table is empty, then explore the data using dfs
-        # otherwise, rerange and return it directly
-        if data.is_empty():
+        if data.is_empty():            
             val_collector = []
             dfs_task(dfs_subject=self.opnode,
                      adj_func=lambda x: x.childs.values(),
                      task_func=__fill_cell,
                      visited_signal_func=lambda x: str(id(x)),
                      visited=[])
+            
             data = DataFrame(data=val_collector, schema=valid_fields, orient='row')
-        else:
-            data = data.select(valid_fields)
+            self.datas[stat_name] = data
         
+        # pick columns, order defined by `pick_cols`
+        if pick_cols:
+            invalid_cols = tuple(filter(lambda col_name:col_name not in data.columns, pick_cols))
+            assert not invalid_cols, f'Column names {invalid_cols} not found in supported columns {data.columns}.'
+            data = data.select(pick_cols)
+        
+        # custom columns name, order defined by `custom_col`
+        if custom_cols:
+            invalid_cols = tuple(filter(lambda col_name:col_name not in data.columns, custom_cols.keys()))
+            assert not invalid_cols, f'Column names {invalid_cols} not found in supported columns {data.columns}.'
+            data = data.rename(custom_cols)
+        
+        # add new column
         if newcol_name:
             data = self.__new_col(df=data,
                                   col_name=newcol_name,
@@ -953,13 +947,11 @@ class TabularRenderer:
                                   used_cols=newcol_dependcol,
                                   return_type=newcol_type,
                                   col_idx=newcol_idx)
-
+            self.datas[stat_name] = data
 
         self.tb_args = table_settings
         self.col_args = column_settings
         tb = self.df2tb(df=data, show_raw=raw_data)
-
-        self.datas[stat_name] = data
 
         if save_to:
             save_to = os.path.abspath(save_to)  
