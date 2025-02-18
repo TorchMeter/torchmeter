@@ -393,6 +393,8 @@ class Meter:
         canvas.split_column(Layout(main_content, name='top', size=main_content_height),
                             Layout(footer, name='down', size=footer_height))
         
+        origin_width = console.width
+        origin_height = console.height
         console.width = main_content_width
         console.height = main_content_height + footer_height
         if self.render_time_sep:
@@ -402,6 +404,9 @@ class Meter:
         else:
             console.print(canvas)
 
+        console.width = origin_width
+        console.height = origin_height
+        
         return tb, data
 
 if __name__ == '__main__':
@@ -416,8 +421,10 @@ if __name__ == '__main__':
     # print(metered_model.structure)
     print(metered_model.mem)
     metered_model.profile(metered_model.mem,
-                          show=True, no_tree=True,
-                          raw_data=False,)
+                          show=True, no_tree=False,
+                          raw_data=False,
+                          custom_cols={'Operation_Id': 'Operation ID'},
+                          pick_cols=['Operation_Id', 'Total'])
                         #   newcol_name='Percentage',
                         #   newcol_func=lambda col_dict,all_num=metered_model.mem.TotalCost.val: f'{col_dict["Total"]*100/all_num:.3f} %',
                         #   newcol_dependcol=['Total'],
