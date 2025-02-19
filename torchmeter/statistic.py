@@ -142,7 +142,7 @@ class Statistics(ABC):
         if opparent is None:
             link_data = UpperLinkData(val=init_val, **kwargs)
         else:
-            upper_getter = attrgetter(f'{self.name}.{attr_name}')
+            upper_getter = attrgetter(f"{self.name}.{attr_name}")
             link_data = UpperLinkData(val=init_val, 
                                       parent_data=upper_getter(opparent),
                                       **kwargs)
@@ -539,10 +539,10 @@ class MemMeter(Statistics):
     
     @property
     def crucial_info(self) -> Dict[str, str]:
-        res_dict =  {'[b]Parameters[/] Memory Cost': f'{self.ParamCost}, {self.ParamCost.val*100/self.TotalCost.val:.2f} %',
-                     '[b]Buffers[/] Memory Cost': f'{self.BufferCost}, {self.BufferCost.val*100/self.TotalCost.val:.2f} %',
-                     '[b]FeatureMap[/] Memory Cost': f'{self.FeatureMapCost}, {self.FeatureMapCost.val*100/self.TotalCost.val:.2f} %',
-                     '[b]Total Memory Cost[/]': f'{self.TotalCost}'}
+        res_dict =  {'[b]Parameters[/] Memory Cost': f"{self.ParamCost}, {self.ParamCost.val*100/self.TotalCost.val:.2f} %",
+                     '[b]Buffers[/] Memory Cost': f"{self.BufferCost}, {self.BufferCost.val*100/self.TotalCost.val:.2f} %",
+                     '[b]FeatureMap[/] Memory Cost': f"{self.FeatureMapCost}, {self.FeatureMapCost.val*100/self.TotalCost.val:.2f}",
+                     '[b]Total Memory Cost[/]': str(self.TotalCost)}
         max_keylen = max([len(key) for key in res_dict.keys()])
         res_dict = {key.ljust(max_keylen): value for key, value in res_dict.items()}
         return res_dict

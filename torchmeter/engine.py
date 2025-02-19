@@ -63,7 +63,7 @@ class OperationNode:
             if key in self.__dict__:
                 setattr(self, key, value)
             else:
-                warnings.warn(f'`{key}` is not a valid attribute of `OperationNode`, ignored.')
+                warnings.warn(f"`{key}` is not a valid attribute of `OperationNode`, ignored.")
 
     @property
     def param(self) -> ParamsMeter:
@@ -116,7 +116,7 @@ class OperationTree:
                                          task_func=OperationTree.__build,
                                          visited_signal_func=lambda x:x.addr,
                                          visited=[])
-            vb.exit_text = f'[b blue][green]{time.time()-start:.3f}[/green] seconds\n[/]'
+            vb.exit_text = f"[b blue][green]{time.time()-start:.3f}[/green] seconds\n[/]"
 
         self.all_nodes = [self.root] + nonroot_nodes
             

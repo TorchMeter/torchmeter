@@ -307,7 +307,7 @@ class TreeRenderer:
             - `TypeError`: if the new value is not a dict.
         """
         if not isinstance(custom_args, dict):
-            raise TypeError(f'The new value of `TreeRenderer.default_level_args` must be a dict. But got {type(custom_args)}.')
+            raise TypeError(f"The new value of `TreeRenderer.default_level_args` must be a dict. But got {type(custom_args)}.")
         
         valid_setting_keys = tuple(Tree('.').__dict__.keys())
         _val_dict = self.__default_level_args.__dict__
@@ -334,7 +334,7 @@ class TreeRenderer:
             `TypeError`: if the new value is not a dict or a list of dict.
         """
         if not isinstance(custom_args, (list, dict)):
-            raise TypeError(f'The new value of `TreeRenderer.tree_level_args` must be a dict or a list of dict. But got {type(custom_args)}.')
+            raise TypeError("The new value of `TreeRenderer.tree_level_args` must be a dict or a list of dict. But got {type(custom_args)}.")
         
         # convert to dict if input a list of dict
         if isinstance(custom_args, list):
@@ -401,7 +401,7 @@ class TreeRenderer:
             - `TypeError`: if the new value is not a dict.
         """
         if not isinstance(custom_args, dict):
-            raise TypeError(f'The new value of `TreeRenderer.repeat_block_args` must be a dict. But got {type(custom_args)}.')
+            raise TypeError(f"The new value of `TreeRenderer.repeat_block_args` must be a dict. But got {type(custom_args)}.")
         
         footer_key = list(filter(lambda x: x.lower() == 'repeat_footer', custom_args.keys()))
         if footer_key:
@@ -484,14 +484,14 @@ class TreeRenderer:
                         # update node_id with a algebraic expression which indicates the loop
                         if level != '1':
                            if loop_idx == 0:
-                               repeat_op_node.node_id = repeat_op_node.parent.node_id + f'.{loop_algebra}'
+                               repeat_op_node.node_id = repeat_op_node.parent.node_id + f".{loop_algebra}"
                            else:
-                               repeat_op_node.node_id = repeat_op_node.parent.node_id + f'.({loop_algebra}+{loop_idx})'
+                               repeat_op_node.node_id = repeat_op_node.parent.node_id + f".({loop_algebra}+{loop_idx})"
                         else:
                             if loop_idx == 0:
                                 repeat_op_node.node_id = loop_algebra
                             else:
-                                repeat_op_node.node_id = f'{loop_algebra}+{loop_idx}'
+                                repeat_op_node.node_id = f"{loop_algebra}+{loop_idx}"
                         
                         # disoolve label field for the `rich.Tree` object of the currently traversed node
                         label = self.__resolve_argtext(text=target_level_args['label'], attr_owner=repeat_op_node)
@@ -519,7 +519,7 @@ class TreeRenderer:
 
                     # update node_id with a algebraic expression which indicates the loop
                     if level != '1':
-                        subject.node_id = subject.parent.node_id + f'.{loop_algebra}'
+                        subject.node_id = subject.parent.node_id + f".{loop_algebra}"
                     else:
                         subject.node_id = loop_algebra
                     display_root.label = self.__resolve_argtext(text=target_level_args['label'], attr_owner=subject)
@@ -608,7 +608,7 @@ class TreeRenderer:
         
         if not isinstance(text, str):
             warnings.warn(message='The received text(see below) to be resolved is not a string, cannot go ahead.\n' + \
-                                  f'Type: {type(text)}\n Content: {text}',
+                                  f"Type: {type(text)}\n Content: {text}",
                           category=UserWarning)
 
         res_str = re.sub(pattern=r'(?<!\\)<(.*?)(?<!\\)>',
@@ -659,7 +659,7 @@ class TabularRenderer:
     @tb_args.setter
     def tb_args(self, custom_args:Dict[str, Any]):
         if not isinstance(custom_args, dict):
-            raise TypeError(f'The new value of `TabularRenderer.tb_args` must be a dict. But got {type(custom_args)}.')
+            raise TypeError(f"The new value of `TabularRenderer.tb_args` must be a dict. But got {type(custom_args)}.")
     
         valid_setting_keys = tuple(Table().__dict__.keys())
         _val_dict = self.__default_tb_args.__dict__
@@ -669,7 +669,7 @@ class TabularRenderer:
     @col_args.setter
     def col_args(self, custom_args:Dict[str, Any]):
         if not isinstance(custom_args, dict):
-            raise TypeError(f'The new value of `TabularRenderer.col_args` must be a dict. But got {type(custom_args)}.')
+            raise TypeError(f"The new value of `TabularRenderer.col_args` must be a dict. But got {type(custom_args)}.")
 
         valid_setting_keys = tuple(Column().__dict__.keys())
         _val_dict = self.__default_col_args.__dict__
@@ -686,7 +686,7 @@ class TabularRenderer:
         assert len(used_cols) > 0, 'You need to specify the columns used in the function for creating new columns, \
                                      and pass them to `newcol_dependcol` as a list.'
         for used_name in used_cols:
-            assert used_name in df.columns, f'Column `{used_name}` is not in the table.\nValid columns are {df.columns}.'
+            assert used_name in df.columns, f"Column `{used_name}` is not in the table.\nValid columns are {df.columns}."
 
         final_cols = df.columns[:]
         col_idx = (col_idx if col_idx >= 0 else len(df.columns)+col_idx+1) % (len(df.columns)+1)
@@ -747,16 +747,16 @@ class TabularRenderer:
         if format is None:
             format = os.path.splitext(save_path)[-1]
             assert '.' in format, 'File foramat unknown!\n' + \
-                                  f'Please specify a file path, not a dierectory path like {save_path}.\n' + \
-                                  f'Or specify a file format using `format=xxx`, now we support exporting to {self.valid_export_format} file.'
+                                  f"Please specify a file path, not a dierectory path like {save_path}.\n" + \
+                                  f"Or specify a file format using `format=xxx`, now we support exporting to {self.valid_export_format} file."
                                   
         format = format.strip('.')
         assert format in self.valid_export_format, \
-                f'`{format}` file is not supported, now we only support exporting {self.valid_export_format} file.'
+                f"`{format}` file is not supported, now we only support exporting {self.valid_export_format} file."
         
         _, file_path = perfect_savepath(origin_path=save_path,
                                        target_ext=format,
-                                       default_filename=f'{self.opnode.name}_{file_suffix}') 
+                                       default_filename=f"{self.opnode.name}_{file_suffix}") 
         
         # deal with invalid data
         df = deepcopy(df)
@@ -783,9 +783,9 @@ class TabularRenderer:
         
         # output saving message
         if file_suffix:
-            print(f'{file_suffix.capitalize()} data saved to [b magenta]{file_path}[/]')
+            print(f"{file_suffix.capitalize()} data saved to [b magenta]{file_path}[/]")
         else:
-            print(f'Data saved to [b magenta]{file_path}[/]')
+            print(f"Data saved to [b magenta]{file_path}[/]")
     
     def __call__(self,
                  stat_name:str, 
@@ -804,7 +804,7 @@ class TabularRenderer:
         Note that `pick_cols` work before `custom_col`
         """
         
-        assert isinstance(newcol_idx, int), f'`newcol_idx` must be an integer, but got {type(newcol_idx)}.'
+        assert isinstance(newcol_idx, int), f"`newcol_idx` must be an integer, but got {type(newcol_idx)}."
         assert stat_name in self.opnode.statistics, \
             f"`{stat_name}` not in the supported statistics {self.opnode.statistics}"
         
@@ -845,13 +845,13 @@ class TabularRenderer:
         # pick columns, order defined by `pick_cols`
         if pick_cols:
             invalid_cols = tuple(filter(lambda col_name:col_name not in data.columns, pick_cols))
-            assert not invalid_cols, f'Column names {invalid_cols} not found in supported columns {data.columns}.'
+            assert not invalid_cols, f"Column names {invalid_cols} not found in supported columns {data.columns}."
             data = data.select(pick_cols)
         
         # custom columns name, order defined by `custom_col`
         if custom_cols:
             invalid_cols = tuple(filter(lambda col_name:col_name not in data.columns, custom_cols.keys()))
-            assert not invalid_cols, f'Column names {invalid_cols} not found in supported columns {data.columns}.'
+            assert not invalid_cols, f"Column names {invalid_cols} not found in supported columns {data.columns}."
             data = data.rename(custom_cols)
         
         # add new column

@@ -287,15 +287,15 @@ class Config(metaclass=ConfigMeta):
         s = '• Config file: ' + (self.config_file if self.config_file else 'None(default setting below)') + '\n'
         for field_name, field_vals in d.items():
             not_container = False
-            field_vals_repr = [f'\n• {field_name}: ']
+            field_vals_repr = [f"\n• {field_name}: "]
             
             if isinstance(field_vals, dict):
-                field_vals_repr.extend([f'{k} = {v} ' for k,v in field_vals.items()])
+                field_vals_repr.extend([f"{k} = {v} " for k,v in field_vals.items()])
             elif isinstance(field_vals, list):
-                field_vals_repr.extend([f'- {v}' for v in field_vals])
+                field_vals_repr.extend([f"- {v}" for v in field_vals])
             else:
                 not_container = True
-                field_vals_repr.append(f'{field_vals}')
+                field_vals_repr.append(str(field_vals))
             
             # concat field name and field value if it is not a container
             if len(field_vals_repr) == 2 and not_container:

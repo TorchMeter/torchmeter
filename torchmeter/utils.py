@@ -13,11 +13,11 @@ def perfect_savepath(origin_path:str,
     if '.' in file: # specify a file path
         os.makedirs(dir, exist_ok=True)
         save_dir = dir
-        save_file = os.path.join(dir, os.path.splitext(file)[0]+f'.{target_ext}')
+        save_file = os.path.join(dir, os.path.splitext(file)[0]+f".{target_ext}")
     else: # specify a dir path
         os.makedirs(origin_path, exist_ok=True)
         save_dir = origin_path
-        save_file = os.path.join(origin_path, f'{default_filename}.{target_ext}')
+        save_file = os.path.join(origin_path, f"{default_filename}.{target_ext}")
     
     return save_dir, save_file
 
@@ -53,9 +53,9 @@ def check_args(func:Callable, *required_args:Tuple[str]) -> List:
     missing_args = [arg for arg in required_args 
                         if arg not in signature(func).parameters]
     if missing_args:
-        print(f'[bold red]Missing following args in function `{func.__name__}()`:[/]')
+        print(f"[bold red]Missing following args in function `{func.__name__}()`:[/]")
         for arg in missing_args:
-            print(f'[red][-] [bold]`{arg}`[/]')
+            print(f"[red][-] [bold]`{arg}`[/]")
     
     return missing_args
 
@@ -134,7 +134,7 @@ def dfs_task(dfs_subject:Any,
     
     missing_args = check_args(task_func, 'subject', 'pre_res')
     if missing_args:
-        print(f'[bold red]Argument `task_func` of `{dfs_task.__name__}()` should be passed in a function with two parameters:')
+        print(f"[bold red]Argument `task_func` of `{dfs_task.__name__}()` should be passed in a function with two parameters:")
         print('[bold red]1. [magenta]`subject`[/magenta]: the first argument, used to receive the currently traversed object[/]')
         print('[bold red]2. [magenta]`pre_res`[/magenta]: the second argument, used to receive the result of the previous level task[/]')
         sys.exit(1)
@@ -184,15 +184,15 @@ def data_repr(val:Any):
     val_type = get_type(val)
     if isinstance(val, (list, tuple, set, dict)) and len(val) > 0:
         if isinstance(val, dict):
-            inner_repr:List[str] = [f'{item_repr(get_type(k),k)}: {data_repr(v)}' for k, v in val.items()]
+            inner_repr:List[str] = [f"{item_repr(get_type(k),k)}: {data_repr(v)}" for k, v in val.items()]
         else:
             inner_repr:List[str] = [data_repr(i) for i in val]
         
-        res_repr = f'[dim]{val_type}[/](' 
+        res_repr = f"[dim]{val_type}[/]("
         res_repr += ',\n'.join(inner_repr)
         res_repr += ')'
 
-        return indent_str(res_repr, indent=len(f'{val_type}('), process_first=False)
+        return indent_str(res_repr, indent=len(f"{val_type}("), process_first=False)
     
     else:
         return item_repr(val_type, val)

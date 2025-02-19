@@ -31,7 +31,7 @@ class Meter:
         elif isinstance(model, nn.Module):
             self.model = model.to(self.__device)
         else:
-            raise TypeError(f'model must be a torch.nn.Module or a path to a model, but got {type(model)}')
+            raise TypeError(f"model must be a torch.nn.Module or a path to a model, but got {type(model)}")
 
         self.ipt = {'args':tuple(), 'kwargs':dict()} # TODO: self.ipt_infer()
 
@@ -181,21 +181,21 @@ class Meter:
         ipt_repr = ',\n'.join(ipt_repr) 
 
         infos = '\n'.join([
-            f'• [b]Model    :[/b] {self.optree.root.name}',
-            f'• [b]Device   :[/b] {self.device}',
-            f'• [b]Signature:[/b] forward(self, {','.join(forward_args)})',
-            f'• [b]Input    :[/b] \n{indent_str(ipt_repr, len('• Inp'), guideline=False)}'
+            f"• [b]Model    :[/b] {self.optree.root.name}",
+            f"• [b]Device   :[/b] {self.device}",
+            f"• [b]Signature:[/b] forward(self, {','.join(forward_args)})",
+            f"• [b]Input    :[/b] \n{indent_str(ipt_repr, indent=5, guideline=False)}"
         ])
         
         console = get_console()
         return console.render_str(infos)
 
     def stat_info(self, stat):
-        infos:List[str] = [f'• [b]Statistics:[/b] {stat.name}']
+        infos:List[str] = [f"• [b]Statistics:[/b] {stat.name}"]
         if stat.name == 'ittp':
-            infos.append(f'• [b]Benchmark Times:[/b] {self.ittp_benchmark_time}')
+            infos.append(f"• [b]Benchmark Times:[/b] {self.ittp_benchmark_time}")
         infos.extend([
-            f'• [b]{k}:[/b] {v}' for k, v in stat.crucial_info.items()
+            f"• [b]{k}:[/b] {v}" for k, v in stat.crucial_info.items()
         ])
                     
         infos = '\n'.join(infos)
@@ -216,7 +216,7 @@ class Meter:
         
         container.add_renderable(format_cell(self.model_info, title='[b]Model INFO[/]', border_style='orange1'))
         container.renderables.extend([format_cell(self.stat_info(getattr(self, stat_name)), 
-                                                  title=f'[b]{stat_name.capitalize()} INFO[/]',
+                                                  title=f"[b]{stat_name.capitalize()} INFO[/]",
                                                   border_style='cyan') 
                                       for stat_name in order])
         
