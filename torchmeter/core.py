@@ -12,9 +12,12 @@ from rich.layout import Layout
 from rich.columns import Columns
 from rich.box import HORIZONTALS
 
+from torchmeter.config import get_config
 from torchmeter.engine import OperationTree
 from torchmeter.utils import indent_str, data_repr
 from torchmeter.display import TreeRenderer, TabularRenderer, render_perline
+
+__cfg__ = get_config()
 
 class Meter:
 
@@ -221,7 +224,6 @@ class Meter:
     def profile(self, 
                 stat, 
                 show=True, no_tree=False, 
-                force_preset=False,
                 **tb_kwargs):
         """To render a tabular profile of the statistics
         
@@ -244,7 +246,7 @@ class Meter:
         
         """
 
-        TREE_TABLE_GAP = 2 # the horizontal gap between tree and table
+        TREE_TABLE_GAP = __cfg__.combine.horizon_gap # the horizontal gap between tree and table
         
         tb, data = self.table_renderer(stat_name=stat.name, **tb_kwargs)
         
@@ -262,7 +264,7 @@ class Meter:
             raise ValueError("The width of the terminal is too small, try to maximize the window and try again.")
         
         # when some cells in the table is overflown, we need to show a line between rows
-        if actual_tb_width < desirable_tb_width and not force_preset:
+        if actual_tb_width < desirable_tb_width:
             tb.show_lines = True 
         
         # get main content(i.e. tree & statistics table)
