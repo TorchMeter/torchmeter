@@ -2,14 +2,6 @@ from typing import Union
 from enum import Enum, IntEnum, IntFlag, unique
 
 @unique
-class DecimalUnit(IntEnum):
-    T:int = 1e12
-    G:int = 1e9
-    M:int = 1e6
-    K:int = 1e3
-    B:int = 1e0
-
-@unique
 class CountUnit(IntEnum):
     T:int = 1e12
     G:int = 1e9
@@ -41,13 +33,16 @@ class SpeedUnit(IntEnum):
     KSamPS:int = 1e3
     SamPS:int  = 1e0
 
-UNIT_TYPE = Union[DecimalUnit, BinaryUnit, TimeUnit, SpeedUnit]
+UNIT_TYPE = Union[CountUnit, BinaryUnit, TimeUnit, SpeedUnit]
 
-def auto_unit(val:Union[int, float], unit_system=DecimalUnit) -> Union[str, None]:
+def auto_unit(val:Union[int, float], unit_system=CountUnit) -> str:
     for unit in list(unit_system):
         if val >= unit.value:
             if val % unit.value:
                 return f"{val / unit.value:.2f} {unit.name}"
             else:
                 return f"{val // unit.value} {unit.name}"
-    return str(val)
+    if isinstance(val, int):
+        return str(val)
+    else:
+        return f"{val:.2f}"

@@ -12,7 +12,7 @@ from torch.cuda import Event as cuda_event
 from torch.cuda import synchronize as cuda_sync
 
 from torchmeter.unit import UNIT_TYPE, auto_unit
-from torchmeter.unit import CountUnit, DecimalUnit, BinaryUnit, TimeUnit, SpeedUnit
+from torchmeter.unit import CountUnit, BinaryUnit, TimeUnit, SpeedUnit
 
 OPN_TYPE = TypeVar("OperationNode")
 
@@ -55,7 +55,7 @@ class MetricsData:
                  'reduce_func',
                  '__unit_sys']
 
-    def __init__(self, reduce_func:Optional[Callable]=np.mean, unit_sys:Optional[UNIT_TYPE]=DecimalUnit):
+    def __init__(self, reduce_func:Optional[Callable]=np.mean, unit_sys:Optional[UNIT_TYPE]=CountUnit):
         self.vals = np.array([])
         self.reduce_func = reduce_func if reduce_func is not None else lambda x:x
         self.__unit_sys = unit_sys
@@ -287,9 +287,9 @@ class CalMeter(Statistics):
 
         _opparent = opnode.parent
         self.__Macs = self.init_linkdata(attr_name='Macs', init_val=0, opparent=_opparent, 
-                                         unit_sys=DecimalUnit, none_str='Not Supported')
+                                         unit_sys=CountUnit, none_str='Not Supported')
         self.__Flops = self.init_linkdata(attr_name='Flops', init_val=0, opparent=_opparent, 
-                                          unit_sys=DecimalUnit, none_str='Not Supported')
+                                          unit_sys=CountUnit, none_str='Not Supported')
 
     @property
     def name(self) -> str:
