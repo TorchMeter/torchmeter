@@ -1,5 +1,4 @@
 import re
-import time
 import warnings
 from copy import deepcopy
 from collections import OrderedDict
@@ -8,12 +7,10 @@ from typing import Any, Dict, List, Optional, Tuple
 import torch.nn as nn
 from rich.tree import Tree
 
-from torchmeter.config import get_config
-from torchmeter.utils import dfs_task, Verboser
+from torchmeter.utils import dfs_task, Timer
 from torchmeter.statistic import ParamsMeter, CalMeter, MemMeter, ITTPMeter
 
 __all__ = ('OperationNode', 'OperationTree')
-__cfg__ = get_config()
 
 class OperationNode:
    
@@ -106,17 +103,12 @@ class OperationTree:
                                   node_id="0",
                                   render_when_repeat=True)
         
-        with Verboser(enable=verbose,
-                      enter_text='[b blue]Scaning model in ',
-                      enter_args={'end':''}) as vb:
-            start = time.time()
-            # all_nodes: List[OperationNode], a list holding all operation nodes but the root
+        with Timer(task_desc="Scanning model"):
             nonroot_nodes, *_ = dfs_task(dfs_subject=self.root, 
                                          adj_func=lambda x:x.childs.values(),
                                          task_func=OperationTree.__build,
                                          visited_signal_func=lambda x:x.addr,
                                          visited=[])
-            vb.exit_text = f"[b blue][green]{time.time()-start:.3f}[/green] seconds\n[/]"
 
         self.all_nodes = [self.root] + nonroot_nodes
             

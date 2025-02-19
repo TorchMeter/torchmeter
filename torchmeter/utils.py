@@ -1,9 +1,11 @@
 import os
 import sys
-from rich import print
+from time import perf_counter
 from inspect import signature
 from functools import partial
 from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Union
+
+from rich.status import Status
 
 def perfect_savepath(origin_path:str, 
                      target_ext:Optional[str],
@@ -197,42 +199,18 @@ def data_repr(val:Any):
     else:
         return item_repr(val_type, val)
 
-class Verboser:
-    def __init__(self, 
-                 enable:bool=True, 
-                 enter_text:str='',
-                 enter_args:dict={},
-                 exit_text:str='',
-                 exit_args:dict={}):
-        """
-        A context manager to print specific text when entering and exiting the context.
-
-        Args:
-        ---
-            - `enable` (bool, optional): Whether to enable the functionality. Defaults to True.
-            
-            - `enter_text` (str, optional): The text to print when entering the context. Defaults to ''.
-            
-            - `enter_args` (dict, optional): The arguments to pass to `rich.print()` when entering the manager. Defaults to {}.
-            
-            - `exit_text` (str, optional): The text to print when exiting the context. Defaults to ''.
-            
-            - `exit_args` (dict, optional): The arguments to pass to `rich.print()` when exiting the manager. Defaults to {}.
-        """
-        self.enable = enable
-        
-        self.enter_text = enter_text
-        self.enter_args = enter_args
-        
-        self.exit_text = exit_text
-        self.exit_args = exit_args
+class Timer(Status):
+    def __init__(self, /, task_desc:str,
+                 *args, **kwargs):
+        super(Timer, self).__init__(status=task_desc, *args, **kwargs)
+        self.task_desc = task_desc
     
     def __enter__(self):
-        if self.enable:
-            print(self.enter_text, **self.enter_args)
+        super().__enter__()
+        self.__start_time = perf_counter()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.enable:
-            print(self.exit_text, **self.exit_args)
-        return False
+        ellapsed_time = perf_counter() - self.__start_time
+        super().__exit__(exc_type, exc_val, exc_tb)
+        self.console.print(f"[b blue]Finish {self.task_desc} in [green]{ellapsed_time:.4f}[/green] seconds[/]")

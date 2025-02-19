@@ -23,18 +23,16 @@ class Meter:
 
     def __init__(self, 
                  model: nn.Module,
-                 device:str='cpu',
-                 verbose:bool=True):
+                 device:str='cpu'):
         
-        self.verbose = verbose
         self.__device = torch.device(device)
 
-        assert isinstance(model, nn.Module), f"model must be a torch.nn.Module or a path to a model, but got {type(model)}"
+        assert isinstance(model, nn.Module), f"model must be an instance of torch.nn.Module, but got {type(model)}"
         self.model = model.to(self.__device)
 
         self.ipt = {'args':tuple(), 'kwargs':dict()} # TODO: self.ipt_infer()
 
-        self.optree = OperationTree(self.model, verbose=verbose)
+        self.optree = OperationTree(self.model)
 
         self.tree_renderer = TreeRenderer(self.optree.root)
         self.table_renderer = TabularRenderer(self.optree.root)
