@@ -1,29 +1,32 @@
 import os
-import sys
 from time import perf_counter
 from inspect import signature
 from functools import partial
-from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Iterable, List, Sequence, Tuple, Union
 
 from rich.status import Status
 
-def perfect_savepath(origin_path:str, 
-                     target_ext:Optional[str],
+def resolve_savepath(origin_path:str, 
+                     target_ext:str,
                      default_filename:str='Data'):
     origin_path = os.path.abspath(origin_path)
     dir, file = os.path.split(origin_path)
-    if '.' in file: # specify a file path
+    
+    # origin_path is a file path
+    if '.' in file: 
         os.makedirs(dir, exist_ok=True)
         save_dir = dir
         save_file = os.path.join(dir, os.path.splitext(file)[0]+f".{target_ext}")
-    else: # specify a dir path
+    
+    # origin_path is a dir path
+    else: 
         os.makedirs(origin_path, exist_ok=True)
         save_dir = origin_path
         save_file = os.path.join(origin_path, f"{default_filename}.{target_ext}")
     
     return save_dir, save_file
 
-def check_args(func:Callable, *required_args:Tuple[str]) -> List:
+def hasargs(func:Callable, *required_args:Tuple[str]) -> None:
     """
     Check if the function `func` has all the required arguments.
 
@@ -34,32 +37,15 @@ def check_args(func:Callable, *required_args:Tuple[str]) -> List:
 
     Returns:
     ---
-        List: A list containing names of missing arguments.
-    
-    Example:
-    ---
-    ```python
-    def test_func(a, bb, c_c, d9):
-        pass
-
-    check_args(test_func, 'a', 'bb', 'c_c', 'd9') 
-    # >>> []
-
-    check_args(test_func, 'A', 'e') 
-    # >>> ['A', 'e']
-    ```
+        None
     """
     if not required_args:
-        return []
+        return 
         
     missing_args = [arg for arg in required_args 
                         if arg not in signature(func).parameters]
-    if missing_args:
-        print(f"[bold red]Missing following args in function `{func.__name__}()`:[/]")
-        for arg in missing_args:
-            print(f"[red][-] [bold]`{arg}`[/]")
     
-    return missing_args
+    assert not missing_args, f"Function `{func.__name__}()` is missing follewing required args: {missing_args}."
 
 def dfs_task(dfs_subject:Any,
              adj_func:Callable[[Any], Iterable],
@@ -134,13 +120,7 @@ def dfs_task(dfs_subject:Any,
         ```
     """
     
-    missing_args = check_args(task_func, 'subject', 'pre_res')
-    if missing_args:
-        print(f"[bold red]Argument `task_func` of `{dfs_task.__name__}()` should be passed in a function with two parameters:")
-        print('[bold red]1. [magenta]`subject`[/magenta]: the first argument, used to receive the currently traversed object[/]')
-        print('[bold red]2. [magenta]`pre_res`[/magenta]: the second argument, used to receive the result of the previous level task[/]')
-        sys.exit(1)
-    del missing_args
+    hasargs(task_func, 'subject', 'pre_res')
 
     visited_signal = visited_signal_func(dfs_subject)
     

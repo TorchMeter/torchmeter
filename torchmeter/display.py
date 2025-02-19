@@ -17,7 +17,7 @@ from polars import DataFrame, struct, col
 from polars import List as pl_list, Object as pl_object
 
 from torchmeter.config import get_config, dict_to_namespace
-from torchmeter.utils import dfs_task, perfect_savepath
+from torchmeter.utils import dfs_task, resolve_savepath
 
 __cfg__ = get_config()
 NAMESPACE_TYPE = TypeVar('NameSpace')
@@ -754,7 +754,7 @@ class TabularRenderer:
         assert format in self.valid_export_format, \
                 f"`{format}` file is not supported, now we only support exporting {self.valid_export_format} file."
         
-        _, file_path = perfect_savepath(origin_path=save_path,
+        _, file_path = resolve_savepath(origin_path=save_path,
                                        target_ext=format,
                                        default_filename=f"{self.opnode.name}_{file_suffix}") 
         
