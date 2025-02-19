@@ -7,69 +7,24 @@ import torch.nn as nn
 from tqdm import tqdm
 from rich import get_console
 from rich.rule import Rule
+from rich.panel import Panel
 from rich.layout import Layout
 from rich.columns import Columns
-from rich.panel import Panel
+from rich.box import HORIZONTALS
 
 from torchmeter.engine import OperationTree
-from torchmeter.display import TreeRenderer, TabularRenderer
-from torchmeter.display import indent_str, data_repr, render_perline
+from torchmeter.utils import indent_str, data_repr
+from torchmeter.display import TreeRenderer, TabularRenderer, render_perline
 
 class Meter:
 
     def __init__(self, 
                  model: Union[nn.Module, str],
                  device:str='cpu',
-                 fold_repeat:bool=True,
-                 render_time_sep:float=0.15,
                  verbose:bool=True):
         
-        assert render_time_sep >= 0, f'`render_time_sep` must be a non-negative number, but got {render_time_sep}.'
-
-        self.fold_repeat = fold_repeat
-        self.render_time_sep = render_time_sep
         self.verbose = verbose
         self.__device = torch.device(device)
-        self.__tree_levels_args = {
-            '0':  {'label': '[b light_coral]<name>[/]', 
-                   'guide_style':'light_coral'}
-        }
-        self.__tree_rpblk_args = { 
-            'title': '[i]Repeat [[b]<repeat_time>[/b]] Times[/]',
-            'title_align': 'center',
-            'highlight': True,
-            'style': 'dark_goldenrod',
-            'border_style': 'dim',
-            'expand': False
-        }
-        self.tb_col_args = {
-            'justify': 'center',
-            'vertical': 'middle',
-            'overflow': 'fold'
-        }
-        self.tb_args = {
-            'style': 'spring_green4',
-            'highlight': True,
-
-            'title': None,
-            'title_style': 'bold',
-            'title_justify': 'center',
-            'title_align': 'center',
-
-            'show_header': True,
-            'header_style': 'bold',
-
-            'show_footer': False,
-            'footer_style': 'italic',
-
-            'show_lines': False,
-
-            'show_edge': True,
-            'safe_box': True,
-
-            'expand': False,
-            'leading': 0,
-        }
 
         if isinstance(model, str):
             self.model = torch.load(model, map_location=self.__device)
@@ -81,10 +36,9 @@ class Meter:
         self.ipt = {'args':tuple(), 'kwargs':dict()} # TODO: self.ipt_infer()
 
         self.optree = OperationTree(self.model, verbose=verbose)
-        self.optree.root.fold_repeat = fold_repeat
 
         self.tree_renderer = TreeRenderer(self.optree.root)
-        self.tb_renderer = TabularRenderer(self.optree.root)
+        self.table_renderer = TabularRenderer(self.optree.root)
 
         self.__measure_param = False
         self.__measure_cal = False
@@ -110,32 +64,39 @@ class Meter:
 
     @property
     def tree_levels_args(self):
-        return self.__tree_levels_args
+        return self.tree_renderer.tree_level_args
     
     @tree_levels_args.setter
-    def tree_levels_args(self, custom_args:Dict[str, Any]) -> None:
-        self.__tree_levels_args = custom_args
-        self.tree_renderer.render_fold_tree = None
-        self.tree_renderer.render_unfold_tree = None
+    def tree_levels_args(self, custom_args:Union[List[Dict[str, Any]], Dict[Any, Dict[str, Any]]]) -> None:
+        self.tree_renderer.tree_level_args = custom_args
 
     @property
     def tree_repeat_block_args(self):
-        return self.__tree_rpblk_args
+        return self.tree_renderer.repeat_block_args
     
     @tree_repeat_block_args.setter
     def tree_repeat_block_args(self, custom_args:Dict[str, Any]) -> None:
-        self.__tree_rpblk_args = custom_args
-        self.tree_renderer.render_fold_tree = None
-        self.tree_renderer.render_unfold_tree = None
+        self.tree_renderer.repeat_block_args = custom_args
+
+    @property
+    def table_display_args(self):
+        return self.table_renderer.tb_args
+
+    @table_display_args.setter
+    def table_display_args(self, custom_args:Dict[str, Any]) -> None:
+        self.table_renderer.tb_args = custom_args
+
+    @property
+    def table_column_args(self):
+        return self.table_renderer.col_args
+
+    @table_column_args.setter
+    def table_column_args(self, custom_args:Dict[str, Any]) -> None:
+        self.table_renderer.col_args = custom_args
 
     @property
     def structure(self):
-        rendered_tree = self.tree_renderer.render_fold_tree if self.fold_repeat else self.tree_renderer.render_unfold_tree
-        
-        if rendered_tree is None:
-            rendered_tree = self.tree_renderer(fold_repeat=self.fold_repeat,
-                                               level_args=self.tree_levels_args,
-                                               repeat_block_args=self.tree_repeat_block_args)
+        rendered_tree = self.tree_renderer()
         
         # render_perline(renderable=rendered_tree)
         return rendered_tree
@@ -242,52 +203,7 @@ class Meter:
         console = get_console()
         return console.render_str(infos)
 
-    def restore_settings(self):
-        self.tree_levels_args = {
-            '0':  {'label': '[b light_coral]<name>[/]', # default display setting for root node
-                   'guide_style':'light_coral'}
-        }
-
-        self.tree_repeat_block_args = { 
-            'title': '[i]Repeat [[b]<repeat_time>[/b]] Times[/]',
-            'title_align': 'center',
-            'highlight': True,
-            'style': 'dark_goldenrod',
-            'border_style': 'dim',
-            'expand': False
-        }
-
-        self.tb_col_args = {
-            'justify': 'center',
-            'vertical': 'middle',
-            'overflow': 'fold'
-        }
-
-        self.tb_args = {
-            'style': 'spring_green4',
-            'highlight': True,
-
-            'title': None,
-            'title_style': 'bold',
-            'title_justify': 'center',
-            'title_align': 'center',
-
-            'show_header': True,
-            'header_style': 'bold',
-
-            'show_footer': False,
-            'footer_style': 'italic',
-
-            'show_lines': False,
-
-            'show_edge': True,
-            'safe_box': True,
-
-            'expand': False,
-            'leading': 0,
-        }
-
-    def overview(self, *order:Tuple[str]):
+    def overview(self, *order:Tuple[str]) -> Columns:
         """Overview of all statistics"""
         
         order = order or self.optree.root.statistics
@@ -295,8 +211,8 @@ class Meter:
         invalid_stat = tuple(filter(lambda x: not hasattr(self.optree.root, x), order))
         assert len(invalid_stat) == 0, f"Invalid statistics: {invalid_stat}"
         
-        container = Columns()
-        format_cell = partial(Panel, safe_box=True, expand=False, highlight=True)
+        container = Columns(expand=True, align='center')
+        format_cell = partial(Panel, safe_box=True, expand=False, highlight=True, box=HORIZONTALS)
         
         container.add_renderable(format_cell(self.model_info, title='[b]Model INFO[/]', border_style='orange1'))
         container.renderables.extend([format_cell(self.stat_info(getattr(self, stat_name)), 
@@ -304,8 +220,7 @@ class Meter:
                                                   border_style='cyan') 
                                       for stat_name in order])
         
-        console = get_console()
-        console.print(container)
+        return container
 
     def profile(self, 
                 stat, 
@@ -335,10 +250,7 @@ class Meter:
 
         TREE_TABLE_GAP = 2 # the horizontal gap between tree and table
         
-        tb_kwargs['table_settings'] = tb_kwargs.get('table_settings', self.tb_args)
-        tb_kwargs['column_settings'] = tb_kwargs.get('column_settings', self.tb_col_args)
-
-        tb, data = self.tb_renderer(stat_name=stat.name, **tb_kwargs)
+        tb, data = self.table_renderer(stat_name=stat.name, **tb_kwargs)
         
         if not show:
             return tb, data
@@ -397,12 +309,8 @@ class Meter:
         origin_height = console.height
         console.width = main_content_width
         console.height = main_content_height + footer_height
-        if self.render_time_sep:
-            render_perline(renderable=canvas, 
-                           console=console,
-                           time_sep=self.render_time_sep)
-        else:
-            console.print(canvas)
+
+        render_perline(renderable=canvas, console=console)
 
         console.width = origin_width
         console.height = origin_height
@@ -412,19 +320,28 @@ class Meter:
 if __name__ == '__main__':
     from rich import print
     from torchvision import models
-
+    from torchmeter.config import get_config
+    
+    cfg = get_config()
     model = models.resnet18()
     
-    metered_model = Meter(model, device='cpu')
+    metered_model = Meter(model, device='cuda:0')
     metered_model(torch.randn(1,3,224,224))
     
-    # print(metered_model.structure)
+    print(metered_model.structure)
     print(metered_model.mem)
+    cfg.tree_levels_args.default.guide_style = 'red'
+    cfg.table_display_args.style = 'red'
     metered_model.profile(metered_model.mem,
                           show=True, no_tree=False,
                           raw_data=False,
-                          custom_cols={'Operation_Id': 'Operation ID'},
-                          pick_cols=['Operation_Id', 'Total'])
+                          custom_cols={'Operation_Id': 'Operation ID',
+                                       'Operation_Name': 'Operation Name',
+                                       'Param_Cost': 'Param Cost',
+                                       'FeatureMap_Cost': 'FeatureMap Cost'},
+                          pick_cols=['Operation_Id', 'Operation_Name', 
+                                     'Param_Cost','FeatureMap_Cost',
+                                     'Total'])
                         #   newcol_name='Percentage',
                         #   newcol_func=lambda col_dict,all_num=metered_model.mem.TotalCost.val: f'{col_dict["Total"]*100/all_num:.3f} %',
                         #   newcol_dependcol=['Total'],

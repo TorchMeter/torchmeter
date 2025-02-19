@@ -4,7 +4,7 @@ import time
 import warnings
 from copy import copy,deepcopy
 from operator import attrgetter
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Union, TypeVar
 
 from rich import print, get_console
 from rich.rule import Rule
@@ -12,61 +12,21 @@ from rich.tree import Tree
 from rich.panel import Panel
 from rich.segment import Segment
 from rich.table import Table, Column
-from rich.box import HEAVY_EDGE, ROUNDED
 from rich.console import Group, RenderableType
 from polars import DataFrame, struct, col
 from polars import List as pl_list, Object as pl_object
 
+from torchmeter.config import get_config, dict_to_namespace
 from torchmeter.utils import dfs_task, perfect_savepath
 
-def indent_str(s:Union[str, Sequence[str]], 
-               indent:int=4, 
-               guideline:bool=True,
-               process_first:bool=True) -> str:
-    res = []
-    split_lines = s.split('\n') if isinstance(s, str) else s
-    guideline = False if len(split_lines) == 1 else guideline
-    
-    for line in split_lines:
-        indent_line = '│' if guideline else ' ' 
-        indent_line += ' '*(indent-1) + str(line)
-        res.append(indent_line)
-
-    if not process_first:
-        res[0] = res[0][indent:]
-
-    if guideline:
-        res[-1] = '└─' + res[-1][2:]
-    
-    return '\n'.join(res)
-
-def data_repr(val:Any):
-    get_type = lambda val: type(val).__name__
-
-    item_repr = lambda val_type, val: (f"[dim]Shape[/]([b green]{list(val.shape)}[/])" if hasattr(val, 'shape') else f"[b green]{val}[/]") + f" [dim]<{val_type}>[/]"
-
-    val_type = get_type(val)
-    if isinstance(val, (list, tuple, set, dict)) and len(val) > 0:
-        if isinstance(val, dict):
-            inner_repr:List[str] = [f'{item_repr(get_type(k),k)}: {data_repr(v)}' for k, v in val.items()]
-        else:
-            inner_repr:List[str] = [data_repr(i) for i in val]
-        
-        res_repr = f'[dim]{val_type}[/](' 
-        res_repr += ',\n'.join(inner_repr)
-        res_repr += ')'
-
-        return indent_str(res_repr, indent=len(f'{val_type}('), process_first=False)
-    
-    else:
-        return item_repr(val_type, val)
+__cfg__ = get_config()
+NAMESPACE_TYPE = TypeVar('NameSpace')
 
 def render_perline(renderable: Union[RenderableType, List[List[Segment]]],
                    line_prefix:'str'='',
                    line_suffix:'str'='',
                    row_separator:'str'='',
-                   console=None, 
-                   time_sep:float=0.15) -> None:
+                   console=None) -> None:
     """
     Output a renderable object line by line. \n
     Each line allows for the setting of a prefix and a suffix, i.e. `line_prefix` and `line_suffix`. \n
@@ -88,12 +48,11 @@ def render_perline(renderable: Union[RenderableType, List[List[Segment]]],
         - `console` (rich.console.Console, optional): The console object to be used for rendering. If it is not specified, 
                                                       the global console object will be used. Defaults to None.
         
-        - `time_sep` (float, optional): The time in second between each line output. Defaults to 0.15.
-    
     Returns:
     ---
         None
     """
+    time_sep = __cfg__.render_interval
     assert time_sep >= 0, f"Argument `time_sep` must be non-negative, but got {time_sep}"
     assert '\n' not in row_separator, "You don't have to add \\n manually in Argument `row_separator`, " + \
                                       "we will do it for you to ensure the correct display."
@@ -285,37 +244,27 @@ class TreeRenderer:
     def __init__(self, 
                  node:"OperationNode", # noqa # type: ignore 
                  loop_algebras:str='xyijkabcdefghlmnopqrstuvwz'):
-        self.opnode = deepcopy(node)
+        self.opnode = node
         self.loop_algebras:str = loop_algebras
 
         self.render_unfold_tree = None
         self.render_fold_tree = None
         
         # basic display format for a rendered tree
-        self.__default_level_args = {
+        self.__default_level_args:NAMESPACE_TYPE = getattr(__cfg__.tree_levels_args, 'default',
+        dict_to_namespace({
             'label':'[b gray35](<node_id>) [green]<name>[/green] [cyan]<type>[/]', # str | Callable
             'style':'tree',
             'guide_style':'light_coral',
             'highlight':True,
             'hide_root':False,
             'expanded':True
-        }
+        }))
         
-        self.__levels_args:Dict[Dict[str, Any]] = {
-            '0':  {'label': '[b light_coral]<name>[/]', # default display setting for root node
-                   'guide_style':'light_coral'}
-        }
+        self.__levels_args:NAMESPACE_TYPE = __cfg__.tree_levels_args
                 
         # basic display format for all repeat blocks in a rendered tree
-        self.__rpblk_args = { 
-            'title': '[i]Repeat [[b]<repeat_time>[/b]] Times[/]',
-            'title_align': 'center',
-            'highlight': True,
-            'style': 'dark_goldenrod',
-            'border_style': 'dim',
-            'box': HEAVY_EDGE,
-            'expand': False
-        }
+        self.__rpblk_args:NAMESPACE_TYPE = __cfg__.tree_repeat_block_args
         
         # basic format of footer in each repeat block
         def __default_rpft(attr_dict:dict) -> str:
@@ -332,15 +281,15 @@ class TreeRenderer:
         self.repeat_footer = __default_rpft 
         
     @property
-    def default_level_args(self) -> Dict[str, Any]:
+    def default_level_args(self) -> NAMESPACE_TYPE:
         return self.__default_level_args
     
     @property
-    def tree_level_args(self) -> Dict[str, Any]:
+    def tree_level_args(self) -> NAMESPACE_TYPE:
         return self.__levels_args
 
     @property
-    def repeat_block_args(self) -> Dict[str, Any]:
+    def repeat_block_args(self) -> NAMESPACE_TYPE:
         return self.__rpblk_args
 
     @default_level_args.setter
@@ -361,8 +310,9 @@ class TreeRenderer:
             raise TypeError(f'The new value of `TreeRenderer.default_level_args` must be a dict. But got {type(custom_args)}.')
         
         valid_setting_keys = tuple(Tree('.').__dict__.keys())
-        self.__default_level_args.update(custom_args)
-        self.__default_level_args = {k:v for k, v in self.__default_level_args.items() if k in valid_setting_keys}
+        _val_dict = self.__default_level_args.__dict__
+        _val_dict.update(custom_args)
+        _val_dict = {k:v for k, v in _val_dict.items() if k in valid_setting_keys}
 
     @tree_level_args.setter
     def tree_level_args(self, 
@@ -431,7 +381,10 @@ class TreeRenderer:
             else:
                 _custom_args[level] = level_args_dict
                
-        self.__levels_args = _custom_args
+        self.__levels_args.__dict__ = _custom_args
+        
+        self.render_fold_tree = None
+        self.render_unfold_tree = None
 
     @repeat_block_args.setter
     def repeat_block_args(self, custom_args:Dict[str, Any]) -> None:
@@ -455,15 +408,13 @@ class TreeRenderer:
             self.repeat_footer = custom_args[footer_key[-1]] 
         
         valid_setting_keys = tuple(Panel('.').__dict__.keys())
-        self.__rpblk_args.update(custom_args)
-        self.__rpblk_args = {k:v for k, v in self.__rpblk_args.items() 
-                                     if k in valid_setting_keys and k not in footer_key}
+        _val_dict = self.__rpblk_args.__dict__
+        _val_dict.update(custom_args)
+        _val_dict = {k:v for k, v in _val_dict.items() 
+                      if k in valid_setting_keys and k not in footer_key}
+        self.render_fold_tree = None
 
-    def __call__(self,
-                 *,
-                 fold_repeat:bool=True,
-                 level_args:Union[List[Dict[str, Any]], Dict[Any, Dict[str, Any]]]={},
-                 repeat_block_args:Dict[str, Any]={}) -> Tree:
+    def __call__(self) -> Tree:
         """Render the `OperationNode` object and its childs as a tree without polluting the original `OperationNode` object.
         
         see docs of the class(i.e. `torchmeter.display.TreeRenderer`) for details.
@@ -487,18 +438,7 @@ class TreeRenderer:
             see docs of the class(i.e. `torchmeter.display.TreeRenderer`) for details.
         """
         
-        assert isinstance(level_args, (list, dict)), f"Argument `level_args` must be a dict or a list of dicts, but got {type(level_args)}"
-        assert isinstance(repeat_block_args, dict), f"Argument `repeat_block_args` must be a dict, but got {type(repeat_block_args)}"
-        
-        # check, clean and apply `level_args`, 
-        if level_args:
-            self.tree_level_args = level_args
-        del level_args
-        
-        # check, clean and apply `repeat_block_args`
-        if repeat_block_args:
-            self.repeat_block_args = repeat_block_args
-        del repeat_block_args
+        fold_repeat:bool = __cfg__.tree_fold_repeat
         
         # task_func for `dfs_task`
         def __apply_display_setting(subject:"OperationNode", # noqa # type: ignore
@@ -515,7 +455,8 @@ class TreeRenderer:
             level = str(display_root.label)  
 
             # update display setting for the currently traversed node
-            target_level_args = self.tree_level_args.get(level, self.default_level_args)
+            target_level_args = getattr(self.tree_level_args, level, self.default_level_args)
+            target_level_args = target_level_args.__dict__
 
             # disolve label field
             origin_node_id = subject.node_id
@@ -586,7 +527,7 @@ class TreeRenderer:
                     if self.repeat_footer:
                         repeat_block_content = Group(
                             copy(display_root), # the tree structure of the circulating body
-                            Rule(characters='-', style=self.repeat_block_args.get('style','')), # a separator made up of '-'
+                            Rule(characters='-', style=getattr(self.repeat_block_args, 'style','none')), # a separator made up of '-'
                             self.__resolve_argtext(text=self.repeat_footer, attr_owner=subject, 
                                                  loop_algebra=loop_algebra, node_id=origin_node_id),
                             fit=True
@@ -596,9 +537,9 @@ class TreeRenderer:
                     
                     # make a pannel to show repeat information
                     repeat_block = Panel(repeat_block_content)
-                    title = self.__resolve_argtext(text=self.repeat_block_args.get('title', ''), attr_owner=subject, 
+                    title = self.__resolve_argtext(text=getattr(self.repeat_block_args, 'title', ''), attr_owner=subject, 
                                                    loop_algebra=loop_algebra)
-                    repeat_block.__dict__.update({**self.repeat_block_args, 'title':title})
+                    repeat_block.__dict__.update({**self.repeat_block_args.__dict__, 'title':title})
                     
                     # overwrite the label of the first node in repeat block 
                     subject.display_root.label = repeat_block
@@ -613,7 +554,8 @@ class TreeRenderer:
             return None
         
         # apply display setting for each node by dfs traversal
-        dfs_task(dfs_subject=self.opnode,
+        copy_tree = deepcopy(self.opnode)
+        dfs_task(dfs_subject=copy_tree,
                  adj_func=lambda x:x.childs.values(),
                  task_func=__apply_display_setting,
                  visited_signal_func=lambda x:str(id(x)),
@@ -625,7 +567,7 @@ class TreeRenderer:
         else:
             self.render_unfold_tree = self.opnode.display_root
         
-        return self.opnode.display_root
+        return copy_tree.display_root
 
     def resolve_attr(self, attr_val:Any) -> str:
         """
@@ -694,43 +636,16 @@ class TabularRenderer:
         self.__stats_data = {stat_name:DataFrame() for stat_name in node.statistics}
 
         # basic display format for each column
-        self.__default_col_args = {
-            'justify': 'center',
-            'vertical': 'middle',
-            'overflow': 'fold'
-        }
+        self.__default_col_args:NAMESPACE_TYPE = __cfg__.table_column_args
 
-        self.__default_tb_args = {
-            'style': 'spring_green4',
-            'highlight': True,
-
-            'title': None,
-            'title_style': 'bold',
-            'title_justify': 'center',
-            'title_align': 'center',
-
-            'show_header': True,
-            'header_style': 'bold',
-
-            'show_footer': False,
-            'footer_style': 'italic',
-
-            'show_lines': False,
-
-            'show_edge': True,
-            'box': ROUNDED,
-            'safe_box': True,
-
-            'expand': False,
-            'leading': 0,
-        }
+        self.__default_tb_args:NAMESPACE_TYPE = __cfg__.table_display_args
             
     @property
-    def tb_args(self):
+    def tb_args(self) -> NAMESPACE_TYPE:
         return self.__default_tb_args
     
     @property
-    def col_args(self):
+    def col_args(self) -> NAMESPACE_TYPE:
         return self.__default_col_args
 
     @property
@@ -747,8 +662,9 @@ class TabularRenderer:
             raise TypeError(f'The new value of `TabularRenderer.tb_args` must be a dict. But got {type(custom_args)}.')
     
         valid_setting_keys = tuple(Table().__dict__.keys())
-        self.__default_tb_args.update(custom_args)
-        self.__default_tb_args = {k:v for k, v in self.__default_tb_args.items() if k in valid_setting_keys}
+        _val_dict = self.__default_tb_args.__dict__
+        _val_dict.update(custom_args)
+        _val_dict = {k:v for k, v in _val_dict.items() if k in valid_setting_keys}
 
     @col_args.setter
     def col_args(self, custom_args:Dict[str, Any]):
@@ -756,8 +672,9 @@ class TabularRenderer:
             raise TypeError(f'The new value of `TabularRenderer.col_args` must be a dict. But got {type(custom_args)}.')
 
         valid_setting_keys = tuple(Column().__dict__.keys())
-        self.__default_col_args.update(custom_args)
-        self.__default_col_args = {k:v for k, v in self.__default_col_args.items() if k in valid_setting_keys}
+        _val_dict = self.__default_col_args.__dict__
+        _val_dict.update(custom_args)
+        _val_dict = {k:v for k, v in _val_dict.items() if k in valid_setting_keys}
 
     def __new_col(self, 
                   df:DataFrame,
@@ -787,11 +704,11 @@ class TabularRenderer:
         tb = Table(*tb_fields)
 
         # apply overall display settings
-        tb.__dict__.update(self.tb_args)
+        tb.__dict__.update(self.tb_args.__dict__)
 
         # apply column settings to all columns
         for tb_col in tb.columns:
-            tb_col.__dict__.update(self.col_args)
+            tb_col.__dict__.update(self.col_args.__dict__)
         
         # collect each column's none replacing string
         col_none_str = {col_name:getattr(df[col_name].drop_nulls().first(), 'none_str', '-') 
@@ -876,8 +793,6 @@ class TabularRenderer:
                  raw_data:bool=False,
                  pick_cols:List[str]=[],
                  custom_cols:Dict[str, str]={},
-                 table_settings:Dict[str, Any]={},
-                 column_settings:Dict[str, Any]={},
                  newcol_name:str='',
                  newcol_func:Callable[[Dict[str, Any]], Any]=lambda col_dict: col_dict,
                  newcol_dependcol:List[str]=[],
@@ -949,8 +864,6 @@ class TabularRenderer:
                                   col_idx=newcol_idx)
             self.datas[stat_name] = data
 
-        self.tb_args = table_settings
-        self.col_args = column_settings
         tb = self.df2tb(df=data, show_raw=raw_data)
 
         if save_to:

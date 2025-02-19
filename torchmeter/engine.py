@@ -8,10 +8,12 @@ from typing import Any, Dict, List, Optional, Tuple
 import torch.nn as nn
 from rich.tree import Tree
 
+from torchmeter.config import get_config
 from torchmeter.utils import dfs_task, Verboser
 from torchmeter.statistic import ParamsMeter, CalMeter, MemMeter, ITTPMeter
 
 __all__ = ('OperationNode', 'OperationTree')
+__cfg__ = get_config()
 
 class OperationNode:
    
@@ -44,8 +46,7 @@ class OperationNode:
         
         # display info 
         self.display_root:Tree = None # set in `OperationTree.__build()`
-        self.fold_repeat = True # TODO: move to a supper level
-        self.render_when_repeat = False # whether to render when enable `fold_repeat` in `render_as_tree`, set in `OperationTree.__build()`
+        self.render_when_repeat = False # whether to render when enable `fold_repeat`, set in `OperationTree.__build()`
         self.is_folded = False # whether the node is folded in a repeat block, set in `OperationTree.__build()`
 
         self.level_args:List[Dict[str, str]] = []
