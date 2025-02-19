@@ -19,19 +19,15 @@ from torchmeter.display import TreeRenderer, TabularRenderer, render_perline
 class Meter:
 
     def __init__(self, 
-                 model: Union[nn.Module, str],
+                 model: nn.Module,
                  device:str='cpu',
                  verbose:bool=True):
         
         self.verbose = verbose
         self.__device = torch.device(device)
 
-        if isinstance(model, str):
-            self.model = torch.load(model, map_location=self.__device)
-        elif isinstance(model, nn.Module):
-            self.model = model.to(self.__device)
-        else:
-            raise TypeError(f"model must be a torch.nn.Module or a path to a model, but got {type(model)}")
+        assert isinstance(model, nn.Module), f"model must be a torch.nn.Module or a path to a model, but got {type(model)}"
+        self.model = model.to(self.__device)
 
         self.ipt = {'args':tuple(), 'kwargs':dict()} # TODO: self.ipt_infer()
 
