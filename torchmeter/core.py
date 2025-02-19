@@ -13,52 +13,18 @@ from rich.columns import Columns
 from rich.box import HORIZONTALS
 
 from torchmeter.engine import OperationTree
-from torchmeter.display import TreeRenderer, TabularRenderer
-from torchmeter.display import indent_str, data_repr, render_perline
+from torchmeter.utils import indent_str, data_repr
+from torchmeter.display import TreeRenderer, TabularRenderer, render_perline
 
 class Meter:
 
     def __init__(self, 
                  model: Union[nn.Module, str],
                  device:str='cpu',
-                 fold_repeat:bool=True,
-                 render_time_sep:float=0.15,
                  verbose:bool=True):
         
-        assert render_time_sep >= 0, f'`render_time_sep` must be a non-negative number, but got {render_time_sep}.'
-
-        self.fold_repeat = fold_repeat
-        self.render_time_sep = render_time_sep
         self.verbose = verbose
         self.__device = torch.device(device)
-        self.tb_col_args = {
-            'justify': 'center',
-            'vertical': 'middle',
-            'overflow': 'fold'
-        }
-        self.tb_args = {
-            'style': 'spring_green4',
-            'highlight': True,
-
-            'title': None,
-            'title_style': 'bold',
-            'title_justify': 'center',
-            'title_align': 'center',
-
-            'show_header': True,
-            'header_style': 'bold',
-
-            'show_footer': False,
-            'footer_style': 'italic',
-
-            'show_lines': False,
-
-            'show_edge': True,
-            'safe_box': True,
-
-            'expand': False,
-            'leading': 0,
-        }
 
         if isinstance(model, str):
             self.model = torch.load(model, map_location=self.__device)
@@ -70,7 +36,6 @@ class Meter:
         self.ipt = {'args':tuple(), 'kwargs':dict()} # TODO: self.ipt_infer()
 
         self.optree = OperationTree(self.model, verbose=verbose)
-        self.optree.root.fold_repeat = fold_repeat
 
         self.tree_renderer = TreeRenderer(self.optree.root)
         self.table_renderer = TabularRenderer(self.optree.root)
@@ -131,10 +96,7 @@ class Meter:
 
     @property
     def structure(self):
-        rendered_tree = self.tree_renderer.render_fold_tree if self.fold_repeat else self.tree_renderer.render_unfold_tree
-        
-        if rendered_tree is None:
-            rendered_tree = self.tree_renderer(fold_repeat=self.fold_repeat)
+        rendered_tree = self.tree_renderer()
         
         # render_perline(renderable=rendered_tree)
         return rendered_tree
@@ -240,51 +202,6 @@ class Meter:
         
         console = get_console()
         return console.render_str(infos)
-
-    def restore_settings(self):
-        self.tree_levels_args = {
-            '0':  {'label': '[b light_coral]<name>[/]', # default display setting for root node
-                   'guide_style':'light_coral'}
-        }
-
-        self.tree_repeat_block_args = { 
-            'title': '[i]Repeat [[b]<repeat_time>[/b]] Times[/]',
-            'title_align': 'center',
-            'highlight': True,
-            'style': 'dark_goldenrod',
-            'border_style': 'dim',
-            'expand': False
-        }
-
-        self.table_column_args = {
-            'justify': 'center',
-            'vertical': 'middle',
-            'overflow': 'fold'
-        }
-
-        self.table_display_args = {
-            'style': 'spring_green4',
-            'highlight': True,
-
-            'title': None,
-            'title_style': 'bold',
-            'title_justify': 'center',
-            'title_align': 'center',
-
-            'show_header': True,
-            'header_style': 'bold',
-
-            'show_footer': False,
-            'footer_style': 'italic',
-
-            'show_lines': False,
-
-            'show_edge': True,
-            'safe_box': True,
-
-            'expand': False,
-            'leading': 0,
-        }
 
     def overview(self, *order:Tuple[str]) -> Columns:
         """Overview of all statistics"""
@@ -392,12 +309,8 @@ class Meter:
         origin_height = console.height
         console.width = main_content_width
         console.height = main_content_height + footer_height
-        if self.render_time_sep:
-            render_perline(renderable=canvas, 
-                           console=console,
-                           time_sep=self.render_time_sep)
-        else:
-            console.print(canvas)
+
+        render_perline(renderable=canvas, console=console)
 
         console.width = origin_width
         console.height = origin_height
@@ -407,15 +320,18 @@ class Meter:
 if __name__ == '__main__':
     from rich import print
     from torchvision import models
-
+    from torchmeter.config import get_config
+    
+    cfg = get_config()
     model = models.resnet18()
     
     metered_model = Meter(model, device='cuda:0')
     metered_model(torch.randn(1,3,224,224))
     
-    # print(metered_model.structure)
-    # print(metered_model.mem)
-    metered_model.table_display_args = {'style':'red'}
+    print(metered_model.structure)
+    print(metered_model.mem)
+    cfg.tree_levels_args.default.guide_style = 'red'
+    cfg.table_display_args.style = 'red'
     metered_model.profile(metered_model.mem,
                           show=True, no_tree=False,
                           raw_data=False,
