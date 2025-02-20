@@ -61,11 +61,11 @@ class Meter:
 
     @property
     def tree_levels_args(self):
-        return self.tree_renderer.tree_level_args
+        return self.tree_renderer.tree_levels_args
     
     @tree_levels_args.setter
     def tree_levels_args(self, custom_args:Union[List[Dict[str, Any]], Dict[Any, Dict[str, Any]]]) -> None:
-        self.tree_renderer.tree_level_args = custom_args
+        self.tree_renderer.tree_levels_args = custom_args
 
     @property
     def tree_repeat_block_args(self):
@@ -342,12 +342,10 @@ if __name__ == '__main__':
     metered_model = Meter(model, device='cuda:0')
     metered_model(torch.randn(1,3,224,224))
     
-    import time
-    s=time.perf_counter()
-    metered_model.structure
     cfg.tree_levels_args.default.guide_style = 'red'
-    metered_model.structure
-    print(time.perf_counter()-s)
+    print(metered_model.structure)
+    metered_model.tree_levels_args.default.guide_style = 'blue'
+    print(metered_model.structure)
     # cfg.tree_levels_args.default.guide_style = 'red'
     # cfg.table_display_args.style = 'red'
     # metered_model.profile(metered_model.mem,

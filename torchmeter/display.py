@@ -1,7 +1,7 @@
 import re
 import os
-import time
 import warnings
+from time import sleep
 from copy import copy,deepcopy
 from operator import attrgetter
 from typing import Any, Callable, Dict, List, Optional, Sequence, Union, TypeVar
@@ -22,10 +22,7 @@ from torchmeter.utils import dfs_task, resolve_savepath
 __cfg__ = get_config()
 NAMESPACE_TYPE = TypeVar('NameSpace')
 
-def render_perline(renderable: Union[RenderableType, List[List[Segment]]],
-                   line_prefix:'str'='',
-                   line_suffix:'str'='',
-                   row_separator:'str'='',
+def render_perline(renderable: RenderableType,
                    console=None) -> None:
     """
     Output a renderable object line by line. \n
@@ -53,84 +50,22 @@ def render_perline(renderable: Union[RenderableType, List[List[Segment]]],
         None
     """
     time_sep = __cfg__.render_interval
-    assert time_sep >= 0, f"Argument `time_sep` must be non-negative, but got {time_sep}"
-    assert '\n' not in row_separator, "You don't have to add \\n manually in Argument `row_separator`, " + \
-                                      "we will do it for you to ensure the correct display."
+    assert time_sep >= 0, f"The `render_interval` value defined in config must be non-negative, but got {time_sep}"
 
     console = console or get_console()
-    console_width = console.width
-    temp_options = deepcopy(console.options)
 
-    # render all items according to their origin width
-    ## ensure renderable object is fully displayed
-    if isinstance(renderable, list):
-        obj_width = 0
-        lines: List[List[Segment]] = []
-        for line_segs in renderable:
-            # discard the last space in the line, so as to have a fit display of the renderable object
-            if line_segs[-1].text.isspace():
-                line_segs.pop(-1)
-            
-            line_width = Segment.get_line_length(line_segs)
-            obj_width = max(obj_width, line_width)
+    if not time_sep:
+        console.print(renderable)
 
-            lines.append(line_segs)
     else:
-        obj_width = min(console.measure(renderable).maximum, console_width)
-        temp_options.max_width = obj_width
-        lines: List[List[Segment]] = console.render_lines(renderable, options=temp_options)
-
-    ## ensure prefix is fully displayed
-    residual_width = console_width - obj_width # >= 0
-    if line_prefix and residual_width > 0:
-        prefix_width = console.measure(line_prefix).maximum
-        assert prefix_width <= residual_width, \
-            f"Argument `line_prefix` is too long to display, try to maximize the windows or set a value less than {residual_width} in length."
-        prefix: List[Segment] = list(console.render(line_prefix))[:-1] # -1 to discard default '\n' in the end
-    else:
-        prefix_width = 0
-        prefix = []
+        lines: List[List[Segment]] = console.render_lines(renderable, new_lines=True)
     
-    ## pick the left most available part of suffix if there isn't enough space
-    residual_width -= prefix_width
-    if line_suffix and residual_width > 0:
-        suffix_width = min(console.measure(line_suffix).maximum, residual_width)
-        suffix: List[Segment] = list(console.render(line_suffix[:residual_width]))[:-1]
-    else:
-        suffix_width = 0
-        suffix = []
-    
-    ## render row separator: repeat the pass-in pattern to full display width
-    if row_separator:
-        total_width = obj_width + prefix_width + suffix_width
-
-        single_sep: List[Segment] = list(console.render(row_separator))[:-1] 
-
-        plain_text: str = ''.join([s.text for s in single_sep])
-        times, remainder = divmod(total_width, len(plain_text))
-
-        if remainder:
-            rowsep_segs: List[Segment] = single_sep * times
-            for seg in single_sep:
-                if len(seg) > remainder:
-                    rowsep_segs.append(seg.split_cells(remainder)[0])
-                    break
-                else:
-                    rowsep_segs.append(seg)
-                    remainder -= len(seg) 
-        else:
-            rowsep_segs = single_sep * times
-        
-        rowsep_segs = [Segment.line()] + rowsep_segs + [Segment.line()]
-    else:
-        rowsep_segs = [Segment.line()]
-    
-    # a fake implementation of `rich.print`
-    console._buffer_index = 0
-    for line in lines:
-        console._buffer.extend(prefix + line + suffix + rowsep_segs)
-        console._check_buffer()
-        time.sleep(time_sep)
+        # a fake implementation of `rich.print`
+        console._buffer_index = 0
+        for line in lines:
+            console._buffer.extend(line)
+            console._check_buffer()
+            sleep(time_sep)
 
 class TreeRenderer:
     """Render a `OperationNode` object as a tree.
@@ -187,7 +122,7 @@ class TreeRenderer:
                                                  The keys of the dict are arguments of `rich.tree.Tree` class. This attribute might be 
                                                  changed by `render()` method if `level_args` is passed in and there is a key `default` or `all` in the passed in setting. 
 
-        - `tree_level_args` (Dict[str, Any]): A dictionary containing the display settings for each level of the tree. 
+        - `tree_levels_args` (Dict[str, Any]): A dictionary containing the display settings for each level of the tree. 
                                               The key is the level number, and the value is a dictionary containing the display settings of corresponding level.
                                               This attribute might be changed by `render()` method if `level_args` is passed in.
 
@@ -241,56 +176,35 @@ class TreeRenderer:
                  repeat_block_args=repeat_block_args)
         ```                                         
     """
-    def __init__(self, 
-                 node:"OperationNode", # noqa # type: ignore 
-                 loop_algebras:str='xyijkabcdefghlmnopqrstuvwz'):
+    
+    loop_algebras:str='xyijkabcdefghlmnopqrstuvwz'
+    
+    def __init__(self, node:"OperationNode"): # noqa # type: ignore 
         self.opnode = node
-        self.loop_algebras:str = loop_algebras
 
         self.render_unfold_tree = None
         self.render_fold_tree = None
-        
-        # basic display format for a rendered tree
-        self.__default_level_args:NAMESPACE_TYPE = getattr(__cfg__.tree_levels_args, 'default',
-        dict_to_namespace({
-            'label':'[b gray35](<node_id>) [green]<name>[/green] [cyan]<type>[/]', # str | Callable
-            'style':'tree',
-            'guide_style':'light_coral',
-            'highlight':True,
-            'hide_root':False,
-            'expanded':True
-        }))
-        
-        self.__levels_args:NAMESPACE_TYPE = __cfg__.tree_levels_args
                 
-        # basic display format for all repeat blocks in a rendered tree
-        self.__rpblk_args:NAMESPACE_TYPE = __cfg__.tree_repeat_block_args
-        
-        # basic format of footer in each repeat block
-        def __default_rpft(attr_dict:dict) -> str:
-            start_idx = attr_dict['node_id'].split('.')[-1]
-            
-            repeat_winsz = attr_dict['repeat_winsz']
-            if repeat_winsz == 1:
-                end_idx = int(start_idx) + attr_dict['repeat_time'] -1
-                return f"Where <loop_algebra> ranges from [{start_idx}, {end_idx}]"
-            else:
-                end_idx = int(start_idx) + attr_dict['repeat_time']*repeat_winsz -1
-                valid_vals = list(map(str, range(int(start_idx), end_idx, repeat_winsz)))
-                return f"Where <loop_algebra> = {', '.join(valid_vals)}"
-        self.repeat_footer = __default_rpft 
-        
     @property
     def default_level_args(self) -> NAMESPACE_TYPE:
-        return self.__default_level_args
+        if not hasattr(self.tree_levels_args, 'default'):
+            self.tree_levels_args.default = dict_to_namespace({
+                'label':'[b gray35](<node_id>) [green]<name>[/green] [cyan]<type>[/]', # str | Callable
+                'style':'tree',
+                'guide_style':'light_coral',
+                'highlight':True,
+                'hide_root':False,
+                'expanded':True
+            })
+        return self.tree_levels_args.default
     
     @property
-    def tree_level_args(self) -> NAMESPACE_TYPE:
-        return self.__levels_args
+    def tree_levels_args(self) -> NAMESPACE_TYPE:
+        return __cfg__.tree_levels_args
 
     @property
     def repeat_block_args(self) -> NAMESPACE_TYPE:
-        return self.__rpblk_args
+        return __cfg__.tree_repeat_block_args
 
     @default_level_args.setter
     def default_level_args(self, custom_args:Dict[str, Any]) -> None:
@@ -306,17 +220,20 @@ class TreeRenderer:
         ---
             - `TypeError`: if the new value is not a dict.
         """
-        if not isinstance(custom_args, dict):
-            raise TypeError(f"The new value of `TreeRenderer.default_level_args` must be a dict. But got {type(custom_args)}.")
+        assert isinstance(custom_args, dict), f"You can only overwrite `{self.__class__.__name__}.default_level_args` with a dict. \
+                                                But got {type(custom_args)}."
         
-        valid_setting_keys = tuple(Tree('.').__dict__.keys())
-        _val_dict = self.__default_level_args.__dict__
-        _val_dict.update(custom_args)
-        _val_dict = {k:v for k, v in _val_dict.items() if k in valid_setting_keys}
+        valid_setting_keys = set(Tree('.').__dict__.keys())
+        passin_keys = set(custom_args.keys())
+        invalid_keys = passin_keys - valid_setting_keys
+        assert not invalid_keys, f"Keys {invalid_keys} is/are not accepted by `rich.tree.Tree`, \
+            refer to https://rich.readthedocs.io/en/latest/tree.html for valid args."
+        self.default_level_args.__dict__.update(custom_args)
+        
+        self.default_level_args.mark_change()
 
-    @tree_level_args.setter
-    def tree_level_args(self, 
-                        custom_args:Union[List[Dict[str, Any]], Dict[Any, Dict[str, Any]]]) -> None:
+    @tree_levels_args.setter
+    def tree_levels_args(self, custom_args:Dict[Any, Dict[str, Any]]) -> None:
         """
         Update the display settings of all levels in the rendered tree with the pass-in list of dict.
         Note that all dicts should have a key `level` to indicate the level of the corresponding display settings.
@@ -333,58 +250,36 @@ class TreeRenderer:
         ---
             `TypeError`: if the new value is not a dict or a list of dict.
         """
-        if not isinstance(custom_args, (list, dict)):
-            raise TypeError("The new value of `TreeRenderer.tree_level_args` must be a dict or a list of dict. But got {type(custom_args)}.")
-        
-        # convert to dict if input a list of dict
-        if isinstance(custom_args, list):
-            _custom_args = {}
-            for level_args_dict in custom_args:
-                if not isinstance(level_args_dict, dict):
-                    warnings.warn(message=f"Non-dict entity found in `custom_args`: \n{level_args_dict}.\nThis entity will be ignored.\n",
-                                  category=UserWarning)
-                elif 'level' not in level_args_dict:
-                    warnings.warn(message=f"Key `level` not found in pass-in setting: \n{custom_args}.\nThis setting will be ignored.\n",
-                                  category=UserWarning)
-                else:
-                    level = str(level_args_dict.pop('level'))
-                    _custom_args[level] = level_args_dict
-        else:
-            _custom_args = custom_args
-        
-        '''
-        _custom_args = {
-            '0': {level_0_setting},
-            '1': {level_1_setting},
-            ...
-        }
-        '''
-        
+        assert isinstance(custom_args, dict), f"You can only overwrite `{self.__class__.__name__}.tree_levels_args` with a dict. \
+                                                But got {type(custom_args)}."    
+                                                            
         # filt out invalid level definations and invalid display settings
-        valid_setting_keys = tuple(Tree('.').__dict__.keys())
-        for level, level_args_dict in _custom_args.items():
+        valid_setting_keys = set(Tree('.').__dict__.keys())
+        for level, level_args_dict in custom_args.items():
             # assure level is a non-negative integer, 'default' or 'all'
             level = level.lower()
             if not level.isnumeric() and level not in ('default', 'all'):
                 warnings.warn(message=f"The `level` key should be numeric, `default` or `all`, but got {level}.\nThis setting will be ignored.\n",
                               category=UserWarning)
                 continue
-
-            level_args_dict = {k:v for k, v in level_args_dict.items() if k in valid_setting_keys}
+                
+            passin_keys = set(level_args_dict.keys())
+            invalid_keys = passin_keys - valid_setting_keys
+            assert not invalid_keys, f"Keys {invalid_keys} is/are not accepted by `rich.tree.Tree`, \
+                refer to https://rich.readthedocs.io/en/latest/tree.html for valid args."
 
             if level == 'default':
                 self.default_level_args = level_args_dict
             elif level == 'all':
                 self.default_level_args = level_args_dict
-                _custom_args = {} # all layer use the default setting
+                # delete all levels settings 
+                self.tree_levels_args = {k:v for k,v in self.tree_levels_args.__dict__.items() 
+                                         if not k.isnumeric()}
                 break
             else:
-                _custom_args[level] = level_args_dict
-               
-        self.__levels_args.__dict__ = _custom_args
-        
-        self.render_fold_tree = None
-        self.render_unfold_tree = None
+                getattr(self.tree_levels_args, level).__dict__.update(level_args_dict)
+                       
+        self.tree_levels_args.mark_change()
 
     @repeat_block_args.setter
     def repeat_block_args(self, custom_args:Dict[str, Any]) -> None:
@@ -400,20 +295,51 @@ class TreeRenderer:
         ---
             - `TypeError`: if the new value is not a dict.
         """
-        if not isinstance(custom_args, dict):
-            raise TypeError(f"The new value of `TreeRenderer.repeat_block_args` must be a dict. But got {type(custom_args)}.")
-        
+        assert isinstance(custom_args, dict), f"You can only overwrite `{self.__class__.__name__}.repeat_block_args` with a dict. \
+                                                But got {type(custom_args)}."  
+                                                        
         footer_key = list(filter(lambda x: x.lower() == 'repeat_footer', custom_args.keys()))
         if footer_key:
-            self.repeat_footer = custom_args[footer_key[-1]] 
+            self.repeat_footer = custom_args[footer_key[-1]]
+            del custom_args[footer_key[-1]] 
         
-        valid_setting_keys = tuple(Panel('.').__dict__.keys())
-        _val_dict = self.__rpblk_args.__dict__
-        _val_dict.update(custom_args)
-        _val_dict = {k:v for k, v in _val_dict.items() 
-                      if k in valid_setting_keys and k not in footer_key}
+        valid_setting_keys = set(Panel('.').__dict__.keys())
+        passin_keys = set(custom_args.keys())
+        invalid_keys = passin_keys - valid_setting_keys
+        assert not invalid_keys, f"Keys {invalid_keys} is/are not accepted by `rich.panel.Panel`, \
+            refer to https://rich.readthedocs.io/en/latest/panel.html for valid args."
+        self.repeat_block_args.__dict__.update(custom_args)
+        
+        self.repeat_block_args.mark_change()
+        
         self.render_fold_tree = None
 
+    def repeat_footer(self, attr_dict:Dict[str, Any]) -> Union[str, None]:
+        """Must have only one args which accept an attribute dict"""
+        # basic format of footer in each repeat block
+        start_idx = attr_dict['node_id'].split('.')[-1]
+            
+        repeat_winsz = attr_dict['repeat_winsz']
+        if repeat_winsz == 1:
+            end_idx = int(start_idx) + attr_dict['repeat_time'] -1
+            return f"Where <loop_algebra> ranges from [{start_idx}, {end_idx}]"
+        else:
+            end_idx = int(start_idx) + attr_dict['repeat_time']*repeat_winsz -1
+            valid_vals = list(map(str, range(int(start_idx), end_idx, repeat_winsz)))
+            return f"Where <loop_algebra> = {', '.join(valid_vals)}"
+
+    def resolve_attr(self, attr_val:Any) -> str:
+        """
+        Function to process the attribute value resolved by regex.
+
+        Args:
+            attr_val (Any): The attribute value resolved by regex.
+
+        Returns:
+            str: the processed result. Must be a string!
+        """
+        return str(attr_val)
+    
     def __call__(self) -> Tree:
         """Render the `OperationNode` object and its childs as a tree without polluting the original `OperationNode` object.
         
@@ -440,6 +366,9 @@ class TreeRenderer:
         
         fold_repeat:bool = __cfg__.tree_fold_repeat
         
+        copy_tree = deepcopy(self.opnode)
+        origin_algebras = self.loop_algebras
+        
         # task_func for `dfs_task`
         def __apply_display_setting(subject:"OperationNode", # noqa # type: ignore
                                     pre_res=None) -> None:
@@ -455,20 +384,21 @@ class TreeRenderer:
             level = str(display_root.label)  
 
             # update display setting for the currently traversed node
-            target_level_args = getattr(self.tree_level_args, level, self.default_level_args)
+            target_level_args = getattr(self.tree_levels_args, level, self.default_level_args)
             target_level_args = target_level_args.__dict__
 
             # disolve label field
             origin_node_id = subject.node_id
             if fold_repeat and int(level) > 1:
                 subject.node_id = subject.parent.node_id + f".{subject.node_id.split('.')[-1]}"
-            label = self.__resolve_argtext(text=target_level_args['label'], attr_owner=subject)
+            label = self.__resolve_argtext(text=target_level_args.get('label', self.default_level_args.label),
+                                           attr_owner=subject)
 
             # apply display setting
             display_root.__dict__.update({**target_level_args, 'label':label})
             
             if fold_repeat:  
-                loop_algebra = self.loop_algebras[0]
+                algebra = self.loop_algebras[0]
                 use_algebra = False
 
                 # if the repeat body contains more than one operations
@@ -484,17 +414,18 @@ class TreeRenderer:
                         # update node_id with a algebraic expression which indicates the loop
                         if level != '1':
                            if loop_idx == 0:
-                               repeat_op_node.node_id = repeat_op_node.parent.node_id + f".{loop_algebra}"
+                               repeat_op_node.node_id = repeat_op_node.parent.node_id + f".{algebra}"
                            else:
-                               repeat_op_node.node_id = repeat_op_node.parent.node_id + f".({loop_algebra}+{loop_idx})"
+                               repeat_op_node.node_id = repeat_op_node.parent.node_id + f".({algebra}+{loop_idx})"
                         else:
                             if loop_idx == 0:
-                                repeat_op_node.node_id = loop_algebra
+                                repeat_op_node.node_id = algebra
                             else:
-                                repeat_op_node.node_id = f"{loop_algebra}+{loop_idx}"
+                                repeat_op_node.node_id = f"{algebra}+{loop_idx}"
                         
                         # disoolve label field for the `rich.Tree` object of the currently traversed node
-                        label = self.__resolve_argtext(text=target_level_args['label'], attr_owner=repeat_op_node)
+                        label = self.__resolve_argtext(text=target_level_args.get('label', self.default_level_args.label), 
+                                                       attr_owner=repeat_op_node)
                         
                         # update display setting for the `rich.Tree` object of the currently traversed node
                         repeat_display_node = copy(repeat_op_node.display_root)
@@ -519,17 +450,18 @@ class TreeRenderer:
 
                     # update node_id with a algebraic expression which indicates the loop
                     if level != '1':
-                        subject.node_id = subject.parent.node_id + f".{loop_algebra}"
+                        subject.node_id = subject.parent.node_id + f".{algebra}"
                     else:
-                        subject.node_id = loop_algebra
+                        subject.node_id = algebra
                     display_root.label = self.__resolve_argtext(text=target_level_args['label'], attr_owner=subject)
 
-                    if self.repeat_footer:
+                    block_footer = self.__resolve_argtext(text=self.repeat_footer, attr_owner=subject,
+                                                          loop_algebra=algebra, node_id=origin_node_id)
+                    if block_footer:
                         repeat_block_content = Group(
                             copy(display_root), # the tree structure of the circulating body
-                            Rule(characters='-', style=getattr(self.repeat_block_args, 'style','none')), # a separator made up of '-'
-                            self.__resolve_argtext(text=self.repeat_footer, attr_owner=subject, 
-                                                 loop_algebra=loop_algebra, node_id=origin_node_id),
+                            Rule(characters='-', style='dim ' + getattr(self.repeat_block_args, 'style','')), # a separator made up of '-'
+                            "[dim]" + block_footer + "[/]",
                             fit=True
                         )
                     else:
@@ -538,7 +470,7 @@ class TreeRenderer:
                     # make a pannel to show repeat information
                     repeat_block = Panel(repeat_block_content)
                     title = self.__resolve_argtext(text=getattr(self.repeat_block_args, 'title', ''), attr_owner=subject, 
-                                                   loop_algebra=loop_algebra)
+                                                   loop_algebra=algebra)
                     repeat_block.__dict__.update({**self.repeat_block_args.__dict__, 'title':title})
                     
                     # overwrite the label of the first node in repeat block 
@@ -554,35 +486,22 @@ class TreeRenderer:
             return None
         
         # apply display setting for each node by dfs traversal
-        copy_tree = deepcopy(self.opnode)
         dfs_task(dfs_subject=copy_tree,
                  adj_func=lambda x:x.childs.values(),
-                 task_func=__apply_display_setting,
-                 visited_signal_func=lambda x:str(id(x)),
-                 visited=[])
+                 task_func=__apply_display_setting)
 
-        # store the rendered result
+        self.loop_algebras = origin_algebras
+        
+        # cache the rendered result
         if fold_repeat:
-            self.render_fold_tree = self.opnode.display_root
+            self.render_fold_tree = copy_tree.display_root
         else:
-            self.render_unfold_tree = self.opnode.display_root
+            self.render_unfold_tree = copy_tree.display_root
         
         return copy_tree.display_root
 
-    def resolve_attr(self, attr_val:Any) -> str:
-        """
-        Function to process the attribute value resolved by regex.
-
-        Args:
-            attr_val (Any): The attribute value resolved by regex.
-
-        Returns:
-            str: the processed result. Must be a string!
-        """
-        return str(attr_val)
-
     def __resolve_argtext(self,
-                          text:Union[str, Callable[[dict], str]], 
+                          text:Union[str, Callable[[dict], Union[str,None]]], 
                           attr_owner:"OperationNode", # noqa # type: ignore
                           **kwargs) -> str: 
         """
@@ -606,10 +525,11 @@ class TreeRenderer:
         if isinstance(text, Callable):
             text = text(attr_dict)
         
-        if not isinstance(text, str):
-            warnings.warn(message='The received text(see below) to be resolved is not a string, cannot go ahead.\n' + \
-                                  f"Type: {type(text)}\n Content: {text}",
-                          category=UserWarning)
+        if text is None:
+            return ""
+        
+        assert isinstance(text, str), 'The received text(see below) to be resolved is not a string nor None, cannot go ahead.\n' + \
+                                      f"Type: {type(text)}\n Content: {text}"
 
         res_str = re.sub(pattern=r'(?<!\\)<(.*?)(?<!\\)>',
                          repl=lambda match: self.resolve_attr(attr_dict.get(match.group(1), None)),
@@ -618,12 +538,6 @@ class TreeRenderer:
                          repl=lambda x: x.group().replace('\\', ''),
                          string=res_str)
         return res_str
-
-    def __deepcopy__(self, memo) -> "TreeRenderer":
-        new_obj = TreeRenderer()
-        memo[id(self)] = new_obj
-        new_obj.__dict__.update(self.__dict__)
-        return new_obj
     
 class TabularRenderer:
 
