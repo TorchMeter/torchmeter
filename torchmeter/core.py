@@ -93,7 +93,24 @@ class Meter:
 
     @property
     def structure(self):
-        rendered_tree = self.tree_renderer()
+        fold_repeat = __cfg__.tree_fold_repeat
+        
+        is_rpbk_change = __cfg__.tree_repeat_block_args.is_change()
+        
+        is_level_change = __cfg__.tree_levels_args.is_change()
+        
+        if fold_repeat:
+            cache_res = self.tree_renderer.render_fold_tree if not is_rpbk_change else None
+        else:
+            cache_res = self.tree_renderer.render_unfold_tree
+        cache_res = cache_res if not is_level_change else None
+        
+        rendered_tree = self.tree_renderer() if cache_res is None else cache_res
+        
+        if is_rpbk_change:
+            __cfg__.tree_repeat_block_args.mark_unchange()
+        if is_level_change:
+            __cfg__.tree_levels_args.mark_unchange()
         
         # render_perline(renderable=rendered_tree)
         return rendered_tree
@@ -283,6 +300,7 @@ class Meter:
 
         # get footer content
         footer = Columns(title=Rule('[gray54]s u m m a r y[/]', characters='-', style='gray54'),
+                         padding=(1,1),
                          equal=True, 
                          expand=True)
         
@@ -324,20 +342,24 @@ if __name__ == '__main__':
     metered_model = Meter(model, device='cuda:0')
     metered_model(torch.randn(1,3,224,224))
     
-    print(metered_model.structure)
-    print(metered_model.mem)
+    import time
+    s=time.perf_counter()
+    metered_model.structure
     cfg.tree_levels_args.default.guide_style = 'red'
-    cfg.table_display_args.style = 'red'
-    metered_model.profile(metered_model.mem,
-                          show=True, no_tree=False,
-                          raw_data=False,
-                          custom_cols={'Operation_Id': 'Operation ID',
-                                       'Operation_Name': 'Operation Name',
-                                       'Param_Cost': 'Param Cost',
-                                       'FeatureMap_Cost': 'FeatureMap Cost'},
-                          pick_cols=['Operation_Id', 'Operation_Name', 
-                                     'Param_Cost','FeatureMap_Cost',
-                                     'Total'])
+    metered_model.structure
+    print(time.perf_counter()-s)
+    # cfg.tree_levels_args.default.guide_style = 'red'
+    # cfg.table_display_args.style = 'red'
+    # metered_model.profile(metered_model.mem,
+    #                       show=True, no_tree=False,
+    #                       raw_data=False,
+    #                       custom_cols={'Operation_Id': 'Operation ID',
+    #                                    'Operation_Name': 'Operation Name',
+    #                                    'Param_Cost': 'Param Cost',
+    #                                    'FeatureMap_Cost': 'FeatureMap Cost'},
+    #                       pick_cols=['Operation_Id', 'Operation_Name', 
+    #                                  'Param_Cost','FeatureMap_Cost',
+    #                                  'Total'])
                         #   newcol_name='Percentage',
                         #   newcol_func=lambda col_dict,all_num=metered_model.mem.TotalCost.val: f'{col_dict["Total"]*100/all_num:.3f} %',
                         #   newcol_dependcol=['Total'],
