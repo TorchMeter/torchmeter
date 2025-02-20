@@ -50,7 +50,7 @@ def hasargs(func:Callable, *required_args:Tuple[str]) -> None:
 def dfs_task(dfs_subject:Any,
              adj_func:Callable[[Any], Iterable],
              task_func:Callable[[Any, Any], Any],
-             visited_signal_func:Callable[[Any], Any]=lambda x:x,
+             visited_signal_func:Callable[[Any], Any]=lambda x:id(x),
              *,
              visited:List=[]) -> Any: 
     """

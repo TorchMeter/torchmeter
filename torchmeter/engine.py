@@ -1,8 +1,6 @@
 import re
-import warnings
-from copy import deepcopy
 from collections import OrderedDict
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 import torch.nn as nn
 from rich.tree import Tree
@@ -19,22 +17,20 @@ class OperationNode:
     def __init__(self, 
                  module:nn.Module,
                  name:Optional[str]=None,
-                 node_id:str='',
+                 node_id:str='0',
                  parent:Optional["OperationNode"]=None,
-                 childs:OrderedDict[str, "OperationNode"]=OrderedDict(),
-                 **kwargs):
+                 render_when_repeat:bool=False):
 
         # basic info
         self.operation = module
         self.type = module.__class__.__name__
         self.name = name if name else self.type
-        self.addr = str(id(module))
-        self.node_id:str = node_id # index in the model tree, for example '1.2.1'
+        self.node_id:str = node_id # index in the model tree, e.g. '1.2.1'
         
         # hierarchical info
         self.parent:"OperationNode" = parent
-        self.childs:OrderedDict[str, "OperationNode"] = childs
-        self.is_leaf = False
+        self.childs:OrderedDict[str, "OperationNode"] = OrderedDict() # e.g. {'1.2.1': OperationNode, ...} 
+        self.is_leaf:bool = len(module._modules) == 0
         
         # repeat info
         self.repeat_winsz = 1 # size of repeat block
@@ -43,24 +39,14 @@ class OperationNode:
         
         # display info 
         self.display_root:Tree = None # set in `OperationTree.__build()`
-        self.render_when_repeat = False # whether to render when enable `fold_repeat`, set in `OperationTree.__build()`
+        self.render_when_repeat = render_when_repeat # whether to render when enable `fold_repeat`, set in `OperationTree.__build()`
         self.is_folded = False # whether the node is folded in a repeat block, set in `OperationTree.__build()`
-
-        self.level_args:List[Dict[str, str]] = []
-        self.repeat_block_args:Dict[str, Any] = {}
 
         # statistic info (all read-only)
         self.__param = ParamsMeter(opnode=self)
         self.__cal = CalMeter(opnode=self)
         self.__mem = MemMeter(opnode=self)
         self.__ittp = ITTPMeter(opnode=self)
-
-        # other info
-        for key, value in kwargs.items():
-            if key in self.__dict__:
-                setattr(self, key, value)
-            else:
-                warnings.warn(f"`{key}` is not a valid attribute of `OperationNode`, ignored.")
 
     @property
     def param(self) -> ParamsMeter:
@@ -77,38 +63,21 @@ class OperationNode:
     @property
     def ittp(self) -> ITTPMeter:
         return self.__ittp
-
-    def __copy__(self):
-        new_obj = OperationNode(self.operation)
-        new_obj.__dict__ = self.__dict__
-        return new_obj
-
-    def __deepcopy__(self, memo):
-        new_obj = OperationNode(self.operation)
-        memo[id(self)] = new_obj
-        new_obj.__dict__ = deepcopy(self.__dict__, memo)
-        return new_obj
     
     def __repr__(self):
-        op_str = str(self.type) if self.operation._modules else str(self.operation)            
+        op_str = str(self.type) if self.is_leaf else str(self.operation)            
         return f"{self.node_id} {self.name}: {op_str}"
     
 class OperationTree:
 
-    def __init__(self, 
-                 model:nn.Module,
-                 verbose:bool=True):
+    def __init__(self, model:nn.Module):
         
-        self.root = OperationNode(module=model,
-                                  node_id="0",
-                                  render_when_repeat=True)
+        self.root = OperationNode(module=model, render_when_repeat=True)
         
         with Timer(task_desc="Scanning model"):
             nonroot_nodes, *_ = dfs_task(dfs_subject=self.root, 
                                          adj_func=lambda x:x.childs.values(),
-                                         task_func=OperationTree.__build,
-                                         visited_signal_func=lambda x:x.addr,
-                                         visited=[])
+                                         task_func=OperationTree.__build)
 
         self.all_nodes = [self.root] + nonroot_nodes
             
@@ -148,17 +117,13 @@ class OperationTree:
             display_parent = display_parent[0]
         
             # create a tree node of rich.Tree, and record the level of the node in attribute 'label'
-            display_node = Tree(label=str(int(display_parent.label)+1), 
-                                guide_style="dark_goldenrod", 
-                                highlight=True)
+            display_node = Tree(label=str(int(display_parent.label)+1))
             
             # add the current node to the father node
             display_parent.children.append(display_node)
         else:
             # situation of root node
-            display_node = Tree(label='0', 
-                                guide_style="dark_goldenrod", 
-                                highlight=True)
+            display_node = Tree(label='0')
         
         # link the display node to the attribute `display_root` of operation node
         subject.display_root = display_node
@@ -173,12 +138,9 @@ class OperationTree:
             child = OperationNode(module=module, 
                                   name=module_name,
                                   parent=subject,
-                                  childs=OrderedDict(),
                                   node_id=module_idx)
             
             all_nodes.append(child)
-            if not module._modules: # if module doen't have child modules
-                child.is_leaf = True
             
             subject.childs[module_idx] = child
             copy_childs.append(child)
@@ -203,8 +165,7 @@ class OperationTree:
             # if the maximum window size `m` does exist, then try to explore the repeat time of the window
             if exist_repeat:
                 # whether all the modules in the window are the same
-                inner_repeat = True if len(set(str_childs[win1_start_end[0]:win2_start_end[1]])) == 1 \
-                                    else False
+                inner_repeat = len(set(str_childs[win1_start_end[0]:win2_start_end[1]])) == 1 
                 
                 # multiply the window size `m` by 2 if all the modules in the window are the same
                 repeat_time = win_size*2 if inner_repeat else 2
@@ -222,10 +183,10 @@ class OperationTree:
                 now_node.repeat_winsz = win_size
                 now_node.repeat_time = repeat_time
                 for idx in range(slide_start_idx, slide_start_idx + win_size):
-                    brother_node = copy_childs[idx]
-                    brother_node.render_when_repeat = True & subject.render_when_repeat
-                    brother_node.is_folded = True if idx-slide_start_idx else False
-                    now_node.repeat_body.append((brother_node.node_id, brother_node.name))
+                    inwin_node = copy_childs[idx]
+                    inwin_node.render_when_repeat = True & subject.render_when_repeat
+                    inwin_node.is_folded = True if idx-slide_start_idx else False
+                    now_node.repeat_body.append((inwin_node.node_id, inwin_node.name))
 
                 # skip the modules that is repeated
                 slide_start_idx += win_size * repeat_time
