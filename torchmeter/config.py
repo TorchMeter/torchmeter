@@ -131,11 +131,11 @@ UNSAFE_KV = {
 
 def dict_to_namespace(d):
     """
-    Recursively converts a dictionary to a SimpleNamespace object.
+    Recursively converts a dictionary to a FlagNameSpace object.
     """
     assert isinstance(d, dict), f"Input must be a dictionary, but got {type(d)}"
     
-    ns = SimpleNamespace()
+    ns = FlagNameSpace()
     for k, v in d.items():
         # overwrite the value of unsafe key to get the unrepresent value
         if k in UNSAFE_KV:
@@ -154,15 +154,18 @@ def dict_to_namespace(d):
             setattr(ns, k, _list)
             
         else:
+            if k.startswith("__FLAG"):
+                warnings.warn(f"Key {k} is not a valid level name and the settings will be ignored.")
+                continue
             setattr(ns, k, v)
             
     return ns
 
 def namespace_to_dict(ns, safe_resolve=False):
     """
-    Recursively converts a SimpleNamespace object to a dictionary.
+    Recursively converts a FlagNameSpace object to a dictionary.
     """
-    assert isinstance(ns, SimpleNamespace), f"Input must be a SimpleNamespace, but got {type(ns)}"
+    assert isinstance(ns, SimpleNamespace), f"Input must be an instance of SimpleNamespace, but got {type(ns)}"
 
     d = {}
     for k, v in ns.__dict__.items():
@@ -182,7 +185,7 @@ def namespace_to_dict(ns, safe_resolve=False):
                     _list.append(item)
             d[k] = _list
             
-        else:
+        elif not k.startswith('__FLAG'):
             d[k] = v
             
     return d
@@ -191,6 +194,45 @@ def get_config():
     cfg_file = os.environ.get('TORCHMETER_CONFIG', None)
     return Config(config_file=cfg_file)
 
+class FlagNameSpace(SimpleNamespace):
+    
+    __flag_key = '__FLAG'
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        
+        cnt = 1
+        while self.__flag_key in kwargs:
+            self.__flag_key += str(cnt)
+            cnt += 1
+        
+        self.mark_unchange()
+            
+    def __setattr__(self, key, value):
+        assert key != self.__flag_key, f"`{key}` is preserved for internal use, could never be changed."
+        super().__setattr__(key, value)
+        self.mark_change()
+    
+    def __delattr__(self, key):
+        assert key != self.__flag_key, f"`{key}` is preserved for internal use, can not be deleted."
+        super().__delattr__(key)
+        self.mark_change()
+    
+    def is_change(self):
+        res = getattr(self, self.__flag_key) or \
+              any(args.is_change() for args in self.__dict__.values() 
+                    if isinstance(args, self.__class__))
+        self.__dict__[self.__flag_key] = res
+        return res
+    
+    def mark_change(self):
+        self.__dict__[self.__flag_key] = True
+    
+    def mark_unchange(self):
+        self.__dict__[self.__flag_key] = False
+        list(map(lambda x: x.mark_unchange() if isinstance(x, self.__class__) else None, 
+                 self.__dict__.values()))        
+        
 class ConfigMeta(type):
     """To achieve sigleton pattern"""
     
@@ -240,8 +282,10 @@ class Config(metaclass=ConfigMeta):
             with open(self.config_file, 'r') as f:
                 raw_data = yaml.safe_load(f)
         
-        ns:SimpleNamespace = dict_to_namespace(raw_data)
+        ns:FlagNameSpace = dict_to_namespace(raw_data)
         for field in ns.__dict__.keys():
+            if field.startswith('__FLAG'):
+                continue
             setattr(self, field, getattr(ns, field))          
 
     def restore(self):
