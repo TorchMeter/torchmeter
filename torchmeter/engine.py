@@ -77,7 +77,8 @@ class OperationTree:
         with Timer(task_desc="Scanning model"):
             nonroot_nodes, *_ = dfs_task(dfs_subject=self.root, 
                                          adj_func=lambda x:x.childs.values(),
-                                         task_func=OperationTree.__build)
+                                         task_func=OperationTree.__build,
+                                         visited=[])
 
         self.all_nodes = [self.root] + nonroot_nodes
             
