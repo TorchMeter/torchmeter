@@ -2,7 +2,7 @@ import re
 import os
 import warnings
 from time import sleep
-from copy import copy,deepcopy
+from copy import copy, deepcopy
 from operator import attrgetter
 from typing import Any, Callable, Dict, List, Optional, Sequence, Union, TypeVar
 
@@ -312,8 +312,6 @@ class TreeRenderer:
         
         self.repeat_block_args.mark_change()
         
-        self.render_fold_tree = None
-
     def repeat_footer(self, attr_dict:Dict[str, Any]) -> Union[str, None]:
         """Must have only one args which accept an attribute dict"""
         # basic format of footer in each repeat block
@@ -488,7 +486,8 @@ class TreeRenderer:
         # apply display setting for each node by dfs traversal
         dfs_task(dfs_subject=copy_tree,
                  adj_func=lambda x:x.childs.values(),
-                 task_func=__apply_display_setting)
+                 task_func=__apply_display_setting,
+                 visited=[])
 
         self.loop_algebras = origin_algebras
         
@@ -541,76 +540,56 @@ class TreeRenderer:
     
 class TabularRenderer:
 
-    def __init__(self, 
-                 node:"OperationNode"):  # noqa # type: ignore
+    def __init__(self, node:"OperationNode"):  # noqa # type: ignore
 
         self.opnode = node
 
         # underlying data
         self.__stats_data = {stat_name:DataFrame() for stat_name in node.statistics}
-
-        # basic display format for each column
-        self.__default_col_args:NAMESPACE_TYPE = __cfg__.table_column_args
-
-        self.__default_tb_args:NAMESPACE_TYPE = __cfg__.table_display_args
             
     @property
     def tb_args(self) -> NAMESPACE_TYPE:
-        return self.__default_tb_args
+        return __cfg__.table_display_args
     
     @property
     def col_args(self) -> NAMESPACE_TYPE:
-        return self.__default_col_args
+        return __cfg__.table_column_args
 
     @property
     def datas(self):
         return self.__stats_data
 
     @property
-    def valid_export_format(self) -> Sequence[str]:
-        return ('csv', 'xlsx')
+    def valid_export_format(self) -> List[str]:
+        return ['csv', 'xlsx']
 
     @tb_args.setter
     def tb_args(self, custom_args:Dict[str, Any]):
-        if not isinstance(custom_args, dict):
-            raise TypeError(f"The new value of `TabularRenderer.tb_args` must be a dict. But got {type(custom_args)}.")
-    
-        valid_setting_keys = tuple(Table().__dict__.keys())
-        _val_dict = self.__default_tb_args.__dict__
-        _val_dict.update(custom_args)
-        _val_dict = {k:v for k, v in _val_dict.items() if k in valid_setting_keys}
-
+        assert isinstance(custom_args, dict), f"You can only overwrite `{self.__class__.__name__}.tb_args` with a dict. \
+                                                But got {type(custom_args)}."
+        
+        valid_setting_keys = set(Table().__dict__.keys())
+        passin_keys = set(custom_args.keys())
+        invalid_keys = passin_keys - valid_setting_keys
+        assert not invalid_keys, f"Keys {invalid_keys} is/are not accepted by `rich.table.Table`, \
+            refer to https://rich.readthedocs.io/en/latest/tables.html for valid args."
+        self.tb_args.__dict__.update(custom_args)
+        
+        self.tb_args.mark_change()
+        
     @col_args.setter
     def col_args(self, custom_args:Dict[str, Any]):
-        if not isinstance(custom_args, dict):
-            raise TypeError(f"The new value of `TabularRenderer.col_args` must be a dict. But got {type(custom_args)}.")
-
-        valid_setting_keys = tuple(Column().__dict__.keys())
-        _val_dict = self.__default_col_args.__dict__
-        _val_dict.update(custom_args)
-        _val_dict = {k:v for k, v in _val_dict.items() if k in valid_setting_keys}
-
-    def __new_col(self, 
-                  df:DataFrame,
-                  col_name:str, 
-                  col_func:Callable[[Dict], Any],
-                  used_cols:List[str],
-                  return_type=None,
-                  col_idx:int = -1) -> DataFrame:
-        assert len(used_cols) > 0, 'You need to specify the columns used in the function for creating new columns, \
-                                     and pass them to `newcol_dependcol` as a list.'
-        for used_name in used_cols:
-            assert used_name in df.columns, f"Column `{used_name}` is not in the table.\nValid columns are {df.columns}."
-
-        final_cols = df.columns[:]
-        col_idx = (col_idx if col_idx >= 0 else len(df.columns)+col_idx+1) % (len(df.columns)+1)
-        final_cols.insert(col_idx, col_name)
-
-        return df.with_columns(
-            struct(used_cols)
-            .map_elements(col_func, return_dtype=return_type)
-            .alias(col_name)
-        ).select(final_cols)
+        assert isinstance(custom_args, dict), f"You can only overwrite `{self.__class__.__name__}.col_args` with a dict. \
+                                                But got {type(custom_args)}."
+        
+        valid_setting_keys = set(Column().__dict__.keys())
+        passin_keys = set(custom_args.keys())
+        invalid_keys = passin_keys - valid_setting_keys
+        assert not invalid_keys, f"Keys {invalid_keys} is/are not accepted by `rich.table.Column`, \
+            refer to https://rich.readthedocs.io/en/latest/columns.html for valid args."
+        self.col_args.__dict__.update(custom_args)
+        
+        self.col_args.mark_change()
 
     def df2tb(self, df:DataFrame, show_raw:bool = False) -> Table:
         # create rich table
@@ -644,11 +623,16 @@ class TabularRenderer:
         return tb
 
     def clear(self, stat_name:Optional[str]=None):
-        if stat_name:
-            self.__stats_data[stat_name].clear()
+        assert stat_name is None or isinstance(stat_name,str), \
+            f"`stat_name` must be a string or None, but got {type(stat_name)}."
+            
+        valid_stat_name = self.opnode.statistics
+        if isinstance(stat_name,str):
+            assert stat_name in valid_stat_name, \
+                f"`{stat_name}` not in the supported statistics {valid_stat_name}."
+            self.datas[stat_name] = DataFrame()
         else:
-            for stat in self.__stats_data.values():
-                stat.clear()
+            self.__stats_data = {stat_name:DataFrame() for stat_name in valid_stat_name}
 
     def export(self, 
                df:DataFrame, 
@@ -657,20 +641,22 @@ class TabularRenderer:
                file_suffix:str='',
                raw_data:bool=False):
         
+        save_path = os.path.abspath(save_path)
+        
         # get save path
         if format is None:
             format = os.path.splitext(save_path)[-1]
-            assert '.' in format, 'File foramat unknown!\n' + \
+            assert '.' in format, 'File foramat unknown! ' + \
                                   f"Please specify a file path, not a dierectory path like {save_path}.\n" + \
-                                  f"Or specify a file format using `format=xxx`, now we support exporting to {self.valid_export_format} file."
+                                  f"Or you can specify a file format using `format=xxx`, now we support exporting to {self.valid_export_format} file."
                                   
         format = format.strip('.')
         assert format in self.valid_export_format, \
-                f"`{format}` file is not supported, now we only support exporting {self.valid_export_format} file."
+                f"`{format}` file is not supported, now we only support exporting to {self.valid_export_format} file."
         
         _, file_path = resolve_savepath(origin_path=save_path,
-                                       target_ext=format,
-                                       default_filename=f"{self.opnode.name}_{file_suffix}") 
+                                        target_ext=format,
+                                        default_filename=f"{self.opnode.name}_{file_suffix}") 
         
         # deal with invalid data
         df = deepcopy(df)
@@ -680,7 +666,7 @@ class TabularRenderer:
         df = df.with_columns([
             col(col_name).map_elements(lambda s: getattr(s,'raw_data',s.val) if raw_data else str(s),
                                        return_dtype=float if raw_data else str)
-            for col_name, obj_cls in obj_cols.items()
+            for col_name in obj_cols.keys()
         ])            
         
         # export 
@@ -709,7 +695,6 @@ class TabularRenderer:
                  custom_cols:Dict[str, str]={},
                  newcol_name:str='',
                  newcol_func:Callable[[Dict[str, Any]], Any]=lambda col_dict: col_dict,
-                 newcol_dependcol:List[str]=[],
                  newcol_type=None,
                  newcol_idx:int=-1,
                  save_to:Optional[str]=None,
@@ -717,10 +702,11 @@ class TabularRenderer:
         """render rich tabel according to the statistics dataframe.
         Note that `pick_cols` work before `custom_col`
         """
-        
-        assert isinstance(newcol_idx, int), f"`newcol_idx` must be an integer, but got {type(newcol_idx)}."
+    
         assert stat_name in self.opnode.statistics, \
-            f"`{stat_name}` not in the supported statistics {self.opnode.statistics}"
+            f"`{stat_name}` not in the supported statistics {self.opnode.statistics}."
+        assert isinstance(newcol_idx, int), f"`newcol_idx` must be an integer, but got {type(newcol_idx)}."
+        assert isinstance(custom_cols, dict), f"`custom_cols` must be a dict, but got {type(custom_cols)}."
         
         stat:"Statistic" = getattr(self.opnode, stat_name) # noqa # type: ignore
         data:DataFrame = self.datas[stat_name]
@@ -729,6 +715,7 @@ class TabularRenderer:
     
         def __fill_cell(subject:"OperationNode", # noqa # type: ignore
                         pre_res=None):
+            # only support display leaf node now
             if not subject.is_leaf:
                 return
 
@@ -750,7 +737,6 @@ class TabularRenderer:
             dfs_task(dfs_subject=self.opnode,
                      adj_func=lambda x: x.childs.values(),
                      task_func=__fill_cell,
-                     visited_signal_func=lambda x: str(id(x)),
                      visited=[])
             
             data = DataFrame(data=val_collector, schema=valid_fields, orient='row')
@@ -773,7 +759,6 @@ class TabularRenderer:
             data = self.__new_col(df=data,
                                   col_name=newcol_name,
                                   col_func=newcol_func,
-                                  used_cols=newcol_dependcol,
                                   return_type=newcol_type,
                                   col_idx=newcol_idx)
             self.datas[stat_name] = data
@@ -784,7 +769,7 @@ class TabularRenderer:
             save_to = os.path.abspath(save_to)  
             if '.' not in os.path.basename(save_to):
                 assert save_format in self.valid_export_format, \
-                    f"Argument `save_format` must be one in {self.valid_export_format}, but got {save_format}\n" + \
+                    f"Argument `save_format` must be one in {self.valid_export_format}, but got {save_format}.\n" + \
                     "Alternatively, you can set `save_to` to a concrete file path, like `path/to/file.xlsx`"
             
             self.export(df=data,
@@ -794,3 +779,20 @@ class TabularRenderer:
                         raw_data=raw_data)
 
         return tb, data
+    
+    def __new_col(self, 
+                  df:DataFrame,
+                  col_name:str, 
+                  col_func:Callable[[Dict], Any],
+                  return_type=None,
+                  col_idx:int = -1) -> DataFrame:
+
+        final_cols = df.columns[:]
+        col_idx = (col_idx if col_idx >= 0 else len(df.columns)+col_idx+1) % (len(df.columns)+1)
+        final_cols.insert(col_idx, col_name)
+
+        return df.with_columns(
+            struct(df.columns)
+            .map_elements(col_func, return_dtype=return_type)
+            .alias(col_name)
+        ).select(final_cols)
