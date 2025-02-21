@@ -4,7 +4,7 @@ import warnings
 from time import sleep
 from copy import copy, deepcopy
 from operator import attrgetter
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union, TypeVar
+from typing import Any, Callable, Dict, List, Optional, Union, TypeVar
 
 from rich import print, get_console
 from rich.rule import Rule
@@ -715,25 +715,26 @@ class TabularRenderer:
     
         def __fill_cell(subject:"OperationNode", # noqa # type: ignore
                         pre_res=None):
-            # only support display leaf node now
-            if not subject.is_leaf:
+            if subject.node_id == '0':
                 return
 
             val_getter = attrgetter(*valid_fields)
 
             node_stat = getattr(subject, stat_name)
-
-            stat_infos = node_stat.detail_val
-            if stat_infos:
-                for rec in stat_infos: # rec: NamedTuple
-                    vals = val_getter(rec)
-                    val_collector.append(vals)
-            else:
-                val_collector.append(['-']*len(valid_fields))
+            
+            try:
+                stat_infos = node_stat.detail_val
+                if stat_infos:
+                    for rec in stat_infos: # rec: NamedTuple
+                        vals = val_getter(rec)
+                        val_collector.append(vals)
+            except RuntimeError:
+                nocall_nodes.append(f"({subject.node_id}){subject.name}")
 
         # only when the table is empty, then explore the data using dfs
         if data.is_empty():            
             val_collector = []
+            nocall_nodes = []
             dfs_task(dfs_subject=self.opnode,
                      adj_func=lambda x: x.childs.values(),
                      task_func=__fill_cell,
@@ -741,6 +742,11 @@ class TabularRenderer:
             
             data = DataFrame(data=val_collector, schema=valid_fields, orient='row')
             self.datas[stat_name] = data
+            
+            if nocall_nodes:
+                warnings.warn(message=f"{', '.join(nocall_nodes)}\nThe modules above might be defined but not explicitly called. " + \
+                                       "They will be ignored in the measuring, so will not appear in the table below.",
+                              category=RuntimeWarning,)
         
         # pick columns, order defined by `pick_cols`
         if pick_cols:

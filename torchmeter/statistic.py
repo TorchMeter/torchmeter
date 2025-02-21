@@ -348,7 +348,9 @@ class CalMeter(Statistics):
 
     def __is_valid_access(self):
         if self.is_measured:
-            if not (self.Flops.val + self.Macs.val) and not self.__stat_ls:
+            if not (self.Flops.val + self.Macs.val) and \
+               not self.__stat_ls and \
+               not isinstance(self._model, (nn.ModuleDict, nn.ModuleList)):
                 raise RuntimeError("This module might be defined but not explicitly called, so no data is collected.")
         else:
             raise AttributeError("You should never access this property on your own " + \
@@ -617,7 +619,7 @@ class MemMeter(Statistics):
 
     def __is_valid_access(self):
         if self.is_measured:
-            if not self.__stat_ls:
+            if not self.__stat_ls and not isinstance(self._model, (nn.ModuleDict, nn.ModuleList)):
                 raise RuntimeError("This module might be defined but not explicitly called, so no data is collected.")
         else:
             raise AttributeError("You should never access this property on your own " + \
@@ -738,7 +740,7 @@ class ITTPMeter(Statistics):
 
     def __is_valid_access(self):
         if self.is_measured:
-            if not self.__stat_ls:
+            if not self.__stat_ls and not isinstance(self._model, (nn.ModuleDict, nn.ModuleList)):
                 raise RuntimeError("This module might be defined but not explicitly called, so no data is collected.")
         else:
             raise AttributeError("You should never access this property on your own " + \
