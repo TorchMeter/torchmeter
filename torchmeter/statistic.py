@@ -51,14 +51,17 @@ class UpperLinkData:
 
 class MetricsData:
 
-    __slots__ = ['vals',
-                 'reduce_func',
-                 '__unit_sys']
+    __slots__ = ['vals', 'reduce_func',
+                 '__unit_sys', 'none_str']
 
-    def __init__(self, reduce_func:Optional[Callable]=np.mean, unit_sys:Optional[UNIT_TYPE]=CountUnit):
+    def __init__(self, 
+                 reduce_func:Optional[Callable]=np.mean, 
+                 unit_sys:Optional[UNIT_TYPE]=CountUnit,
+                 none_str:str='-'):
         self.vals = np.array([])
-        self.reduce_func = reduce_func if reduce_func is not None else lambda x:x
+        self.reduce_func = reduce_func if reduce_func is not None else np.mean
         self.__unit_sys = unit_sys
+        self.none_str = none_str
 
     @property
     def metrics(self):
@@ -70,6 +73,10 @@ class MetricsData:
             return np.percentile(self.vals, 75) - np.percentile(self.vals, 25)
         else:
             return 0.
+    
+    @property
+    def val(self) -> Tuple[float, float]:
+        return self.metrics, self.iqr
     
     @property
     def raw_data(self):
@@ -86,15 +93,15 @@ class MetricsData:
             return f"{auto_unit(self.metrics, self.__unit_sys)}" + ' ± ' + \
                    f"{auto_unit(self.iqr, self.__unit_sys)}"
         else:
-            return f"{self.metrics} ± {self.iqr}"
+            return f"{self.metrics:.2f} ± {self.iqr:.2f}"
 
 class Statistics(ABC):
 
     def __new__(cls, *args, **kwargs):
-        assert hasattr(cls, 'detail_val_container'), f"Class '{cls.__name__}' must have the class attribute 'detail_val_container', \
-                                               which should be a NamedTuple"
-        assert hasattr(cls, 'overview_val_container'), f"Class '{cls.__name__}' must have the class attribute 'overview_val_container', \
-                                            which should be a NamedTuple"
+        assert hasattr(cls, 'detail_val_container'), \
+            f"Class '{cls.__name__}' must have the class attribute 'detail_val_container', which should be a NamedTuple"
+        assert hasattr(cls, 'overview_val_container'), \
+            f"Class '{cls.__name__}' must have the class attribute 'overview_val_container', which should be a NamedTuple"
         return super().__new__(cls)        
 
     @property
@@ -117,8 +124,8 @@ class Statistics(ABC):
 
     @property
     @abstractmethod
-    def crucial_info(self) -> Dict[str, str]:
-        """The dict of crucial information of the statistics, used in profile footer"""
+    def crucial_data(self) -> Dict[str, str]:
+        """The dict of crucial data of the statistics, used in profile footer"""
         ...
 
     @abstractmethod
@@ -151,13 +158,12 @@ class Statistics(ABC):
     def __repr__(self):
         repr_str = self.val.__class__.__name__ + '\n'
 
-        max_len = max((len(f) for f in self.ov_fields))
+        max_len = max(len(f) for f in self.ov_fields)
 
         for field in self.ov_fields:
             field_val = getattr(self.val, field, 'N/A')
             if isinstance(field_val, UpperLinkData):
-                numeric_val = float(field_val.val) # get the value
-                repr_str += '• ' + f"{field.rjust(max_len)} = {numeric_val} = {field_val}\n"
+                repr_str += '• ' + f"{field.rjust(max_len)} = {field_val.raw_data:.2f} = {field_val}\n"
             else:
                 repr_str += '• ' + f"{field.rjust(max_len)} = {field_val}\n"
 
@@ -187,7 +193,7 @@ class ParamsMeter(Statistics):
         self._model = opnode.operation
         
         self.__stat_ls = [] # record all parameters' information
-        self.is_measured = True if self._model._modules else False # only measure the leaf nodes
+        self.is_measured = False # used for cache
 
         _opparent = opnode.parent
         self.__RegNum = self.init_linkdata(attr_name='RegNum', init_val=0, opparent=_opparent, unit_sys=CountUnit)
@@ -220,7 +226,9 @@ class ParamsMeter(Statistics):
                                            Learnable_Params=self.RegNum)
 
     @property
-    def crucial_info(self) -> Dict[str, str]:
+    def crucial_data(self) -> Dict[str, str]:
+        self.measure()
+            
         res_dict = {'Learnable Parameters Num': str(self.RegNum),
                     'Total Parameters Num': str(self.TotalNum)}
         max_keylen = max([len(key) for key in res_dict.keys()])
@@ -228,7 +236,7 @@ class ParamsMeter(Statistics):
         return res_dict
 
     def measure(self) -> None:
-        if self.is_measured: # TODO: non-leaf layer may have its own parameter
+        if self.is_measured:
             return
         
         if not self._model._parameters:
@@ -237,7 +245,9 @@ class ParamsMeter(Statistics):
                                                             Operation_Type=self._opnode.type,
                                                             Numeric_Num=UpperLinkData(val=0, unit_sys=CountUnit)))
         else:
-            for param_name, param_val in self._model.named_parameters(): 
+            for param_name, param_val in self._model._parameters.items(): 
+                if param_val is None:
+                    continue
                 p_num = param_val.numel()
                 
                 p_reg = False
@@ -283,7 +293,7 @@ class CalMeter(Statistics):
         self._model = opnode.operation
         
         self.__stat_ls = [] # record the flops and macs information of each operation
-        self.is_measured = True if self._model._modules else False # only measure the leaf nodes
+        self.is_measured = False if self._opnode.is_leaf else True # only measure the leaf nodes
 
         _opparent = opnode.parent
         self.__Macs = self.init_linkdata(attr_name='Macs', init_val=0, opparent=_opparent, 
@@ -305,12 +315,12 @@ class CalMeter(Statistics):
 
     @property
     def detail_val(self) -> List[NamedTuple]:
-        self.measure()
+        self.__is_valid_access()
         return self.__stat_ls
     
     @property
     def val(self) -> NamedTuple:
-        self.measure()
+        self.__is_valid_access()
         return self.overview_val_container(Operation_Id=self._opnode.node_id,
                                            Operation_Type=self._opnode.type,
                                            Operation_Name=self._opnode.name,
@@ -318,7 +328,8 @@ class CalMeter(Statistics):
                                            FLOPs=self.Flops)
 
     @property
-    def crucial_info(self) -> Dict[str, str]:
+    def crucial_data(self) -> Dict[str, str]:
+        self.__is_valid_access()
         res_dict = {'FLOPs': str(self.Flops),
                     'MACs(aka MACC, MADD)': str(self.Macs)}
         max_keylen = max([len(key) for key in res_dict.keys()])
@@ -334,6 +345,15 @@ class CalMeter(Statistics):
         self.is_measured = True
 
         return hook
+
+    def __is_valid_access(self):
+        if self.is_measured:
+            if not (self.Flops.val + self.Macs.val) and not self.__stat_ls:
+                raise RuntimeError("This module might be defined but not explicitly called, so no data is collected.")
+        else:
+            raise AttributeError("You should never access this property on your own " + \
+                                 "before accessing `Meter(your_model).cal`.")
+        return True
 
     def __regist_hook(self, module):
         if isinstance(module, (nn.Conv1d, nn.Conv2d, nn.Conv3d)):
@@ -504,7 +524,7 @@ class MemMeter(Statistics):
         self._model = opnode.operation
         
         self.__stat_ls = [] # record the memory cost of each operation
-        self.is_measured = True if self._model._modules else False # only measure the leaf nodes
+        self.is_measured = False # used for cache
 
         _opparent = opnode.parent
         self.__ParamCost = self.init_linkdata(attr_name='ParamCost', init_val=0, opparent=_opparent, unit_sys=BinaryUnit)
@@ -534,22 +554,12 @@ class MemMeter(Statistics):
     
     @property
     def detail_val(self) -> List[NamedTuple]:
-        self.measure()
+        self.__is_valid_access()
         return self.__stat_ls
-    
-    @property
-    def crucial_info(self) -> Dict[str, str]:
-        res_dict =  {'[b]Parameters[/] Memory Cost': f"{self.ParamCost}, {self.ParamCost.val*100/self.TotalCost.val:.2f} %",
-                     '[b]Buffers[/] Memory Cost': f"{self.BufferCost}, {self.BufferCost.val*100/self.TotalCost.val:.2f} %",
-                     '[b]FeatureMap[/] Memory Cost': f"{self.FeatureMapCost}, {self.FeatureMapCost.val*100/self.TotalCost.val:.2f}",
-                     '[b]Total Memory Cost[/]': str(self.TotalCost)}
-        max_keylen = max([len(key) for key in res_dict.keys()])
-        res_dict = {key.ljust(max_keylen): value for key, value in res_dict.items()}
-        return res_dict
                 
     @property
     def val(self) -> NamedTuple:
-        self.measure()
+        self.__is_valid_access()
         return self.overview_val_container(Operation_Id=self._opnode.node_id,
                                            Operation_Type=self._opnode.type,
                                            Operation_Name=self._opnode.name,
@@ -558,12 +568,22 @@ class MemMeter(Statistics):
                                            FeatureMap_Cost=self.FeatureMapCost,
                                            Total=self.TotalCost)
 
+    @property
+    def crucial_data(self) -> Dict[str, str]:
+        self.__is_valid_access()
+        res_dict =  {'[b]Parameters[/] Memory Cost': f"{self.ParamCost}, {self.ParamCost.val*100/self.TotalCost.val:.2f} %",
+                     '[b]Buffers[/] Memory Cost': f"{self.BufferCost}, {self.BufferCost.val*100/self.TotalCost.val:.2f} %",
+                     '[b]FeatureMap[/] Memory Cost': f"{self.FeatureMapCost}, {self.FeatureMapCost.val*100/self.TotalCost.val:.2f}",
+                     '[b]Total Memory Cost[/]': str(self.TotalCost)}
+        max_keylen = max([len(key) for key in res_dict.keys()])
+        res_dict = {key.ljust(max_keylen): value for key, value in res_dict.items()}
+        return res_dict
+
     def measure(self):
         if self.is_measured:
             return
         
         hook = self._model.register_forward_hook(self.__hook_func)
-        # TODO: measure backward cost (deal with the gradient)
         
         self.is_measured = True
 
@@ -571,7 +591,9 @@ class MemMeter(Statistics):
 
     def __hook_func(self, module, input, output):
         param_cost = 0 # byte
-        for param in module.parameters():
+        for param in module._parameters.values():
+            if param is None:
+                continue
             param_cost += param.numel() * param.element_size()
         self.__ParamCost += param_cost
         
@@ -592,6 +614,15 @@ class MemMeter(Statistics):
                                                         Buffer_Cost=self.BufferCost if buffer_cost else None, 
                                                         FeatureMap_Cost=self.FeatureMapCost, 
                                                         Total=self.TotalCost))
+
+    def __is_valid_access(self):
+        if self.is_measured:
+            if not self.__stat_ls:
+                raise RuntimeError("This module might be defined but not explicitly called, so no data is collected.")
+        else:
+            raise AttributeError("You should never access this property on your own " + \
+                                 "before accessing `Meter(your_model).cal`.")
+        return True
 
 class ITTPMeter(Statistics):
 
@@ -616,6 +647,7 @@ class ITTPMeter(Statistics):
         self._model = opnode.operation
         
         self.__stat_ls = [] # record the inference time and throughput of each operation
+        self.is_measured = False
 
         self.__InferTime = MetricsData(reduce_func=np.median, unit_sys=TimeUnit)
         self.__Throughput = MetricsData(reduce_func=np.median, unit_sys=SpeedUnit)
@@ -634,10 +666,12 @@ class ITTPMeter(Statistics):
 
     @property
     def detail_val(self) -> List[NamedTuple]:
+        self.__is_valid_access()
         return self.__stat_ls
     
     @property
     def val(self) -> NamedTuple:
+        self.__is_valid_access()
         return self.overview_val_container(Operation_Id=self._opnode.node_id,
                                            Operation_Type=self._opnode.type,
                                            Operation_Name=self._opnode.name,
@@ -645,7 +679,8 @@ class ITTPMeter(Statistics):
                                            Throughput=self.__Throughput)
 
     @property
-    def crucial_info(self) -> Dict[str, str]:
+    def crucial_data(self) -> Dict[str, str]:
+        self.__is_valid_access()
         res_dict = {'Inference Elapse': str(self.InferTime),
                     'Throughput': str(self.Throughput)}
         max_keylen = max([len(key) for key in res_dict.keys()])
@@ -658,6 +693,8 @@ class ITTPMeter(Statistics):
                                                          device=device, 
                                                          repeat=repeat,
                                                          global_process=global_process))
+        
+        self.is_measured = True
         
         return hook
 
@@ -699,4 +736,11 @@ class ITTPMeter(Statistics):
                                                         Infer_Time=self.InferTime,
                                                         Throughput=self.Throughput))
 
-
+    def __is_valid_access(self):
+        if self.is_measured:
+            if not self.__stat_ls:
+                raise RuntimeError("This module might be defined but not explicitly called, so no data is collected.")
+        else:
+            raise AttributeError("You should never access this property on your own " + \
+                                 "before accessing `Meter(your_model).cal`.")
+        return True
