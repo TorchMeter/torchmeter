@@ -524,8 +524,9 @@ class MemMeter(Statistics):
     def __init__(self, opnode: OPN_TYPE):
         self._opnode = opnode
         self._model = opnode.operation
+        self.is_inplace = getattr(self._model, 'inplace', False)
         
-        self.__stat_ls = [] # record the memory cost of each operation
+        self.__stat_ls = set() # use set not list to avoid duplicate access
         self.is_measured = False # used for cache
 
         _opparent = opnode.parent
@@ -604,18 +605,22 @@ class MemMeter(Statistics):
             buffer_cost += buffer.numel() * buffer.element_size()
         self.__BufferCost += buffer_cost
         
-        feat_cost = output.numel() * output.element_size() # byte
+        if self._opnode.is_leaf and not self.is_inplace:
+            feat_cost = output.numel() * output.element_size() # byte
+        else:
+            feat_cost = 0
         self.__FeatureMapCost += feat_cost
         
-        self.__TotalCost += param_cost + buffer_cost + feat_cost
+        total_cost = param_cost + buffer_cost + feat_cost
+        self.__TotalCost += total_cost
         
-        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                        Operation_Name=self._opnode.name,
-                                                        Operation_Type=self._opnode.type,
-                                                        Param_Cost=self.ParamCost if param_cost else None, 
-                                                        Buffer_Cost=self.BufferCost if buffer_cost else None, 
-                                                        FeatureMap_Cost=self.FeatureMapCost, 
-                                                        Total=self.TotalCost))
+        self.__stat_ls.add(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                     Operation_Name=self._opnode.name + ('(inplace)' if self.is_inplace else ''),
+                                                     Operation_Type=self._opnode.type,
+                                                     Param_Cost=None if self._opnode.is_leaf and not param_cost else self.ParamCost, 
+                                                     Buffer_Cost=None if self._opnode.is_leaf and not buffer_cost else self.BufferCost, 
+                                                     FeatureMap_Cost=None if self._opnode.is_leaf and not feat_cost else self.FeatureMapCost, 
+                                                     Total=self.TotalCost if total_cost else None))
 
     def __is_valid_access(self):
         if self.is_measured:
