@@ -18,7 +18,7 @@ OPN_TYPE = TypeVar("OperationNode")
 
 class UpperLinkData:
 
-    __slots__ = ['val', 'none_str',
+    __slots__ = ['val', 'none_str', 'access_cnt',
                  '__parent_data', '__unit_sys']
 
     def __init__(self, 
@@ -28,6 +28,7 @@ class UpperLinkData:
         self.val = val
         self.__parent_data = parent_data    
         self.__unit_sys = unit_sys
+        self.access_cnt = 1
         self.none_str = none_str # Use when there is a "None" in the column where this data is located while rendering the table.
     
     @property
@@ -37,6 +38,7 @@ class UpperLinkData:
     def __iadd__(self, other):
         self.val += other
         self.__upper_update(other)
+        # self.access_cnt += 1
         return self
     
     def __upper_update(self, other:int):
@@ -45,9 +47,10 @@ class UpperLinkData:
     
     def __repr__(self):
         if self.__unit_sys is not None:
-            return auto_unit(self.val, self.__unit_sys)
+            base = auto_unit(self.val/self.access_cnt, self.__unit_sys)
         else:
-            return str(self.val)
+            base = str(self.val/self.access_cnt)
+        return base + (f"[dim]\nx {self.access_cnt}[/]" if self.access_cnt > 1 else "")
 
 class MetricsData:
 
@@ -389,16 +392,20 @@ class CalMeter(Statistics):
         self.__Macs += MACs
         self.__Flops += FLOPs
         
-        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                        Operation_Name=self._opnode.name,
-                                                        Operation_Type=self._opnode.type,
-                                                        Kernel_Size=list(module.kernel_size),
-                                                        Bias=bool(is_bias),
-                                                        Input_Shape=list(input[0].shape),
-                                                        Output_Shape=[len(output)]+list(output[0].shape),
-                                                        MACs=self.Macs,
-                                                        FLOPs=self.Flops)
-        )
+        if len(self.__stat_ls):
+            self.Macs.access_cnt += 1
+            self.Flops.access_cnt += 1
+        else:
+            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                            Operation_Name=self._opnode.name,
+                                                            Operation_Type=self._opnode.type,
+                                                            Kernel_Size=list(module.kernel_size),
+                                                            Bias=bool(is_bias),
+                                                            Input_Shape=list(input[0].shape),
+                                                            Output_Shape=[len(output)]+list(output[0].shape),
+                                                            MACs=self.Macs,
+                                                            FLOPs=self.Flops)
+            )
     
     def __linear_hook(self, module, input, output):
         k = module.in_features
@@ -411,15 +418,19 @@ class CalMeter(Statistics):
         self.__Macs += MACs
         self.__Flops += FLOPs
 
-        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                        Operation_Name=self._opnode.name,
-                                                        Operation_Type=self._opnode.type,
-                                                        Bias=bool(is_bias),
-                                                        Input_Shape=list(input[0].shape),
-                                                        Output_Shape=[len(output)]+list(output[0].shape),
-                                                        MACs=self.Macs,
-                                                        FLOPs=self.Flops)
-        )
+        if len(self.__stat_ls):
+            self.Macs.access_cnt += 1
+            self.Flops.access_cnt += 1
+        else:
+            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                            Operation_Name=self._opnode.name,
+                                                            Operation_Type=self._opnode.type,
+                                                            Bias=bool(is_bias),
+                                                            Input_Shape=list(input[0].shape),
+                                                            Output_Shape=[len(output)]+list(output[0].shape),
+                                                            MACs=self.Macs,
+                                                            FLOPs=self.Flops)
+            )
 
     def __BN_hook(self, module, input, output):
         FLOPs = 4*input[0].numel()
@@ -427,14 +438,18 @@ class CalMeter(Statistics):
         self.__Macs += MACs
         self.__Flops += FLOPs
 
-        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                        Operation_Name=self._opnode.name,
-                                                        Operation_Type=self._opnode.type,
-                                                        Input_Shape=list(input[0].shape),
-                                                        Output_Shape=[len(output)]+list(output[0].shape),
-                                                        MACs=self.Macs,
-                                                        FLOPs=self.Flops)
-        )
+        if len(self.__stat_ls):
+            self.Macs.access_cnt += 1
+            self.Flops.access_cnt += 1
+        else:
+            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                            Operation_Name=self._opnode.name,
+                                                            Operation_Type=self._opnode.type,
+                                                            Input_Shape=list(input[0].shape),
+                                                            Output_Shape=[len(output)]+list(output[0].shape),
+                                                            MACs=self.Macs,
+                                                            FLOPs=self.Flops)
+            )
 
     def __activate_hook(self, module, input, output):
         k = input[0].numel()
@@ -457,14 +472,18 @@ class CalMeter(Statistics):
         self.__Macs += MACs
         self.__Flops += FLOPs
 
-        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                        Operation_Name=self._opnode.name,
-                                                        Operation_Type=self._opnode.type,
-                                                        Input_Shape=list(input[0].shape),
-                                                        Output_Shape=[len(output)]+list(output[0].shape),
-                                                        MACs=self.Macs,
-                                                        FLOPs=self.Flops)
-        )
+        if len(self.__stat_ls):
+            self.Macs.access_cnt += 1
+            self.Flops.access_cnt += 1
+        else:
+            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                            Operation_Name=self._opnode.name,
+                                                            Operation_Type=self._opnode.type,
+                                                            Input_Shape=list(input[0].shape),
+                                                            Output_Shape=[len(output)]+list(output[0].shape),
+                                                            MACs=self.Macs,
+                                                            FLOPs=self.Flops)
+            )
 
     def __pool_hook(self, module, input, output):
         k = module.kernel_size
@@ -481,23 +500,28 @@ class CalMeter(Statistics):
         self.__Macs += MACs
         self.__Flops += FLOPs
 
-        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                        Operation_Name=self._opnode.name,
-                                                        Operation_Type=self._opnode.type,
-                                                        Kernel_Size=list(k) if len(k)>1 else [k[0]]*2,
-                                                        Input_Shape=list(input[0].shape),
-                                                        Output_Shape=[len(output)]+list(output[0].shape),
-                                                        MACs=self.Macs,
-                                                        FLOPs=self.Flops)
-        )
+        if len(self.__stat_ls):
+            self.Macs.access_cnt += 1
+            self.Flops.access_cnt += 1
+        else:
+            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                            Operation_Name=self._opnode.name,
+                                                            Operation_Type=self._opnode.type,
+                                                            Kernel_Size=list(k) if len(k)>1 else [k[0]]*2,
+                                                            Input_Shape=list(input[0].shape),
+                                                            Output_Shape=[len(output)]+list(output[0].shape),
+                                                            MACs=self.Macs,
+                                                            FLOPs=self.Flops)
+            )
 
     def __not_support_hook(self, module, input, output):
-        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                        Operation_Name=self._opnode.name,
-                                                        Operation_Type=self._opnode.type,
-                                                        Input_Shape=list(input[0].shape),
-                                                        Output_Shape=[len(output)]+list(output[0].shape))
-        )
+        if not len(self.__stat_ls):
+            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                            Operation_Name=self._opnode.name,
+                                                            Operation_Type=self._opnode.type,
+                                                            Input_Shape=list(input[0].shape),
+                                                            Output_Shape=[len(output)]+list(output[0].shape))
+            )
 
 class MemMeter(Statistics):
 
@@ -526,7 +550,7 @@ class MemMeter(Statistics):
         self._model = opnode.operation
         self.is_inplace = getattr(self._model, 'inplace', False)
         
-        self.__stat_ls = set() # use set not list to avoid duplicate access
+        self.__stat_ls = [] # record the flops and macs information of each operation
         self.is_measured = False # used for cache
 
         _opparent = opnode.parent
@@ -611,16 +635,21 @@ class MemMeter(Statistics):
             feat_cost = 0
         self.__FeatureMapCost += feat_cost
         
-        total_cost = param_cost + buffer_cost + feat_cost
-        self.__TotalCost += total_cost
+        if len(self.__stat_ls):
+            # duplicated access
+            self.FeatureMapCost.access_cnt += 1
+            total_cost = feat_cost
+        else:
+            total_cost = param_cost + buffer_cost + feat_cost
+            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                            Operation_Name=self._opnode.name,
+                                                            Operation_Type=self._opnode.type + ('(inplace)' if self.is_inplace else ''),
+                                                            Param_Cost=None if self._opnode.is_leaf and not param_cost else self.ParamCost, 
+                                                            Buffer_Cost=None if self._opnode.is_leaf and not buffer_cost else self.BufferCost, 
+                                                            FeatureMap_Cost=None if self._opnode.is_leaf and not feat_cost else self.FeatureMapCost, 
+                                                            Total=None if self._opnode.is_leaf and not total_cost else self.TotalCost))
         
-        self.__stat_ls.add(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                     Operation_Name=self._opnode.name + ('(inplace)' if self.is_inplace else ''),
-                                                     Operation_Type=self._opnode.type,
-                                                     Param_Cost=None if self._opnode.is_leaf and not param_cost else self.ParamCost, 
-                                                     Buffer_Cost=None if self._opnode.is_leaf and not buffer_cost else self.BufferCost, 
-                                                     FeatureMap_Cost=None if self._opnode.is_leaf and not feat_cost else self.FeatureMapCost, 
-                                                     Total=self.TotalCost if total_cost else None))
+        self.__TotalCost += total_cost
 
     def __is_valid_access(self):
         if self.is_measured:
