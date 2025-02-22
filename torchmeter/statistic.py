@@ -403,7 +403,7 @@ class CalMeter(Statistics):
                                                             Kernel_Size=list(module.kernel_size),
                                                             Bias=bool(is_bias),
                                                             Input_Shape=list(input[0].shape),
-                                                            Output_Shape=[len(output)]+list(output[0].shape),
+                                                            Output_Shape=list(output.shape),
                                                             MACs=self.Macs,
                                                             FLOPs=self.Flops)
             )
@@ -428,7 +428,7 @@ class CalMeter(Statistics):
                                                             Operation_Type=self._opnode.type,
                                                             Bias=bool(is_bias),
                                                             Input_Shape=list(input[0].shape),
-                                                            Output_Shape=[len(output)]+list(output[0].shape),
+                                                            Output_Shape=list(output.shape),
                                                             MACs=self.Macs,
                                                             FLOPs=self.Flops)
             )
@@ -447,7 +447,7 @@ class CalMeter(Statistics):
                                                             Operation_Name=self._opnode.name,
                                                             Operation_Type=self._opnode.type,
                                                             Input_Shape=list(input[0].shape),
-                                                            Output_Shape=[len(output)]+list(output[0].shape),
+                                                            Output_Shape=list(output.shape),
                                                             MACs=self.Macs,
                                                             FLOPs=self.Flops)
             )
@@ -481,7 +481,7 @@ class CalMeter(Statistics):
                                                             Operation_Name=self._opnode.name,
                                                             Operation_Type=self._opnode.type,
                                                             Input_Shape=list(input[0].shape),
-                                                            Output_Shape=[len(output)]+list(output[0].shape),
+                                                            Output_Shape=list(output.shape),
                                                             MACs=self.Macs,
                                                             FLOPs=self.Flops)
             )
@@ -510,7 +510,7 @@ class CalMeter(Statistics):
                                                             Operation_Type=self._opnode.type,
                                                             Kernel_Size=list(k) if len(k)>1 else [k[0]]*2,
                                                             Input_Shape=list(input[0].shape),
-                                                            Output_Shape=[len(output)]+list(output[0].shape),
+                                                            Output_Shape=list(output.shape),
                                                             MACs=self.Macs,
                                                             FLOPs=self.Flops)
             )
@@ -521,7 +521,7 @@ class CalMeter(Statistics):
                                                             Operation_Name=self._opnode.name,
                                                             Operation_Type=self._opnode.type,
                                                             Input_Shape=list(input[0].shape),
-                                                            Output_Shape=[len(output)]+list(output[0].shape))
+                                                            Output_Shape=list(output.shape))
             )
 
 class MemMeter(Statistics):
