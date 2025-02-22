@@ -279,8 +279,8 @@ class CalMeter(Statistics):
                                                               'Operation_Type',
                                                               'Kernel_Size',  # Kernel_Size([H,W])
                                                               'Bias', 
-                                                              'Input_Shape',  # Input_Shape([B,C,H,W])'
-                                                              'Output_Shape',  # Output_Shape([B,C,H,W])'
+                                                              'Input',  # Input([B,C,H,W])'
+                                                              'Output',  # Output([B,C,H,W])'
                                                               'MACs', 
                                                               'FLOPs'])
     
@@ -297,7 +297,7 @@ class CalMeter(Statistics):
         self._model = opnode.operation
         
         self.__stat_ls = [] # record the flops and macs information of each operation
-        self.is_measured = False if self._opnode.is_leaf else True # only measure the leaf nodes
+        self.is_measured = False 
 
         _opparent = opnode.parent
         self.__Macs = self.init_linkdata(attr_name='Macs', init_val=0, opparent=_opparent, 
@@ -361,8 +361,30 @@ class CalMeter(Statistics):
                                  "before accessing `Meter(your_model).cal`.")
         return True
 
+    def __iopt_repr(self, iopt) -> str:
+        if isinstance(iopt, Tensor):
+            return str(list(iopt.shape))
+        
+        elif iopt is None:
+            return 'None'
+
+        elif isinstance(iopt, (tuple, list, set)):
+            repr = tuple(map(self.__iopt_repr, iopt))
+            return '(' + ',\n'.join(repr) + ')' if len(repr) > 1 else repr[0]
+        
+        elif isinstance(iopt, dict):
+            repr = ["{}: {}".format(self.__iopt_repr(k), self.__iopt_repr(v))
+                    for k, v in iopt.items()]
+            return '{' + ',\n'.join(repr) + '}' if len(repr) > 1 else repr[0]
+        
+        else:
+            return type(iopt).__name__
+
     def __regist_hook(self, module):
-        if isinstance(module, (nn.Conv1d, nn.Conv2d, nn.Conv3d)):
+        if not self._opnode.is_leaf:
+            h = module.register_forward_hook(self.__container_hook)
+            
+        elif isinstance(module, (nn.Conv1d, nn.Conv2d, nn.Conv3d)):
             h = module.register_forward_hook(self.__conv_hook)
 
         elif isinstance(module, (nn.Sigmoid, nn.Tanh, nn.ReLU, nn.ReLU6, nn.SiLU, nn.PReLU, nn.RReLU, nn.LeakyReLU)):
@@ -402,8 +424,8 @@ class CalMeter(Statistics):
                                                             Operation_Type=self._opnode.type,
                                                             Kernel_Size=list(module.kernel_size),
                                                             Bias=bool(is_bias),
-                                                            Input_Shape=list(input[0].shape),
-                                                            Output_Shape=list(output.shape),
+                                                            Input=self.__iopt_repr(input),
+                                                            Output=self.__iopt_repr(output),
                                                             MACs=self.Macs,
                                                             FLOPs=self.Flops)
             )
@@ -427,8 +449,8 @@ class CalMeter(Statistics):
                                                             Operation_Name=self._opnode.name,
                                                             Operation_Type=self._opnode.type,
                                                             Bias=bool(is_bias),
-                                                            Input_Shape=list(input[0].shape),
-                                                            Output_Shape=list(output.shape),
+                                                            Input=self.__iopt_repr(input),
+                                                            Output=self.__iopt_repr(output),
                                                             MACs=self.Macs,
                                                             FLOPs=self.Flops)
             )
@@ -446,8 +468,8 @@ class CalMeter(Statistics):
             self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
                                                             Operation_Name=self._opnode.name,
                                                             Operation_Type=self._opnode.type,
-                                                            Input_Shape=list(input[0].shape),
-                                                            Output_Shape=list(output.shape),
+                                                            Input=self.__iopt_repr(input),
+                                                            Output=self.__iopt_repr(output),
                                                             MACs=self.Macs,
                                                             FLOPs=self.Flops)
             )
@@ -480,8 +502,8 @@ class CalMeter(Statistics):
             self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
                                                             Operation_Name=self._opnode.name,
                                                             Operation_Type=self._opnode.type,
-                                                            Input_Shape=list(input[0].shape),
-                                                            Output_Shape=list(output.shape),
+                                                            Input=self.__iopt_repr(input),
+                                                            Output=self.__iopt_repr(output),
                                                             MACs=self.Macs,
                                                             FLOPs=self.Flops)
             )
@@ -509,8 +531,22 @@ class CalMeter(Statistics):
                                                             Operation_Name=self._opnode.name,
                                                             Operation_Type=self._opnode.type,
                                                             Kernel_Size=list(k) if len(k)>1 else [k[0]]*2,
-                                                            Input_Shape=list(input[0].shape),
-                                                            Output_Shape=list(output.shape),
+                                                            Input=self.__iopt_repr(input),
+                                                            Output=self.__iopt_repr(output),
+                                                            MACs=self.Macs,
+                                                            FLOPs=self.Flops)
+            )
+
+    def __container_hook(self, module, input, output):
+        if len(self.__stat_ls):
+            self.Macs.access_cnt += 1
+            self.Flops.access_cnt += 1
+        else:
+            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                            Operation_Name=self._opnode.name,
+                                                            Operation_Type=self._opnode.type,
+                                                            Input=self.__iopt_repr(input),
+                                                            Output=self.__iopt_repr(output),
                                                             MACs=self.Macs,
                                                             FLOPs=self.Flops)
             )
@@ -520,8 +556,8 @@ class CalMeter(Statistics):
             self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
                                                             Operation_Name=self._opnode.name,
                                                             Operation_Type=self._opnode.type,
-                                                            Input_Shape=list(input[0].shape),
-                                                            Output_Shape=list(output.shape))
+                                                            Input=self.__iopt_repr(input),
+                                                            Output=self.__iopt_repr(output))
             )
 
 class MemMeter(Statistics):
