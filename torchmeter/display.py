@@ -556,10 +556,6 @@ class TabularRenderer:
         return __cfg__.table_column_args
 
     @property
-    def datas(self):
-        return self.__stats_data
-
-    @property
     def valid_export_format(self) -> List[str]:
         return ['csv', 'xlsx']
 
@@ -630,7 +626,7 @@ class TabularRenderer:
         if isinstance(stat_name,str):
             assert stat_name in valid_stat_name, \
                 f"`{stat_name}` not in the supported statistics {valid_stat_name}."
-            self.datas[stat_name] = DataFrame()
+            self.__stats_data[stat_name] = DataFrame()
         else:
             self.__stats_data = {stat_name:DataFrame() for stat_name in valid_stat_name}
 
@@ -710,7 +706,7 @@ class TabularRenderer:
         assert isinstance(custom_cols, dict), f"`custom_cols` must be a dict, but got {type(custom_cols)}."
         
         stat:"Statistic" = getattr(self.opnode, stat_name) # noqa # type: ignore
-        data:DataFrame = self.datas[stat_name]
+        data:DataFrame = self.__stats_data[stat_name]
 
         valid_fields = data.columns or stat.tb_fields
     
@@ -742,7 +738,7 @@ class TabularRenderer:
                      visited=[])
             
             data = DataFrame(data=val_collector, schema=valid_fields, orient='row')
-            self.datas[stat_name] = data
+            self.__stats_data[stat_name] = data
             
             if nocall_nodes:
                 warnings.warn(message=f"{', '.join(nocall_nodes)}\nThe modules above might be defined but not explicitly called. " + \
@@ -772,7 +768,7 @@ class TabularRenderer:
                                   col_func=newcol_func,
                                   return_type=newcol_type,
                                   col_idx=newcol_idx)
-            self.datas[stat_name] = data
+            self.__stats_data[stat_name] = data
 
         tb = self.df2tb(df=data, show_raw=raw_data)
 
