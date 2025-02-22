@@ -692,6 +692,7 @@ class TabularRenderer:
                  *, 
                  raw_data:bool=False,
                  pick_cols:List[str]=[],
+                 exclude_cols:List[str]=[],
                  custom_cols:Dict[str, str]={},
                  newcol_name:str='',
                  newcol_func:Callable[[Dict[str, Any]], Any]=lambda col_dict: col_dict,
@@ -750,9 +751,13 @@ class TabularRenderer:
         
         # pick columns, order defined by `pick_cols`
         if pick_cols:
-            invalid_cols = tuple(filter(lambda col_name:col_name not in data.columns, pick_cols))
+            invalid_cols = tuple(filter(lambda col_name:col_name not in valid_fields, pick_cols))
             assert not invalid_cols, f"Column names {invalid_cols} not found in supported columns {data.columns}."
-            data = data.select(pick_cols)
+        else:
+            pick_cols = valid_fields
+        # not use set is to keep order
+        final_cols = [col_name for col_name in pick_cols if col_name not in exclude_cols] 
+        data = data.select(final_cols)
         
         # custom columns name, order defined by `custom_col`
         if custom_cols:
