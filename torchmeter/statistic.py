@@ -7,7 +7,8 @@ from typing import Any, Callable, Dict, List, NamedTuple, Optional, TypeVar, Tup
 
 import numpy as np
 import torch.nn as nn
-from torch import no_grad
+from pympler.asizeof import asizeof
+from torch import no_grad, Tensor
 from torch.cuda import Event as cuda_event
 from torch.cuda import synchronize as cuda_sync
 
@@ -629,10 +630,15 @@ class MemMeter(Statistics):
             buffer_cost += buffer.numel() * buffer.element_size()
         self.__BufferCost += buffer_cost
         
+        feat_cost = 0
         if self._opnode.is_leaf and not self.is_inplace:
-            feat_cost = output.numel() * output.element_size() # byte
-        else:
-            feat_cost = 0
+            for opt in output:
+                if isinstance(opt, Tensor):
+                    feat_cost += opt.numel() * opt.element_size() # byte
+                elif isinstance(opt, str):
+                    feat_cost += opt.__sizeof__()
+                else:
+                    feat_cost += asizeof(opt)
         self.__FeatureMapCost += feat_cost
         
         if len(self.__stat_ls):
