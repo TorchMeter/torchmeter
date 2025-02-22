@@ -533,7 +533,7 @@ class MemMeter(Statistics):
                                                               'Operation_Type',
                                                               'Param_Cost', 
                                                               'Buffer_Cost', 
-                                                              'FeatureMap_Cost',  
+                                                              'Output_Cost',  
                                                               'Total'])
     
     overview_val_container:NamedTuple = namedtuple(typename='Memory_INFO', 
@@ -543,7 +543,7 @@ class MemMeter(Statistics):
                                                                 'Operation_Name', 
                                                                 'Param_Cost', 
                                                                 'Buffer_Cost', 
-                                                                'FeatureMap_Cost',  
+                                                                'Output_Cost',  
                                                                 'Total'])
 
     def __init__(self, opnode: OPN_TYPE):
@@ -557,7 +557,7 @@ class MemMeter(Statistics):
         _opparent = opnode.parent
         self.__ParamCost = self.init_linkdata(attr_name='ParamCost', init_val=0, opparent=_opparent, unit_sys=BinaryUnit)
         self.__BufferCost = self.init_linkdata(attr_name='BufferCost', init_val=0, opparent=_opparent, unit_sys=BinaryUnit)
-        self.__FeatureMapCost = self.init_linkdata(attr_name='FeatureMapCost', init_val=0, opparent=_opparent, unit_sys=BinaryUnit)
+        self.__OutputCost = self.init_linkdata(attr_name='OutputCost', init_val=0, opparent=_opparent, unit_sys=BinaryUnit)
         self.__TotalCost = self.init_linkdata(attr_name='TotalCost', init_val=0, opparent=_opparent, unit_sys=BinaryUnit)
 
     @property
@@ -573,8 +573,8 @@ class MemMeter(Statistics):
         return self.__BufferCost
 
     @property
-    def FeatureMapCost(self) -> UpperLinkData:
-        return self.__FeatureMapCost
+    def OutputCost(self) -> UpperLinkData:
+        return self.__OutputCost
     
     @property
     def TotalCost(self) -> UpperLinkData:
@@ -593,7 +593,7 @@ class MemMeter(Statistics):
                                            Operation_Name=self._opnode.name,
                                            Param_Cost=self.ParamCost,
                                            Buffer_Cost=self.BufferCost,
-                                           FeatureMap_Cost=self.FeatureMapCost,
+                                           Output_Cost=self.OutputCost,
                                            Total=self.TotalCost)
 
     @property
@@ -601,7 +601,7 @@ class MemMeter(Statistics):
         self.__is_valid_access()
         res_dict =  {'[b]Parameters[/] Memory Cost': f"{self.ParamCost}, {self.ParamCost.val*100/self.TotalCost.val:.2f} %",
                      '[b]Buffers[/] Memory Cost': f"{self.BufferCost}, {self.BufferCost.val*100/self.TotalCost.val:.2f} %",
-                     '[b]FeatureMap[/] Memory Cost': f"{self.FeatureMapCost}, {self.FeatureMapCost.val*100/self.TotalCost.val:.2f}",
+                     '[b]FeatureMap[/] Memory Cost': f"{self.OutputCost}, {self.OutputCost.val*100/self.TotalCost.val:.2f}",
                      '[b]Total Memory Cost[/]': str(self.TotalCost)}
         max_keylen = max([len(key) for key in res_dict.keys()])
         res_dict = {key.ljust(max_keylen): value for key, value in res_dict.items()}
@@ -630,29 +630,29 @@ class MemMeter(Statistics):
             buffer_cost += buffer.numel() * buffer.element_size()
         self.__BufferCost += buffer_cost
         
-        feat_cost = 0
+        opt_cost = 0
         if self._opnode.is_leaf and not self.is_inplace:
             for opt in output:
                 if isinstance(opt, Tensor):
-                    feat_cost += opt.numel() * opt.element_size() # byte
+                    opt_cost += opt.numel() * opt.element_size() # byte
                 elif isinstance(opt, str):
-                    feat_cost += opt.__sizeof__()
+                    opt_cost += opt.__sizeof__()
                 else:
-                    feat_cost += asizeof(opt)
-        self.__FeatureMapCost += feat_cost
+                    opt_cost += asizeof(opt)
+        self.__OutputCost += opt_cost
         
         if len(self.__stat_ls):
             # duplicated access
-            self.FeatureMapCost.access_cnt += 1
-            total_cost = feat_cost
+            self.OutputCost.access_cnt += 1
+            total_cost = opt_cost
         else:
-            total_cost = param_cost + buffer_cost + feat_cost
+            total_cost = param_cost + buffer_cost + opt_cost
             self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
                                                             Operation_Name=self._opnode.name,
                                                             Operation_Type=self._opnode.type + ('(inplace)' if self.is_inplace else ''),
                                                             Param_Cost=None if self._opnode.is_leaf and not param_cost else self.ParamCost, 
                                                             Buffer_Cost=None if self._opnode.is_leaf and not buffer_cost else self.BufferCost, 
-                                                            FeatureMap_Cost=None if self._opnode.is_leaf and not feat_cost else self.FeatureMapCost, 
+                                                            Output_Cost=None if self._opnode.is_leaf and not opt_cost else self.OutputCost, 
                                                             Total=None if self._opnode.is_leaf and not total_cost else self.TotalCost))
         
         self.__TotalCost += total_cost
