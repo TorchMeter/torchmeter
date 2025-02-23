@@ -20,6 +20,9 @@ from torchmeter.config import get_config, dict_to_namespace
 from torchmeter.utils import dfs_task, resolve_savepath
 
 __cfg__ = get_config()
+
+__all__ = ["render_perline", "TreeRenderer", "TabularRenderer"]
+
 NAMESPACE_TYPE = TypeVar('NameSpace')
 
 def render_perline(renderable: RenderableType,
@@ -50,7 +53,8 @@ def render_perline(renderable: RenderableType,
         None
     """
     time_sep = __cfg__.render_interval
-    assert time_sep >= 0, f"The `render_interval` value defined in config must be non-negative, but got {time_sep}"
+    if time_sep < 0:
+        raise ValueError(f"The `render_interval` value defined in config must be non-negative, but got {time_sep}")
 
     console = console or get_console()
 
@@ -220,14 +224,16 @@ class TreeRenderer:
         ---
             - `TypeError`: if the new value is not a dict.
         """
-        assert isinstance(custom_args, dict), f"You can only overwrite `{self.__class__.__name__}.default_level_args` with a dict. \
-                                                But got {type(custom_args)}."
+        if not isinstance(custom_args, dict):
+            raise TypeError(f"You can only overwrite `{self.__class__.__name__}.default_level_args` with a dict. " + \
+                            f"But got {type(custom_args)}.")
         
         valid_setting_keys = set(Tree('.').__dict__.keys())
         passin_keys = set(custom_args.keys())
         invalid_keys = passin_keys - valid_setting_keys
-        assert not invalid_keys, f"Keys {invalid_keys} is/are not accepted by `rich.tree.Tree`, \
-            refer to https://rich.readthedocs.io/en/latest/tree.html for valid args."
+        if invalid_keys:
+            raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.tree.Tree`, " + \
+                           "refer to https://rich.readthedocs.io/en/latest/tree.html for valid args.")
         self.default_level_args.__dict__.update(custom_args)
         
         self.default_level_args.mark_change()
@@ -250,8 +256,9 @@ class TreeRenderer:
         ---
             `TypeError`: if the new value is not a dict or a list of dict.
         """
-        assert isinstance(custom_args, dict), f"You can only overwrite `{self.__class__.__name__}.tree_levels_args` with a dict. \
-                                                But got {type(custom_args)}."    
+        if not isinstance(custom_args, dict):
+            raise TypeError(f"You can only overwrite `{self.__class__.__name__}.tree_levels_args` with a dict. " + \
+                            f"But got {type(custom_args)}.")
                                                             
         # filt out invalid level definations and invalid display settings
         valid_setting_keys = set(Tree('.').__dict__.keys())
@@ -265,8 +272,9 @@ class TreeRenderer:
                 
             passin_keys = set(level_args_dict.keys())
             invalid_keys = passin_keys - valid_setting_keys
-            assert not invalid_keys, f"Keys {invalid_keys} is/are not accepted by `rich.tree.Tree`, \
-                refer to https://rich.readthedocs.io/en/latest/tree.html for valid args."
+            if invalid_keys:
+                raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.tree.Tree`, " + \
+                               "refer to https://rich.readthedocs.io/en/latest/tree.html for valid args.")
 
             if level == 'default':
                 self.default_level_args = level_args_dict
@@ -295,8 +303,9 @@ class TreeRenderer:
         ---
             - `TypeError`: if the new value is not a dict.
         """
-        assert isinstance(custom_args, dict), f"You can only overwrite `{self.__class__.__name__}.repeat_block_args` with a dict. \
-                                                But got {type(custom_args)}."  
+        if not isinstance(custom_args, dict):
+            raise TypeError(f"You can only overwrite `{self.__class__.__name__}.repeat_block_args` with a dict. " + \
+                            f"But got {type(custom_args)}.")
                                                         
         footer_key = list(filter(lambda x: x.lower() == 'repeat_footer', custom_args.keys()))
         if footer_key:
@@ -306,8 +315,9 @@ class TreeRenderer:
         valid_setting_keys = set(Panel('.').__dict__.keys())
         passin_keys = set(custom_args.keys())
         invalid_keys = passin_keys - valid_setting_keys
-        assert not invalid_keys, f"Keys {invalid_keys} is/are not accepted by `rich.panel.Panel`, \
-            refer to https://rich.readthedocs.io/en/latest/panel.html for valid args."
+        if invalid_keys:
+            raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.panel.Panel`, " + \
+                           "refer to https://rich.readthedocs.io/en/latest/panel.html for valid args.")
         self.repeat_block_args.__dict__.update(custom_args)
         
         self.repeat_block_args.mark_change()
@@ -469,7 +479,9 @@ class TreeRenderer:
                     repeat_block = Panel(repeat_block_content)
                     title = self.__resolve_argtext(text=getattr(self.repeat_block_args, 'title', ''), attr_owner=subject, 
                                                    loop_algebra=algebra)
-                    repeat_block.__dict__.update({**self.repeat_block_args.__dict__, 'title':title})
+                    repeat_block.__dict__.update({**self.repeat_block_args.__dict__, 
+                                                  'title':title, 
+                                                  'border_style': self.repeat_block_args.border_style + ' ' + self.repeat_block_args.style})
                     
                     # overwrite the label of the first node in repeat block 
                     subject.display_root.label = repeat_block
@@ -527,8 +539,9 @@ class TreeRenderer:
         if text is None:
             return ""
         
-        assert isinstance(text, str), 'The received text(see below) to be resolved is not a string nor None, cannot go ahead.\n' + \
-                                      f"Type: {type(text)}\n Content: {text}"
+        if not isinstance(text, str):
+            raise TypeError("The received text(see below) to be resolved is not a string nor None, cannot go ahead.\n" + \
+                            f"Type: {type(text)}\nContent: {text}")
 
         res_str = re.sub(pattern=r'(?<!\\)<(.*?)(?<!\\)>',
                          repl=lambda match: self.resolve_attr(attr_dict.get(match.group(1), None)),
@@ -561,28 +574,32 @@ class TabularRenderer:
 
     @tb_args.setter
     def tb_args(self, custom_args:Dict[str, Any]):
-        assert isinstance(custom_args, dict), f"You can only overwrite `{self.__class__.__name__}.tb_args` with a dict. \
-                                                But got {type(custom_args)}."
+        if not isinstance(custom_args, dict):
+            raise TypeError(f"You can only overwrite `{self.__class__.__name__}.tb_args` with a dict. " + \
+                            f"But got {type(custom_args)}.")
         
         valid_setting_keys = set(Table().__dict__.keys())
         passin_keys = set(custom_args.keys())
         invalid_keys = passin_keys - valid_setting_keys
-        assert not invalid_keys, f"Keys {invalid_keys} is/are not accepted by `rich.table.Table`, \
-            refer to https://rich.readthedocs.io/en/latest/tables.html for valid args."
+        if invalid_keys:
+            raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.table.Table`, " + \
+                           "refer to https://rich.readthedocs.io/en/latest/tables.html for valid args.")
         self.tb_args.__dict__.update(custom_args)
         
         self.tb_args.mark_change()
         
     @col_args.setter
     def col_args(self, custom_args:Dict[str, Any]):
-        assert isinstance(custom_args, dict), f"You can only overwrite `{self.__class__.__name__}.col_args` with a dict. \
-                                                But got {type(custom_args)}."
+        if not isinstance(custom_args, dict):
+            raise TypeError(f"You can only overwrite `{self.__class__.__name__}.col_args` with a dict. " + \
+                            f"But got {type(custom_args)}.")
         
         valid_setting_keys = set(Column().__dict__.keys())
         passin_keys = set(custom_args.keys())
         invalid_keys = passin_keys - valid_setting_keys
-        assert not invalid_keys, f"Keys {invalid_keys} is/are not accepted by `rich.table.Column`, \
-            refer to https://rich.readthedocs.io/en/latest/columns.html for valid args."
+        if invalid_keys:
+            raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.table.Column`, " + \
+                           "refer to https://rich.readthedocs.io/en/latest/columns.html for valid args.")
         self.col_args.__dict__.update(custom_args)
         
         self.col_args.mark_change()
@@ -598,9 +615,10 @@ class TabularRenderer:
         # apply column settings to all columns
         for tb_col in tb.columns:
             tb_col.__dict__.update(self.col_args.__dict__)
+            tb_col.highlight = self.tb_args.highlight # compatiable with higher version of rich
         
         # collect each column's none replacing string
-        col_none_str = {col_name:getattr(df[col_name].drop_nulls().first(), 'none_str', '-') 
+        col_none_str = {col_name:getattr(df[col_name].drop_nulls()[0], 'none_str', '-') 
                         for col_name, col_type in df.schema.items()}
         
         # fill table
@@ -619,13 +637,13 @@ class TabularRenderer:
         return tb
 
     def clear(self, stat_name:Optional[str]=None):
-        assert stat_name is None or isinstance(stat_name,str), \
-            f"`stat_name` must be a string or None, but got {type(stat_name)}."
+        if stat_name is not None and not isinstance(stat_name,str):
+            raise TypeError(f"`stat_name` must be a string or None, but got {type(stat_name)}.")
             
         valid_stat_name = self.opnode.statistics
         if isinstance(stat_name,str):
-            assert stat_name in valid_stat_name, \
-                f"`{stat_name}` not in the supported statistics {valid_stat_name}."
+            if stat_name not in valid_stat_name:
+                raise ValueError(f"`{stat_name}` not in the supported statistics {valid_stat_name}.")
             self.__stats_data[stat_name] = DataFrame()
         else:
             self.__stats_data = {stat_name:DataFrame() for stat_name in valid_stat_name}
@@ -642,13 +660,13 @@ class TabularRenderer:
         # get save path
         if format is None:
             format = os.path.splitext(save_path)[-1]
-            assert '.' in format, 'File foramat unknown! ' + \
-                                  f"Please specify a file path, not a dierectory path like {save_path}.\n" + \
-                                  f"Or you can specify a file format using `format=xxx`, now we support exporting to {self.valid_export_format} file."
+            if '.' not in format:
+                raise ValueError(f"File foramat unknown! Please specify a file format like {save_path}.\n" + \
+                                 f"Or you can specify a file format using `format=xxx`, now we support exporting to {self.valid_export_format} file.")
                                   
         format = format.strip('.')
-        assert format in self.valid_export_format, \
-                f"`{format}` file is not supported, now we only support exporting to {self.valid_export_format} file."
+        if format not in self.valid_export_format:
+            raise ValueError(f"`{format}` file is not supported, now we only support exporting to {self.valid_export_format} file.")
         
         _, file_path = resolve_savepath(origin_path=save_path,
                                         target_ext=format,
@@ -684,7 +702,7 @@ class TabularRenderer:
             print(f"Data saved to [b magenta]{file_path}[/]")
     
     def __call__(self,
-                 stat_name:str, 
+                 stat:"Statistic",  # noqa # type: ignore
                  *, 
                  raw_data:bool=False,
                  pick_cols:List[str]=[],
@@ -699,13 +717,16 @@ class TabularRenderer:
         """render rich tabel according to the statistics dataframe.
         Note that `pick_cols` work before `custom_col`
         """
-    
-        assert stat_name in self.opnode.statistics, \
-            f"`{stat_name}` not in the supported statistics {self.opnode.statistics}."
-        assert isinstance(newcol_idx, int), f"`newcol_idx` must be an integer, but got {type(newcol_idx)}."
-        assert isinstance(custom_cols, dict), f"`custom_cols` must be a dict, but got {type(custom_cols)}."
+
+        stat_name:"Statistic" = stat.name  # noqa # type: ignore
+
+        if stat_name not in self.opnode.statistics:
+            raise ValueError(f"`{stat_name}` not in the supported statistics {self.opnode.statistics}.")
+        if not isinstance(newcol_idx, int):
+            raise ValueError(f"`newcol_idx` must be an integer, but got {type(newcol_idx)}.")
+        if not isinstance(custom_cols, dict):
+            raise ValueError(f"`custom_cols` must be a dict, but got {type(custom_cols)}.")
         
-        stat:"Statistic" = getattr(self.opnode, stat_name) # noqa # type: ignore
         data:DataFrame = self.__stats_data[stat_name]
 
         valid_fields = data.columns or stat.tb_fields
@@ -748,7 +769,8 @@ class TabularRenderer:
         # pick columns, order defined by `pick_cols`
         if pick_cols:
             invalid_cols = tuple(filter(lambda col_name:col_name not in valid_fields, pick_cols))
-            assert not invalid_cols, f"Column names {invalid_cols} not found in supported columns {data.columns}."
+            if invalid_cols:
+                raise ValueError(f"Column names {invalid_cols} not found in supported columns {data.columns}.")
         else:
             pick_cols = valid_fields
         # not use set is to keep order
@@ -758,7 +780,8 @@ class TabularRenderer:
         # custom columns name, order defined by `custom_col`
         if custom_cols:
             invalid_cols = tuple(filter(lambda col_name:col_name not in data.columns, custom_cols.keys()))
-            assert not invalid_cols, f"Column names {invalid_cols} not found in supported columns {data.columns}."
+            if invalid_cols:
+                raise ValueError(f"Column names {invalid_cols} not found in supported columns {data.columns}.")
             data = data.rename(custom_cols)
         
         # add new column
@@ -775,9 +798,9 @@ class TabularRenderer:
         if save_to:
             save_to = os.path.abspath(save_to)  
             if '.' not in os.path.basename(save_to):
-                assert save_format in self.valid_export_format, \
-                    f"Argument `save_format` must be one in {self.valid_export_format}, but got {save_format}.\n" + \
-                    "Alternatively, you can set `save_to` to a concrete file path, like `path/to/file.xlsx`"
+                if save_format not in self.valid_export_format:
+                    raise ValueError(f"Argument `save_format` must be one in {self.valid_export_format}, but got {save_format}.\n" + \
+                                     "Alternatively, you can set `save_to` to a concrete file path, like `path/to/file.xlsx`")
             
             self.export(df=data,
                         save_path=save_to,

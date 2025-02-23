@@ -11,10 +11,12 @@ tree_repeat_block_args:
   title_align: center         # Title alignment, left, center, right
   subtitle: null              # Subtitle of the repeat block, accept rich styling
   subtitle_align: center      # Subtitle alignment, left, center, right
+  
   style: dark_goldenrod   # Style of the repeat block, execute `python -m rich.theme` to get more
   highlight: true             # Whether to highlight the value (number, string...)
   box: HEAVY_EDGE             # Box type, use its name directly like here!!! execute `python -m rich.box` to get more
   border_style: dim           # Border style, execute `python -m rich.theme` to get more
+  
   width: null                 # Width of the repeat block, null means auto
   height: null                # Height of the repeat block, null means auto
   padding:                    # Padding of the repeat block
