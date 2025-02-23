@@ -1,8 +1,7 @@
 from inspect import signature
 from functools import partial
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple
 
-import torch
 import torch.nn as nn
 from tqdm import tqdm
 from rich import get_console
@@ -11,6 +10,8 @@ from rich.panel import Panel
 from rich.layout import Layout
 from rich.columns import Columns
 from rich.box import HORIZONTALS
+from torch import Tensor
+from torch import device as tc_device
 
 from torchmeter.config import get_config
 from torchmeter.engine import OperationTree
@@ -19,15 +20,18 @@ from torchmeter.display import TreeRenderer, TabularRenderer, render_perline
 
 __cfg__ = get_config()
 
+__all__ = ["Meter"]
+
 class Meter:
 
     def __init__(self, 
                  model: nn.Module,
-                 device:str='cpu'):
+                 device:str='cpu') -> None:
         
-        self.__device = torch.device(device)
+        self.__device = tc_device(device)
 
-        assert isinstance(model, nn.Module), f"model must be an instance of torch.nn.Module, but got {type(model)}"
+        if not isinstance(model, nn.Module):
+            raise TypeError(f"model must be a nn.Module, but got {type(model)}.")
         self.model = model.to(self.__device)
 
         self.ipt = {'args':tuple(), 'kwargs':dict()} # TODO: self.ipt_infer()
@@ -43,28 +47,28 @@ class Meter:
         self.ittp_warmup = 50
         self.ittp_benchmark_time = 100
 
-    def __call__(self, *args, **kwargs):
-        self.ipt = {'args': tuple(x.to(self.device) for x in args if isinstance(x, torch.Tensor)), 
-                    'kwargs': {k:v.to(self.device) for k,v in kwargs.items() if isinstance(v, torch.Tensor)}}
+    def __call__(self, *args, **kwargs) -> Any:
+        self.ipt = {'args': args, 'kwargs': kwargs}
+        self._ipt2device()
         return self.model(*self.ipt['args'], **self.ipt['kwargs'])
     
     @property
-    def device(self):
+    def device(self) -> tc_device:
         return self.__device
     
     @device.setter
-    def device(self, new_device:str):
-        self.__device = torch.device(new_device)
+    def device(self, new_device:str) -> None:
+        self.__device = tc_device(new_device)
         self.model.to(self.__device)
-        self.ipt = {'args': tuple(x.to(self.device) for x in self.ipt['args'] if isinstance(x, torch.Tensor)), 
-                    'kwargs': {k:v.to(self.device) for k,v in self.ipt['kwargs'].items() if isinstance(v, torch.Tensor)}}
+        if not self._is_ipt_empty():
+            self._ipt2device()
 
     @property
     def tree_levels_args(self):
         return self.tree_renderer.tree_levels_args
     
     @tree_levels_args.setter
-    def tree_levels_args(self, custom_args:Union[List[Dict[str, Any]], Dict[Any, Dict[str, Any]]]) -> None:
+    def tree_levels_args(self, custom_args:Dict[Any, Dict[str, Any]]) -> None:
         self.tree_renderer.tree_levels_args = custom_args
 
     @property
@@ -118,10 +122,7 @@ class Meter:
     @property
     def param(self):
         if not self.__measure_param:
-            for node in self.optree.all_nodes:
-                if node.is_leaf:
-                    node.param.measure()
-
+            list(map(lambda node: node.param.measure(), self.optree.all_nodes))
             self.__measure_param = True
 
         return self.optree.root.param
@@ -129,16 +130,17 @@ class Meter:
     @property
     def cal(self):
         if not self.__measure_cal:
-            if len(self.ipt['args']) + len(self.ipt['kwargs']) == 0:
-                raise ValueError("Input unknown! You should perform at least one feed-forward inference before measuring calculation!") 
+            if self._is_ipt_empty():
+                raise RuntimeError("Input unknown! You should perform at least one feed-forward inference before measuring calculation!") 
 
-            hook_ls = [node.cal.measure() for node in self.optree.all_nodes if node.is_leaf]
+            hook_ls = [node.cal.measure() for node in self.optree.all_nodes]
 
             # feed forwad
+            self._ipt2device()
             self.model(*self.ipt['args'], **self.ipt['kwargs']) 
 
             # remove hooks after measurement
-            list(map(lambda x:x.remove(), hook_ls)) 
+            list(map(lambda x:x.remove() if x is not None else None, hook_ls)) 
 
             self.__measure_cal = True
         
@@ -147,16 +149,17 @@ class Meter:
     @property
     def mem(self):
         if not self.__measure_mem:
-            if len(self.ipt['args']) + len(self.ipt['kwargs']) == 0:
-                raise ValueError("Input unknown! You should perform at least one feed-forward inference before measuring the memory cost!") 
+            if self._is_ipt_empty():
+                raise RuntimeError("Input unknown! You should perform at least one feed-forward inference before measuring the memory cost!") 
 
-            hook_ls = [node.mem.measure() for node in self.optree.all_nodes if node.is_leaf]
+            hook_ls = [node.mem.measure() for node in self.optree.all_nodes]
 
             # feed forwad
+            self._ipt2device()
             self.model(*self.ipt['args'], **self.ipt['kwargs']) 
 
             # remove hooks after measurement
-            list(map(lambda x:x.remove(), hook_ls))
+            list(map(lambda x:x.remove() if x is not None else None, hook_ls))
 
             self.__measure_mem = True
 
@@ -164,15 +167,17 @@ class Meter:
 
     @property
     def ittp(self):
-        if len(self.ipt['args']) + len(self.ipt['kwargs']) == 0:
-            raise ValueError("Input unknown! You should perform at least one feed-forward inference before measuring the inference time or throughput!") 
+        if self._is_ipt_empty():
+            raise RuntimeError("Input unknown! You should perform at least one feed-forward inference before measuring the inference time or throughput!") 
+
+        self._ipt2device()
 
         for i in tqdm(range(self.ittp_warmup), desc='Warming Up'):
             self.model(*self.ipt['args'], **self.ipt['kwargs'])
 
         pb = tqdm(total=self.ittp_benchmark_time*len(self.optree.all_nodes), 
                   desc='Benchmark Inference Time & Throughput', 
-                  unit='time')
+                  unit='module')
         hook_ls = [node.ittp.measure(device=self.device, 
                                      repeat=self.ittp_benchmark_time,
                                      global_process=pb) 
@@ -182,12 +187,12 @@ class Meter:
         self.model(*self.ipt['args'], **self.ipt['kwargs']) 
 
         # remove hooks after measurement
-        list(map(lambda x:x.remove(), hook_ls))
+        list(map(lambda x:x.remove() if x is not None else None, hook_ls))
 
         return self.optree.root.ittp
 
     @property
-    def model_info(self):
+    def model_info(self) -> "rich.text.Text": # noqa # type: ignore
         forward_args:Tuple[str] = tuple(signature(self.model.forward).parameters.keys())
         ipt_dict = {forward_args[args_idx]: anony_ipt for args_idx, anony_ipt in enumerate(self.ipt['args'])}
         ipt_dict.update(self.ipt['kwargs'])
@@ -197,19 +202,35 @@ class Meter:
         infos = '\n'.join([
             f"• [b]Model    :[/b] {self.optree.root.name}",
             f"• [b]Device   :[/b] {self.device}",
-            f"• [b]Signature:[/b] forward(self, {','.join(forward_args)})",
-            f"• [b]Input    :[/b] \n{indent_str(ipt_repr, indent=5, guideline=False)}"
+            f"• [b]Signature:[/b] forward(self, {', '.join(forward_args)})",
+            f"• [b]Input    :[/b] \n{indent_str(ipt_repr, indent=3, guideline=False)}"
         ])
         
         console = get_console()
         return console.render_str(infos)
 
-    def stat_info(self, stat):
-        infos:List[str] = [f"• [b]Statistics:[/b] {stat.name}"]
-        if stat.name == 'ittp':
+    @property
+    def subnodes(self) -> List[str]:
+        return [f"({node.node_id}) {node.name}" for node in self.optree.all_nodes]
+
+    def rebase(self, node_id:str) -> "Meter":
+        id_generator = ( (node_idx, node.node_id) for node_idx, node in enumerate(self.optree.all_nodes) )
+
+        for idx, valid_id in id_generator:
+            if node_id == valid_id:
+                new_base = self.optree.all_nodes[idx]
+                return self.__class__(new_base.operation, device=self.device)
+        else:
+            raise ValueError(f"Invalid node_id: {node_id}. Use `Meter(your_model).subnodes` to check valid ones.")
+
+    def stat_info(self, stat_name:str):
+        stat = getattr(self, stat_name)
+
+        infos:List[str] = [f"• [b]Statistics:[/b] {stat_name}"]
+        if stat_name == 'ittp':
             infos.append(f"• [b]Benchmark Times:[/b] {self.ittp_benchmark_time}")
         infos.extend([
-            f"• [b]{k}:[/b] {v}" for k, v in stat.crucial_info.items()
+            f"• [b]{k}:[/b] {v}" for k, v in stat.crucial_data.items()
         ])
                     
         infos = '\n'.join(infos)
@@ -222,14 +243,15 @@ class Meter:
         
         order = order or self.optree.root.statistics
         
-        invalid_stat = tuple(filter(lambda x: not hasattr(self.optree.root, x), order))
-        assert len(invalid_stat) == 0, f"Invalid statistics: {invalid_stat}"
+        invalid_stat = tuple(filter(lambda x: x not in self.optree.root.statistics, order))
+        if len(invalid_stat) > 0:
+            raise AttributeError(f"Invalid statistics: {invalid_stat}")
         
         container = Columns(expand=True, align='center')
         format_cell = partial(Panel, safe_box=True, expand=False, highlight=True, box=HORIZONTALS)
         
         container.add_renderable(format_cell(self.model_info, title='[b]Model INFO[/]', border_style='orange1'))
-        container.renderables.extend([format_cell(self.stat_info(getattr(self, stat_name)), 
+        container.renderables.extend([format_cell(self.stat_info(stat_name), 
                                                   title=f"[b]{stat_name.capitalize()} INFO[/]",
                                                   border_style='cyan') 
                                       for stat_name in order])
@@ -237,7 +259,7 @@ class Meter:
         return container
 
     def profile(self, 
-                stat, 
+                stat_name:str, 
                 show=True, no_tree=False, 
                 **tb_kwargs):
         """To render a tabular profile of the statistics
@@ -263,7 +285,7 @@ class Meter:
 
         TREE_TABLE_GAP = __cfg__.combine.horizon_gap # the horizontal gap between tree and table
         
-        tb, data = self.table_renderer(stat_name=stat.name, **tb_kwargs)
+        tb, data = self.table_renderer(stat=getattr(self,stat_name), **tb_kwargs)
         
         if not show:
             return tb, data
@@ -276,7 +298,8 @@ class Meter:
         actual_tb_width = min(desirable_tb_width, console.width - tree_width - TREE_TABLE_GAP)
         
         if actual_tb_width <= 5: # 5 is the minimum width of table
-            raise ValueError("The width of the terminal is too small, try to maximize the window and try again.")
+            raise ValueError("The width of the terminal is too small, try to maximize the window or " + \
+                             "set a smaller `horizon_gap` value in your config and try again.")
         
         # when some cells in the table is overflown, we need to show a line between rows
         if actual_tb_width < desirable_tb_width:
@@ -285,18 +308,17 @@ class Meter:
         # get main content(i.e. tree & statistics table)
         if no_tree:
             main_content = tb
-            main_content_height = len(console.render_lines(tb))
-            main_content_width = actual_tb_width
+            tree_height = 0
         else:
             main_content = Layout()
             main_content.split_row(Layout(tree, name='left', size=tree_width + TREE_TABLE_GAP),
                                    Layout(tb, name='right', size=actual_tb_width))
-            
-            temp_options = console.options.update_width(actual_tb_width) 
             tree_height = len(console.render_lines(tree))
-            tb_height = len(console.render_lines(tb, options=temp_options))
-            main_content_height = max(tree_height, tb_height)
-            main_content_width = tree_width + TREE_TABLE_GAP + actual_tb_width
+        
+        temp_options = console.options.update_width(actual_tb_width) 
+        tb_height = len(console.render_lines(tb, options=temp_options))
+        main_content_height = max(tree_height, tb_height)
+        main_content_width = tree_width + actual_tb_width + (0 if no_tree else TREE_TABLE_GAP)
 
         # get footer content
         footer = Columns(title=Rule('[gray54]s u m m a r y[/]', characters='-', style='gray54'),
@@ -305,7 +327,7 @@ class Meter:
                          expand=True)
         
         model_info = self.model_info
-        stat_info = self.stat_info(stat)
+        stat_info = self.stat_info(stat_name=stat_name)
         model_info.style = 'dim'
         stat_info.style = 'dim'
         footer.add_renderable(model_info)
@@ -331,37 +353,25 @@ class Meter:
         
         return tb, data
 
-if __name__ == '__main__':
-    from rich import print
-    from torchvision import models
-    from torchmeter.config import get_config
-    
-    cfg = get_config()
-    model = models.resnet18()
-    
-    metered_model = Meter(model, device='cuda:0')
-    metered_model(torch.randn(1,3,224,224))
-    
-    cfg.tree_levels_args.default.guide_style = 'red'
-    print(metered_model.structure)
-    metered_model.tree_levels_args.default.guide_style = 'blue'
-    print(metered_model.structure)
-    # cfg.tree_levels_args.default.guide_style = 'red'
-    # cfg.table_display_args.style = 'red'
-    # metered_model.profile(metered_model.mem,
-    #                       show=True, no_tree=False,
-    #                       raw_data=False,
-    #                       custom_cols={'Operation_Id': 'Operation ID',
-    #                                    'Operation_Name': 'Operation Name',
-    #                                    'Param_Cost': 'Param Cost',
-    #                                    'FeatureMap_Cost': 'FeatureMap Cost'},
-    #                       pick_cols=['Operation_Id', 'Operation_Name', 
-    #                                  'Param_Cost','FeatureMap_Cost',
-    #                                  'Total'])
-                        #   newcol_name='Percentage',
-                        #   newcol_func=lambda col_dict,all_num=metered_model.mem.TotalCost.val: f'{col_dict["Total"]*100/all_num:.3f} %',
-                        #   newcol_dependcol=['Total'],
-                        #   newcol_type=str,
-                        #   newcol_idx=0,
-                        #   save_to='.',
-                        #   save_format='xlsx')
+    def _is_ipt_empty(self) -> bool:
+        return not self.ipt['args'] and not self.ipt['kwargs']
+        
+    def _ipt2device(self) -> None:
+        if self._is_ipt_empty():
+            raise ValueError("No input data provided.")
+
+        devices = set(arg.device for arg in self.ipt['args'] if isinstance(arg, Tensor))
+        devices.update(kwargs.device for kwargs in self.ipt['kwargs'].values() if isinstance(kwargs, Tensor))
+
+        if len(devices) == 1 and next(iter(devices)) == self.device:
+            return
+
+        self.ipt = {
+            'args': tuple(x.to(self.device) if isinstance(x, Tensor) else x 
+                          for x in self.ipt['args']),
+            'kwargs': {k: (v.to(self.device) if isinstance(v, Tensor) else v) 
+                       for k, v in self.ipt['kwargs'].items()}
+        }
+
+    def __repr__(self) -> str:
+        return f"Meter(model={self.optree}, device={self.device})"
