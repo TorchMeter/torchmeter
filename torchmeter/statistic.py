@@ -7,18 +7,21 @@ from typing import Any, Callable, Dict, List, NamedTuple, Optional, TypeVar, Tup
 
 import numpy as np
 import torch.nn as nn
-from torch import no_grad
+from pympler.asizeof import asizeof
+from torch import no_grad, Tensor
 from torch.cuda import Event as cuda_event
 from torch.cuda import synchronize as cuda_sync
 
 from torchmeter.unit import UNIT_TYPE, auto_unit
-from torchmeter.unit import CountUnit, DecimalUnit, BinaryUnit, TimeUnit, SpeedUnit
+from torchmeter.unit import CountUnit, BinaryUnit, TimeUnit, SpeedUnit
+
+__all__ = ["ParamsMeter", "CalMeter", "MemMeter", "ITTPMeter"]
 
 OPN_TYPE = TypeVar("OperationNode")
 
 class UpperLinkData:
 
-    __slots__ = ['val', 'none_str',
+    __slots__ = ['val', 'none_str', 'access_cnt',
                  '__parent_data', '__unit_sys']
 
     def __init__(self, 
@@ -28,6 +31,7 @@ class UpperLinkData:
         self.val = val
         self.__parent_data = parent_data    
         self.__unit_sys = unit_sys
+        self.access_cnt = 1
         self.none_str = none_str # Use when there is a "None" in the column where this data is located while rendering the table.
     
     @property
@@ -37,6 +41,7 @@ class UpperLinkData:
     def __iadd__(self, other):
         self.val += other
         self.__upper_update(other)
+        # self.access_cnt += 1
         return self
     
     def __upper_update(self, other:int):
@@ -45,20 +50,24 @@ class UpperLinkData:
     
     def __repr__(self):
         if self.__unit_sys is not None:
-            return auto_unit(self.val, self.__unit_sys)
+            base = auto_unit(self.val/self.access_cnt, self.__unit_sys)
         else:
-            return str(self.val)
+            base = str(self.val/self.access_cnt)
+        return base + (f" [dim](×{self.access_cnt})[/]" if self.access_cnt > 1 else "")
 
 class MetricsData:
 
-    __slots__ = ['vals',
-                 'reduce_func',
-                 '__unit_sys']
+    __slots__ = ['vals', 'reduce_func',
+                 '__unit_sys', 'none_str']
 
-    def __init__(self, reduce_func:Optional[Callable]=np.mean, unit_sys:Optional[UNIT_TYPE]=DecimalUnit):
+    def __init__(self, 
+                 reduce_func:Optional[Callable]=np.mean, 
+                 unit_sys:Optional[UNIT_TYPE]=CountUnit,
+                 none_str:str='-'):
         self.vals = np.array([])
-        self.reduce_func = reduce_func if reduce_func is not None else lambda x:x
+        self.reduce_func = reduce_func if reduce_func is not None else np.mean
         self.__unit_sys = unit_sys
+        self.none_str = none_str
 
     @property
     def metrics(self):
@@ -70,6 +79,10 @@ class MetricsData:
             return np.percentile(self.vals, 75) - np.percentile(self.vals, 25)
         else:
             return 0.
+    
+    @property
+    def val(self) -> Tuple[float, float]:
+        return self.metrics, self.iqr
     
     @property
     def raw_data(self):
@@ -86,15 +99,15 @@ class MetricsData:
             return f"{auto_unit(self.metrics, self.__unit_sys)}" + ' ± ' + \
                    f"{auto_unit(self.iqr, self.__unit_sys)}"
         else:
-            return f"{self.metrics} ± {self.iqr}"
+            return f"{self.metrics:.2f} ± {self.iqr:.2f}"
 
 class Statistics(ABC):
 
     def __new__(cls, *args, **kwargs):
-        assert hasattr(cls, 'detail_val_container'), f"Class '{cls.__name__}' must have the class attribute 'detail_val_container', \
-                                               which should be a NamedTuple"
-        assert hasattr(cls, 'overview_val_container'), f"Class '{cls.__name__}' must have the class attribute 'overview_val_container', \
-                                            which should be a NamedTuple"
+        if not hasattr(cls, 'detail_val_container'):
+            raise AttributeError(f"Class '{cls.__name__}' must have the class attribute 'detail_val_container', which should be a NamedTuple")
+        if not hasattr(cls, 'overview_val_container'):
+            raise AttributeError(f"Class '{cls.__name__}' must have the class attribute 'overview_val_container', which should be a NamedTuple")
         return super().__new__(cls)        
 
     @property
@@ -117,8 +130,8 @@ class Statistics(ABC):
 
     @property
     @abstractmethod
-    def crucial_info(self) -> Dict[str, str]:
-        """The dict of crucial information of the statistics, used in profile footer"""
+    def crucial_data(self) -> Dict[str, str]:
+        """The dict of crucial data of the statistics, used in profile footer"""
         ...
 
     @abstractmethod
@@ -142,7 +155,7 @@ class Statistics(ABC):
         if opparent is None:
             link_data = UpperLinkData(val=init_val, **kwargs)
         else:
-            upper_getter = attrgetter(f'{self.name}.{attr_name}')
+            upper_getter = attrgetter(f"{self.name}.{attr_name}")
             link_data = UpperLinkData(val=init_val, 
                                       parent_data=upper_getter(opparent),
                                       **kwargs)
@@ -151,13 +164,12 @@ class Statistics(ABC):
     def __repr__(self):
         repr_str = self.val.__class__.__name__ + '\n'
 
-        max_len = max((len(f) for f in self.ov_fields))
+        max_len = max(len(f) for f in self.ov_fields)
 
         for field in self.ov_fields:
             field_val = getattr(self.val, field, 'N/A')
             if isinstance(field_val, UpperLinkData):
-                numeric_val = float(field_val.val) # get the value
-                repr_str += '• ' + f"{field.rjust(max_len)} = {numeric_val} = {field_val}\n"
+                repr_str += '• ' + f"{field.rjust(max_len)} = {field_val.raw_data:.2f} = {field_val}\n"
             else:
                 repr_str += '• ' + f"{field.rjust(max_len)} = {field_val}\n"
 
@@ -187,7 +199,7 @@ class ParamsMeter(Statistics):
         self._model = opnode.operation
         
         self.__stat_ls = [] # record all parameters' information
-        self.is_measured = True if self._model._modules else False # only measure the leaf nodes
+        self.is_measured = False # used for cache
 
         _opparent = opnode.parent
         self.__RegNum = self.init_linkdata(attr_name='RegNum', init_val=0, opparent=_opparent, unit_sys=CountUnit)
@@ -220,7 +232,9 @@ class ParamsMeter(Statistics):
                                            Learnable_Params=self.RegNum)
 
     @property
-    def crucial_info(self) -> Dict[str, str]:
+    def crucial_data(self) -> Dict[str, str]:
+        self.measure()
+            
         res_dict = {'Learnable Parameters Num': str(self.RegNum),
                     'Total Parameters Num': str(self.TotalNum)}
         max_keylen = max([len(key) for key in res_dict.keys()])
@@ -228,7 +242,7 @@ class ParamsMeter(Statistics):
         return res_dict
 
     def measure(self) -> None:
-        if self.is_measured: # TODO: non-leaf layer may have its own parameter
+        if self.is_measured:
             return
         
         if not self._model._parameters:
@@ -237,7 +251,9 @@ class ParamsMeter(Statistics):
                                                             Operation_Type=self._opnode.type,
                                                             Numeric_Num=UpperLinkData(val=0, unit_sys=CountUnit)))
         else:
-            for param_name, param_val in self._model.named_parameters(): 
+            for param_name, param_val in self._model._parameters.items(): 
+                if param_val is None:
+                    continue
                 p_num = param_val.numel()
                 
                 p_reg = False
@@ -265,8 +281,8 @@ class CalMeter(Statistics):
                                                               'Operation_Type',
                                                               'Kernel_Size',  # Kernel_Size([H,W])
                                                               'Bias', 
-                                                              'Input_Shape',  # Input_Shape([B,C,H,W])'
-                                                              'Output_Shape',  # Output_Shape([B,C,H,W])'
+                                                              'Input',  # Input([B,C,H,W])'
+                                                              'Output',  # Output([B,C,H,W])'
                                                               'MACs', 
                                                               'FLOPs'])
     
@@ -283,13 +299,13 @@ class CalMeter(Statistics):
         self._model = opnode.operation
         
         self.__stat_ls = [] # record the flops and macs information of each operation
-        self.is_measured = True if self._model._modules else False # only measure the leaf nodes
+        self.is_measured = False 
 
         _opparent = opnode.parent
         self.__Macs = self.init_linkdata(attr_name='Macs', init_val=0, opparent=_opparent, 
-                                         unit_sys=DecimalUnit, none_str='Not Supported')
+                                         unit_sys=CountUnit, none_str='Not Supported')
         self.__Flops = self.init_linkdata(attr_name='Flops', init_val=0, opparent=_opparent, 
-                                          unit_sys=DecimalUnit, none_str='Not Supported')
+                                          unit_sys=CountUnit, none_str='Not Supported')
 
     @property
     def name(self) -> str:
@@ -305,12 +321,12 @@ class CalMeter(Statistics):
 
     @property
     def detail_val(self) -> List[NamedTuple]:
-        self.measure()
+        self.__is_valid_access()
         return self.__stat_ls
     
     @property
     def val(self) -> NamedTuple:
-        self.measure()
+        self.__is_valid_access()
         return self.overview_val_container(Operation_Id=self._opnode.node_id,
                                            Operation_Type=self._opnode.type,
                                            Operation_Name=self._opnode.name,
@@ -318,7 +334,8 @@ class CalMeter(Statistics):
                                            FLOPs=self.Flops)
 
     @property
-    def crucial_info(self) -> Dict[str, str]:
+    def crucial_data(self) -> Dict[str, str]:
+        self.__is_valid_access()
         res_dict = {'FLOPs': str(self.Flops),
                     'MACs(aka MACC, MADD)': str(self.Macs)}
         max_keylen = max([len(key) for key in res_dict.keys()])
@@ -335,8 +352,41 @@ class CalMeter(Statistics):
 
         return hook
 
+    def __is_valid_access(self):
+        if self.is_measured:
+            if not (self.Flops.val + self.Macs.val) and \
+               not self.__stat_ls and \
+               not isinstance(self._model, (nn.ModuleDict, nn.ModuleList)):
+                raise RuntimeError("This module might be defined but not explicitly called, so no data is collected.")
+        else:
+            raise AttributeError("You should never access this property on your own " + \
+                                 "before accessing `Meter(your_model).cal`.")
+        return True
+
+    def __iopt_repr(self, iopt) -> str:
+        if isinstance(iopt, Tensor):
+            return str(list(iopt.shape))
+        
+        elif iopt is None:
+            return 'None'
+
+        elif isinstance(iopt, (tuple, list, set)):
+            repr = tuple(map(self.__iopt_repr, iopt))
+            return '(' + ',\n'.join(repr) + ')' if len(repr) > 1 else repr[0]
+        
+        elif isinstance(iopt, dict):
+            repr = ["{}: {}".format(self.__iopt_repr(k), self.__iopt_repr(v))
+                    for k, v in iopt.items()]
+            return '{' + ',\n'.join(repr) + '}' if len(repr) > 1 else repr[0]
+        
+        else:
+            return type(iopt).__name__
+
     def __regist_hook(self, module):
-        if isinstance(module, (nn.Conv1d, nn.Conv2d, nn.Conv3d)):
+        if not self._opnode.is_leaf:
+            h = module.register_forward_hook(self.__container_hook)
+            
+        elif isinstance(module, (nn.Conv1d, nn.Conv2d, nn.Conv3d)):
             h = module.register_forward_hook(self.__conv_hook)
 
         elif isinstance(module, (nn.Sigmoid, nn.Tanh, nn.ReLU, nn.ReLU6, nn.SiLU, nn.PReLU, nn.RReLU, nn.LeakyReLU)):
@@ -367,16 +417,20 @@ class CalMeter(Statistics):
         self.__Macs += MACs
         self.__Flops += FLOPs
         
-        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                        Operation_Name=self._opnode.name,
-                                                        Operation_Type=self._opnode.type,
-                                                        Kernel_Size=list(module.kernel_size),
-                                                        Bias=bool(is_bias),
-                                                        Input_Shape=list(input[0].shape),
-                                                        Output_Shape=[len(output)]+list(output[0].shape),
-                                                        MACs=self.Macs,
-                                                        FLOPs=self.Flops)
-        )
+        if len(self.__stat_ls):
+            self.Macs.access_cnt += 1
+            self.Flops.access_cnt += 1
+        else:
+            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                            Operation_Name=self._opnode.name,
+                                                            Operation_Type=self._opnode.type,
+                                                            Kernel_Size=list(module.kernel_size),
+                                                            Bias=bool(is_bias),
+                                                            Input=self.__iopt_repr(input),
+                                                            Output=self.__iopt_repr(output),
+                                                            MACs=self.Macs,
+                                                            FLOPs=self.Flops)
+            )
     
     def __linear_hook(self, module, input, output):
         k = module.in_features
@@ -389,15 +443,19 @@ class CalMeter(Statistics):
         self.__Macs += MACs
         self.__Flops += FLOPs
 
-        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                        Operation_Name=self._opnode.name,
-                                                        Operation_Type=self._opnode.type,
-                                                        Bias=bool(is_bias),
-                                                        Input_Shape=list(input[0].shape),
-                                                        Output_Shape=[len(output)]+list(output[0].shape),
-                                                        MACs=self.Macs,
-                                                        FLOPs=self.Flops)
-        )
+        if len(self.__stat_ls):
+            self.Macs.access_cnt += 1
+            self.Flops.access_cnt += 1
+        else:
+            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                            Operation_Name=self._opnode.name,
+                                                            Operation_Type=self._opnode.type,
+                                                            Bias=bool(is_bias),
+                                                            Input=self.__iopt_repr(input),
+                                                            Output=self.__iopt_repr(output),
+                                                            MACs=self.Macs,
+                                                            FLOPs=self.Flops)
+            )
 
     def __BN_hook(self, module, input, output):
         FLOPs = 4*input[0].numel()
@@ -405,14 +463,18 @@ class CalMeter(Statistics):
         self.__Macs += MACs
         self.__Flops += FLOPs
 
-        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                        Operation_Name=self._opnode.name,
-                                                        Operation_Type=self._opnode.type,
-                                                        Input_Shape=list(input[0].shape),
-                                                        Output_Shape=[len(output)]+list(output[0].shape),
-                                                        MACs=self.Macs,
-                                                        FLOPs=self.Flops)
-        )
+        if len(self.__stat_ls):
+            self.Macs.access_cnt += 1
+            self.Flops.access_cnt += 1
+        else:
+            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                            Operation_Name=self._opnode.name,
+                                                            Operation_Type=self._opnode.type,
+                                                            Input=self.__iopt_repr(input),
+                                                            Output=self.__iopt_repr(output),
+                                                            MACs=self.Macs,
+                                                            FLOPs=self.Flops)
+            )
 
     def __activate_hook(self, module, input, output):
         k = input[0].numel()
@@ -435,14 +497,18 @@ class CalMeter(Statistics):
         self.__Macs += MACs
         self.__Flops += FLOPs
 
-        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                        Operation_Name=self._opnode.name,
-                                                        Operation_Type=self._opnode.type,
-                                                        Input_Shape=list(input[0].shape),
-                                                        Output_Shape=[len(output)]+list(output[0].shape),
-                                                        MACs=self.Macs,
-                                                        FLOPs=self.Flops)
-        )
+        if len(self.__stat_ls):
+            self.Macs.access_cnt += 1
+            self.Flops.access_cnt += 1
+        else:
+            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                            Operation_Name=self._opnode.name,
+                                                            Operation_Type=self._opnode.type,
+                                                            Input=self.__iopt_repr(input),
+                                                            Output=self.__iopt_repr(output),
+                                                            MACs=self.Macs,
+                                                            FLOPs=self.Flops)
+            )
 
     def __pool_hook(self, module, input, output):
         k = module.kernel_size
@@ -459,23 +525,42 @@ class CalMeter(Statistics):
         self.__Macs += MACs
         self.__Flops += FLOPs
 
-        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                        Operation_Name=self._opnode.name,
-                                                        Operation_Type=self._opnode.type,
-                                                        Kernel_Size=list(k) if len(k)>1 else [k[0]]*2,
-                                                        Input_Shape=list(input[0].shape),
-                                                        Output_Shape=[len(output)]+list(output[0].shape),
-                                                        MACs=self.Macs,
-                                                        FLOPs=self.Flops)
-        )
+        if len(self.__stat_ls):
+            self.Macs.access_cnt += 1
+            self.Flops.access_cnt += 1
+        else:
+            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                            Operation_Name=self._opnode.name,
+                                                            Operation_Type=self._opnode.type,
+                                                            Kernel_Size=list(k) if len(k)>1 else [k[0]]*2,
+                                                            Input=self.__iopt_repr(input),
+                                                            Output=self.__iopt_repr(output),
+                                                            MACs=self.Macs,
+                                                            FLOPs=self.Flops)
+            )
+
+    def __container_hook(self, module, input, output):
+        if len(self.__stat_ls):
+            self.Macs.access_cnt += 1
+            self.Flops.access_cnt += 1
+        else:
+            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                            Operation_Name=self._opnode.name,
+                                                            Operation_Type=self._opnode.type,
+                                                            Input=self.__iopt_repr(input),
+                                                            Output=self.__iopt_repr(output),
+                                                            MACs=self.Macs,
+                                                            FLOPs=self.Flops)
+            )
 
     def __not_support_hook(self, module, input, output):
-        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                        Operation_Name=self._opnode.name,
-                                                        Operation_Type=self._opnode.type,
-                                                        Input_Shape=list(input[0].shape),
-                                                        Output_Shape=[len(output)]+list(output[0].shape))
-        )
+        if not len(self.__stat_ls):
+            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                            Operation_Name=self._opnode.name,
+                                                            Operation_Type=self._opnode.type,
+                                                            Input=self.__iopt_repr(input),
+                                                            Output=self.__iopt_repr(output))
+            )
 
 class MemMeter(Statistics):
 
@@ -486,7 +571,7 @@ class MemMeter(Statistics):
                                                               'Operation_Type',
                                                               'Param_Cost', 
                                                               'Buffer_Cost', 
-                                                              'FeatureMap_Cost',  
+                                                              'Output_Cost',  
                                                               'Total'])
     
     overview_val_container:NamedTuple = namedtuple(typename='Memory_INFO', 
@@ -496,20 +581,21 @@ class MemMeter(Statistics):
                                                                 'Operation_Name', 
                                                                 'Param_Cost', 
                                                                 'Buffer_Cost', 
-                                                                'FeatureMap_Cost',  
+                                                                'Output_Cost',  
                                                                 'Total'])
 
     def __init__(self, opnode: OPN_TYPE):
         self._opnode = opnode
         self._model = opnode.operation
+        self.is_inplace = getattr(self._model, 'inplace', False)
         
-        self.__stat_ls = [] # record the memory cost of each operation
-        self.is_measured = True if self._model._modules else False # only measure the leaf nodes
+        self.__stat_ls = [] # record the flops and macs information of each operation
+        self.is_measured = False # used for cache
 
         _opparent = opnode.parent
         self.__ParamCost = self.init_linkdata(attr_name='ParamCost', init_val=0, opparent=_opparent, unit_sys=BinaryUnit)
         self.__BufferCost = self.init_linkdata(attr_name='BufferCost', init_val=0, opparent=_opparent, unit_sys=BinaryUnit)
-        self.__FeatureMapCost = self.init_linkdata(attr_name='FeatureMapCost', init_val=0, opparent=_opparent, unit_sys=BinaryUnit)
+        self.__OutputCost = self.init_linkdata(attr_name='OutputCost', init_val=0, opparent=_opparent, unit_sys=BinaryUnit)
         self.__TotalCost = self.init_linkdata(attr_name='TotalCost', init_val=0, opparent=_opparent, unit_sys=BinaryUnit)
 
     @property
@@ -525,8 +611,8 @@ class MemMeter(Statistics):
         return self.__BufferCost
 
     @property
-    def FeatureMapCost(self) -> UpperLinkData:
-        return self.__FeatureMapCost
+    def OutputCost(self) -> UpperLinkData:
+        return self.__OutputCost
     
     @property
     def TotalCost(self) -> UpperLinkData:
@@ -534,36 +620,36 @@ class MemMeter(Statistics):
     
     @property
     def detail_val(self) -> List[NamedTuple]:
-        self.measure()
+        self.__is_valid_access()
         return self.__stat_ls
-    
-    @property
-    def crucial_info(self) -> Dict[str, str]:
-        res_dict =  {'[b]Parameters[/] Memory Cost': f'{self.ParamCost}, {self.ParamCost.val*100/self.TotalCost.val:.2f} %',
-                     '[b]Buffers[/] Memory Cost': f'{self.BufferCost}, {self.BufferCost.val*100/self.TotalCost.val:.2f} %',
-                     '[b]FeatureMap[/] Memory Cost': f'{self.FeatureMapCost}, {self.FeatureMapCost.val*100/self.TotalCost.val:.2f} %',
-                     '[b]Total Memory Cost[/]': f'{self.TotalCost}'}
-        max_keylen = max([len(key) for key in res_dict.keys()])
-        res_dict = {key.ljust(max_keylen): value for key, value in res_dict.items()}
-        return res_dict
                 
     @property
     def val(self) -> NamedTuple:
-        self.measure()
+        self.__is_valid_access()
         return self.overview_val_container(Operation_Id=self._opnode.node_id,
                                            Operation_Type=self._opnode.type,
                                            Operation_Name=self._opnode.name,
                                            Param_Cost=self.ParamCost,
                                            Buffer_Cost=self.BufferCost,
-                                           FeatureMap_Cost=self.FeatureMapCost,
+                                           Output_Cost=self.OutputCost,
                                            Total=self.TotalCost)
+
+    @property
+    def crucial_data(self) -> Dict[str, str]:
+        self.__is_valid_access()
+        res_dict =  {'[b]Parameters[/] Memory Cost': f"{self.ParamCost}, {self.ParamCost.val*100/self.TotalCost.val:.2f} %",
+                     '[b]Buffers[/] Memory Cost': f"{self.BufferCost}, {self.BufferCost.val*100/self.TotalCost.val:.2f} %",
+                     '[b]FeatureMap[/] Memory Cost': f"{self.OutputCost}, {self.OutputCost.val*100/self.TotalCost.val:.2f}",
+                     '[b]Total Memory Cost[/]': str(self.TotalCost)}
+        max_keylen = max([len(key) for key in res_dict.keys()])
+        res_dict = {key.ljust(max_keylen): value for key, value in res_dict.items()}
+        return res_dict
 
     def measure(self):
         if self.is_measured:
             return
         
         hook = self._model.register_forward_hook(self.__hook_func)
-        # TODO: measure backward cost (deal with the gradient)
         
         self.is_measured = True
 
@@ -571,7 +657,9 @@ class MemMeter(Statistics):
 
     def __hook_func(self, module, input, output):
         param_cost = 0 # byte
-        for param in module.parameters():
+        for param in module._parameters.values():
+            if param is None:
+                continue
             param_cost += param.numel() * param.element_size()
         self.__ParamCost += param_cost
         
@@ -580,18 +668,41 @@ class MemMeter(Statistics):
             buffer_cost += buffer.numel() * buffer.element_size()
         self.__BufferCost += buffer_cost
         
-        feat_cost = output.numel() * output.element_size() # byte
-        self.__FeatureMapCost += feat_cost
+        opt_cost = 0
+        if self._opnode.is_leaf and not self.is_inplace:
+            for opt in output:
+                if isinstance(opt, Tensor):
+                    opt_cost += opt.numel() * opt.element_size() # byte
+                elif isinstance(opt, str):
+                    opt_cost += opt.__sizeof__()
+                else:
+                    opt_cost += asizeof(opt)
+        self.__OutputCost += opt_cost
         
-        self.__TotalCost += param_cost + buffer_cost + feat_cost
+        if len(self.__stat_ls):
+            # duplicated access
+            self.OutputCost.access_cnt += 1
+            total_cost = opt_cost
+        else:
+            total_cost = param_cost + buffer_cost + opt_cost
+            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
+                                                            Operation_Name=self._opnode.name,
+                                                            Operation_Type=self._opnode.type + ('(inplace)' if self.is_inplace else ''),
+                                                            Param_Cost=None if self._opnode.is_leaf and not param_cost else self.ParamCost, 
+                                                            Buffer_Cost=None if self._opnode.is_leaf and not buffer_cost else self.BufferCost, 
+                                                            Output_Cost=None if self._opnode.is_leaf and not opt_cost else self.OutputCost, 
+                                                            Total=None if self._opnode.is_leaf and not total_cost else self.TotalCost))
         
-        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                        Operation_Name=self._opnode.name,
-                                                        Operation_Type=self._opnode.type,
-                                                        Param_Cost=self.ParamCost if param_cost else None, 
-                                                        Buffer_Cost=self.BufferCost if buffer_cost else None, 
-                                                        FeatureMap_Cost=self.FeatureMapCost, 
-                                                        Total=self.TotalCost))
+        self.__TotalCost += total_cost
+
+    def __is_valid_access(self):
+        if self.is_measured:
+            if not self.__stat_ls and not isinstance(self._model, (nn.ModuleDict, nn.ModuleList)):
+                raise RuntimeError("This module might be defined but not explicitly called, so no data is collected.")
+        else:
+            raise AttributeError("You should never access this property on your own " + \
+                                 "before accessing `Meter(your_model).cal`.")
+        return True
 
 class ITTPMeter(Statistics):
 
@@ -616,6 +727,7 @@ class ITTPMeter(Statistics):
         self._model = opnode.operation
         
         self.__stat_ls = [] # record the inference time and throughput of each operation
+        self.is_measured = False
 
         self.__InferTime = MetricsData(reduce_func=np.median, unit_sys=TimeUnit)
         self.__Throughput = MetricsData(reduce_func=np.median, unit_sys=SpeedUnit)
@@ -634,10 +746,12 @@ class ITTPMeter(Statistics):
 
     @property
     def detail_val(self) -> List[NamedTuple]:
+        self.__is_valid_access()
         return self.__stat_ls
     
     @property
     def val(self) -> NamedTuple:
+        self.__is_valid_access()
         return self.overview_val_container(Operation_Id=self._opnode.node_id,
                                            Operation_Type=self._opnode.type,
                                            Operation_Name=self._opnode.name,
@@ -645,7 +759,8 @@ class ITTPMeter(Statistics):
                                            Throughput=self.__Throughput)
 
     @property
-    def crucial_info(self) -> Dict[str, str]:
+    def crucial_data(self) -> Dict[str, str]:
+        self.__is_valid_access()
         res_dict = {'Inference Elapse': str(self.InferTime),
                     'Throughput': str(self.Throughput)}
         max_keylen = max([len(key) for key in res_dict.keys()])
@@ -658,6 +773,8 @@ class ITTPMeter(Statistics):
                                                          device=device, 
                                                          repeat=repeat,
                                                          global_process=global_process))
+        
+        self.is_measured = True
         
         return hook
 
@@ -699,4 +816,11 @@ class ITTPMeter(Statistics):
                                                         Infer_Time=self.InferTime,
                                                         Throughput=self.Throughput))
 
-
+    def __is_valid_access(self):
+        if self.is_measured:
+            if not self.__stat_ls and not isinstance(self._model, (nn.ModuleDict, nn.ModuleList)):
+                raise RuntimeError("This module might be defined but not explicitly called, so no data is collected.")
+        else:
+            raise AttributeError("You should never access this property on your own " + \
+                                 "before accessing `Meter(your_model).cal`.")
+        return True

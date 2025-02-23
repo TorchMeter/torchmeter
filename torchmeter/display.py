@@ -1,10 +1,10 @@
 import re
 import os
-import time
 import warnings
-from copy import copy,deepcopy
+from time import sleep
+from copy import copy, deepcopy
 from operator import attrgetter
-from typing import Any, Callable, Dict, List, Optional, Sequence, Union
+from typing import Any, Callable, Dict, List, Optional, Union, TypeVar
 
 from rich import print, get_console
 from rich.rule import Rule
@@ -12,61 +12,21 @@ from rich.tree import Tree
 from rich.panel import Panel
 from rich.segment import Segment
 from rich.table import Table, Column
-from rich.box import HEAVY_EDGE, ROUNDED
 from rich.console import Group, RenderableType
 from polars import DataFrame, struct, col
 from polars import List as pl_list, Object as pl_object
 
-from torchmeter.utils import dfs_task, perfect_savepath
+from torchmeter.config import get_config, dict_to_namespace
+from torchmeter.utils import dfs_task, resolve_savepath
 
-def indent_str(s:Union[str, Sequence[str]], 
-               indent:int=4, 
-               guideline:bool=True,
-               process_first:bool=True) -> str:
-    res = []
-    split_lines = s.split('\n') if isinstance(s, str) else s
-    guideline = False if len(split_lines) == 1 else guideline
-    
-    for line in split_lines:
-        indent_line = '│' if guideline else ' ' 
-        indent_line += ' '*(indent-1) + str(line)
-        res.append(indent_line)
+__cfg__ = get_config()
 
-    if not process_first:
-        res[0] = res[0][indent:]
+__all__ = ["render_perline", "TreeRenderer", "TabularRenderer"]
 
-    if guideline:
-        res[-1] = '└─' + res[-1][2:]
-    
-    return '\n'.join(res)
+NAMESPACE_TYPE = TypeVar('NameSpace')
 
-def data_repr(val:Any):
-    get_type = lambda val: type(val).__name__
-
-    item_repr = lambda val_type, val: (f"[dim]Shape[/]([b green]{list(val.shape)}[/])" if hasattr(val, 'shape') else f"[b green]{val}[/]") + f" [dim]<{val_type}>[/]"
-
-    val_type = get_type(val)
-    if isinstance(val, (list, tuple, set, dict)) and len(val) > 0:
-        if isinstance(val, dict):
-            inner_repr:List[str] = [f'{item_repr(get_type(k),k)}: {data_repr(v)}' for k, v in val.items()]
-        else:
-            inner_repr:List[str] = [data_repr(i) for i in val]
-        
-        res_repr = f'[dim]{val_type}[/](' 
-        res_repr += ',\n'.join(inner_repr)
-        res_repr += ')'
-
-        return indent_str(res_repr, indent=len(f'{val_type}('), process_first=False)
-    
-    else:
-        return item_repr(val_type, val)
-
-def render_perline(renderable: Union[RenderableType, List[List[Segment]]],
-                   line_prefix:'str'='',
-                   line_suffix:'str'='',
-                   row_separator:'str'='',
-                   console=None, 
-                   time_sep:float=0.15) -> None:
+def render_perline(renderable: RenderableType,
+                   console=None) -> None:
     """
     Output a renderable object line by line. \n
     Each line allows for the setting of a prefix and a suffix, i.e. `line_prefix` and `line_suffix`. \n
@@ -88,90 +48,28 @@ def render_perline(renderable: Union[RenderableType, List[List[Segment]]],
         - `console` (rich.console.Console, optional): The console object to be used for rendering. If it is not specified, 
                                                       the global console object will be used. Defaults to None.
         
-        - `time_sep` (float, optional): The time in second between each line output. Defaults to 0.15.
-    
     Returns:
     ---
         None
     """
-    assert time_sep >= 0, f"Argument `time_sep` must be non-negative, but got {time_sep}"
-    assert '\n' not in row_separator, "You don't have to add \\n manually in Argument `row_separator`, " + \
-                                      "we will do it for you to ensure the correct display."
+    time_sep = __cfg__.render_interval
+    if time_sep < 0:
+        raise ValueError(f"The `render_interval` value defined in config must be non-negative, but got {time_sep}")
 
     console = console or get_console()
-    console_width = console.width
-    temp_options = deepcopy(console.options)
 
-    # render all items according to their origin width
-    ## ensure renderable object is fully displayed
-    if isinstance(renderable, list):
-        obj_width = 0
-        lines: List[List[Segment]] = []
-        for line_segs in renderable:
-            # discard the last space in the line, so as to have a fit display of the renderable object
-            if line_segs[-1].text.isspace():
-                line_segs.pop(-1)
-            
-            line_width = Segment.get_line_length(line_segs)
-            obj_width = max(obj_width, line_width)
+    if not time_sep:
+        console.print(renderable)
 
-            lines.append(line_segs)
     else:
-        obj_width = min(console.measure(renderable).maximum, console_width)
-        temp_options.max_width = obj_width
-        lines: List[List[Segment]] = console.render_lines(renderable, options=temp_options)
-
-    ## ensure prefix is fully displayed
-    residual_width = console_width - obj_width # >= 0
-    if line_prefix and residual_width > 0:
-        prefix_width = console.measure(line_prefix).maximum
-        assert prefix_width <= residual_width, \
-            f"Argument `line_prefix` is too long to display, try to maximize the windows or set a value less than {residual_width} in length."
-        prefix: List[Segment] = list(console.render(line_prefix))[:-1] # -1 to discard default '\n' in the end
-    else:
-        prefix_width = 0
-        prefix = []
+        lines: List[List[Segment]] = console.render_lines(renderable, new_lines=True)
     
-    ## pick the left most available part of suffix if there isn't enough space
-    residual_width -= prefix_width
-    if line_suffix and residual_width > 0:
-        suffix_width = min(console.measure(line_suffix).maximum, residual_width)
-        suffix: List[Segment] = list(console.render(line_suffix[:residual_width]))[:-1]
-    else:
-        suffix_width = 0
-        suffix = []
-    
-    ## render row separator: repeat the pass-in pattern to full display width
-    if row_separator:
-        total_width = obj_width + prefix_width + suffix_width
-
-        single_sep: List[Segment] = list(console.render(row_separator))[:-1] 
-
-        plain_text: str = ''.join([s.text for s in single_sep])
-        times, remainder = divmod(total_width, len(plain_text))
-
-        if remainder:
-            rowsep_segs: List[Segment] = single_sep * times
-            for seg in single_sep:
-                if len(seg) > remainder:
-                    rowsep_segs.append(seg.split_cells(remainder)[0])
-                    break
-                else:
-                    rowsep_segs.append(seg)
-                    remainder -= len(seg) 
-        else:
-            rowsep_segs = single_sep * times
-        
-        rowsep_segs = [Segment.line()] + rowsep_segs + [Segment.line()]
-    else:
-        rowsep_segs = [Segment.line()]
-    
-    # a fake implementation of `rich.print`
-    console._buffer_index = 0
-    for line in lines:
-        console._buffer.extend(prefix + line + suffix + rowsep_segs)
-        console._check_buffer()
-        time.sleep(time_sep)
+        # a fake implementation of `rich.print`
+        console._buffer_index = 0
+        for line in lines:
+            console._buffer.extend(line)
+            console._check_buffer()
+            sleep(time_sep)
 
 class TreeRenderer:
     """Render a `OperationNode` object as a tree.
@@ -228,7 +126,7 @@ class TreeRenderer:
                                                  The keys of the dict are arguments of `rich.tree.Tree` class. This attribute might be 
                                                  changed by `render()` method if `level_args` is passed in and there is a key `default` or `all` in the passed in setting. 
 
-        - `tree_level_args` (Dict[str, Any]): A dictionary containing the display settings for each level of the tree. 
+        - `tree_levels_args` (Dict[str, Any]): A dictionary containing the display settings for each level of the tree. 
                                               The key is the level number, and the value is a dictionary containing the display settings of corresponding level.
                                               This attribute might be changed by `render()` method if `level_args` is passed in.
 
@@ -282,66 +180,35 @@ class TreeRenderer:
                  repeat_block_args=repeat_block_args)
         ```                                         
     """
-    def __init__(self, 
-                 node:"OperationNode", # noqa # type: ignore 
-                 loop_algebras:str='xyijkabcdefghlmnopqrstuvwz'):
-        self.opnode = deepcopy(node)
-        self.loop_algebras:str = loop_algebras
+    
+    loop_algebras:str='xyijkabcdefghlmnopqrstuvwz'
+    
+    def __init__(self, node:"OperationNode"): # noqa # type: ignore 
+        self.opnode = node
 
         self.render_unfold_tree = None
         self.render_fold_tree = None
-        
-        # basic display format for a rendered tree
-        self.__default_level_args = {
-            'label':'[b gray35](<node_id>) [green]<name>[/green] [cyan]<type>[/]', # str | Callable
-            'style':'tree',
-            'guide_style':'light_coral',
-            'highlight':True,
-            'hide_root':False,
-            'expanded':True
-        }
-        
-        self.__levels_args:Dict[Dict[str, Any]] = {
-            '0':  {'label': '[b light_coral]<name>[/]', # default display setting for root node
-                   'guide_style':'light_coral'}
-        }
                 
-        # basic display format for all repeat blocks in a rendered tree
-        self.__rpblk_args = { 
-            'title': '[i]Repeat [[b]<repeat_time>[/b]] Times[/]',
-            'title_align': 'center',
-            'highlight': True,
-            'style': 'dark_goldenrod',
-            'border_style': 'dim',
-            'box': HEAVY_EDGE,
-            'expand': False
-        }
-        
-        # basic format of footer in each repeat block
-        def __default_rpft(attr_dict:dict) -> str:
-            start_idx = attr_dict['node_id'].split('.')[-1]
-            
-            repeat_winsz = attr_dict['repeat_winsz']
-            if repeat_winsz == 1:
-                end_idx = int(start_idx) + attr_dict['repeat_time'] -1
-                return f"Where <loop_algebra> ranges from [{start_idx}, {end_idx}]"
-            else:
-                end_idx = int(start_idx) + attr_dict['repeat_time']*repeat_winsz -1
-                valid_vals = list(map(str, range(int(start_idx), end_idx, repeat_winsz)))
-                return f"Where <loop_algebra> = {', '.join(valid_vals)}"
-        self.repeat_footer = __default_rpft 
-        
     @property
-    def default_level_args(self) -> Dict[str, Any]:
-        return self.__default_level_args
+    def default_level_args(self) -> NAMESPACE_TYPE:
+        if not hasattr(self.tree_levels_args, 'default'):
+            self.tree_levels_args.default = dict_to_namespace({
+                'label':'[b gray35](<node_id>) [green]<name>[/green] [cyan]<type>[/]', # str | Callable
+                'style':'tree',
+                'guide_style':'light_coral',
+                'highlight':True,
+                'hide_root':False,
+                'expanded':True
+            })
+        return self.tree_levels_args.default
     
     @property
-    def tree_level_args(self) -> Dict[str, Any]:
-        return self.__levels_args
+    def tree_levels_args(self) -> NAMESPACE_TYPE:
+        return __cfg__.tree_levels_args
 
     @property
-    def repeat_block_args(self) -> Dict[str, Any]:
-        return self.__rpblk_args
+    def repeat_block_args(self) -> NAMESPACE_TYPE:
+        return __cfg__.tree_repeat_block_args
 
     @default_level_args.setter
     def default_level_args(self, custom_args:Dict[str, Any]) -> None:
@@ -358,15 +225,21 @@ class TreeRenderer:
             - `TypeError`: if the new value is not a dict.
         """
         if not isinstance(custom_args, dict):
-            raise TypeError(f'The new value of `TreeRenderer.default_level_args` must be a dict. But got {type(custom_args)}.')
+            raise TypeError(f"You can only overwrite `{self.__class__.__name__}.default_level_args` with a dict. " + \
+                            f"But got {type(custom_args)}.")
         
-        valid_setting_keys = tuple(Tree('.').__dict__.keys())
-        self.__default_level_args.update(custom_args)
-        self.__default_level_args = {k:v for k, v in self.__default_level_args.items() if k in valid_setting_keys}
+        valid_setting_keys = set(Tree('.').__dict__.keys())
+        passin_keys = set(custom_args.keys())
+        invalid_keys = passin_keys - valid_setting_keys
+        if invalid_keys:
+            raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.tree.Tree`, " + \
+                           "refer to https://rich.readthedocs.io/en/latest/tree.html for valid args.")
+        self.default_level_args.__dict__.update(custom_args)
+        
+        self.default_level_args.mark_change()
 
-    @tree_level_args.setter
-    def tree_level_args(self, 
-                        custom_args:Union[List[Dict[str, Any]], Dict[Any, Dict[str, Any]]]) -> None:
+    @tree_levels_args.setter
+    def tree_levels_args(self, custom_args:Dict[Any, Dict[str, Any]]) -> None:
         """
         Update the display settings of all levels in the rendered tree with the pass-in list of dict.
         Note that all dicts should have a key `level` to indicate the level of the corresponding display settings.
@@ -383,55 +256,38 @@ class TreeRenderer:
         ---
             `TypeError`: if the new value is not a dict or a list of dict.
         """
-        if not isinstance(custom_args, (list, dict)):
-            raise TypeError(f'The new value of `TreeRenderer.tree_level_args` must be a dict or a list of dict. But got {type(custom_args)}.')
-        
-        # convert to dict if input a list of dict
-        if isinstance(custom_args, list):
-            _custom_args = {}
-            for level_args_dict in custom_args:
-                if not isinstance(level_args_dict, dict):
-                    warnings.warn(message=f"Non-dict entity found in `custom_args`: \n{level_args_dict}.\nThis entity will be ignored.\n",
-                                  category=UserWarning)
-                elif 'level' not in level_args_dict:
-                    warnings.warn(message=f"Key `level` not found in pass-in setting: \n{custom_args}.\nThis setting will be ignored.\n",
-                                  category=UserWarning)
-                else:
-                    level = str(level_args_dict.pop('level'))
-                    _custom_args[level] = level_args_dict
-        else:
-            _custom_args = custom_args
-        
-        '''
-        _custom_args = {
-            '0': {level_0_setting},
-            '1': {level_1_setting},
-            ...
-        }
-        '''
-        
+        if not isinstance(custom_args, dict):
+            raise TypeError(f"You can only overwrite `{self.__class__.__name__}.tree_levels_args` with a dict. " + \
+                            f"But got {type(custom_args)}.")
+                                                            
         # filt out invalid level definations and invalid display settings
-        valid_setting_keys = tuple(Tree('.').__dict__.keys())
-        for level, level_args_dict in _custom_args.items():
+        valid_setting_keys = set(Tree('.').__dict__.keys())
+        for level, level_args_dict in custom_args.items():
             # assure level is a non-negative integer, 'default' or 'all'
             level = level.lower()
             if not level.isnumeric() and level not in ('default', 'all'):
                 warnings.warn(message=f"The `level` key should be numeric, `default` or `all`, but got {level}.\nThis setting will be ignored.\n",
                               category=UserWarning)
                 continue
-
-            level_args_dict = {k:v for k, v in level_args_dict.items() if k in valid_setting_keys}
+                
+            passin_keys = set(level_args_dict.keys())
+            invalid_keys = passin_keys - valid_setting_keys
+            if invalid_keys:
+                raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.tree.Tree`, " + \
+                               "refer to https://rich.readthedocs.io/en/latest/tree.html for valid args.")
 
             if level == 'default':
                 self.default_level_args = level_args_dict
             elif level == 'all':
                 self.default_level_args = level_args_dict
-                _custom_args = {} # all layer use the default setting
+                # delete all levels settings 
+                self.tree_levels_args = {k:v for k,v in self.tree_levels_args.__dict__.items() 
+                                         if not k.isnumeric()}
                 break
             else:
-                _custom_args[level] = level_args_dict
-               
-        self.__levels_args = _custom_args
+                getattr(self.tree_levels_args, level).__dict__.update(level_args_dict)
+                       
+        self.tree_levels_args.mark_change()
 
     @repeat_block_args.setter
     def repeat_block_args(self, custom_args:Dict[str, Any]) -> None:
@@ -448,22 +304,51 @@ class TreeRenderer:
             - `TypeError`: if the new value is not a dict.
         """
         if not isinstance(custom_args, dict):
-            raise TypeError(f'The new value of `TreeRenderer.repeat_block_args` must be a dict. But got {type(custom_args)}.')
-        
+            raise TypeError(f"You can only overwrite `{self.__class__.__name__}.repeat_block_args` with a dict. " + \
+                            f"But got {type(custom_args)}.")
+                                                        
         footer_key = list(filter(lambda x: x.lower() == 'repeat_footer', custom_args.keys()))
         if footer_key:
-            self.repeat_footer = custom_args[footer_key[-1]] 
+            self.repeat_footer = custom_args[footer_key[-1]]
+            del custom_args[footer_key[-1]] 
         
-        valid_setting_keys = tuple(Panel('.').__dict__.keys())
-        self.__rpblk_args.update(custom_args)
-        self.__rpblk_args = {k:v for k, v in self.__rpblk_args.items() 
-                                     if k in valid_setting_keys and k not in footer_key}
+        valid_setting_keys = set(Panel('.').__dict__.keys())
+        passin_keys = set(custom_args.keys())
+        invalid_keys = passin_keys - valid_setting_keys
+        if invalid_keys:
+            raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.panel.Panel`, " + \
+                           "refer to https://rich.readthedocs.io/en/latest/panel.html for valid args.")
+        self.repeat_block_args.__dict__.update(custom_args)
+        
+        self.repeat_block_args.mark_change()
+        
+    def repeat_footer(self, attr_dict:Dict[str, Any]) -> Union[str, None]:
+        """Must have only one args which accept an attribute dict"""
+        # basic format of footer in each repeat block
+        start_idx = attr_dict['node_id'].split('.')[-1]
+            
+        repeat_winsz = attr_dict['repeat_winsz']
+        if repeat_winsz == 1:
+            end_idx = int(start_idx) + attr_dict['repeat_time'] -1
+            return f"Where <loop_algebra> ranges from [{start_idx}, {end_idx}]"
+        else:
+            end_idx = int(start_idx) + attr_dict['repeat_time']*repeat_winsz -1
+            valid_vals = list(map(str, range(int(start_idx), end_idx, repeat_winsz)))
+            return f"Where <loop_algebra> = {', '.join(valid_vals)}"
 
-    def __call__(self,
-                 *,
-                 fold_repeat:bool=True,
-                 level_args:Union[List[Dict[str, Any]], Dict[Any, Dict[str, Any]]]={},
-                 repeat_block_args:Dict[str, Any]={}) -> Tree:
+    def resolve_attr(self, attr_val:Any) -> str:
+        """
+        Function to process the attribute value resolved by regex.
+
+        Args:
+            attr_val (Any): The attribute value resolved by regex.
+
+        Returns:
+            str: the processed result. Must be a string!
+        """
+        return str(attr_val)
+    
+    def __call__(self) -> Tree:
         """Render the `OperationNode` object and its childs as a tree without polluting the original `OperationNode` object.
         
         see docs of the class(i.e. `torchmeter.display.TreeRenderer`) for details.
@@ -487,18 +372,10 @@ class TreeRenderer:
             see docs of the class(i.e. `torchmeter.display.TreeRenderer`) for details.
         """
         
-        assert isinstance(level_args, (list, dict)), f"Argument `level_args` must be a dict or a list of dicts, but got {type(level_args)}"
-        assert isinstance(repeat_block_args, dict), f"Argument `repeat_block_args` must be a dict, but got {type(repeat_block_args)}"
+        fold_repeat:bool = __cfg__.tree_fold_repeat
         
-        # check, clean and apply `level_args`, 
-        if level_args:
-            self.tree_level_args = level_args
-        del level_args
-        
-        # check, clean and apply `repeat_block_args`
-        if repeat_block_args:
-            self.repeat_block_args = repeat_block_args
-        del repeat_block_args
+        copy_tree = deepcopy(self.opnode)
+        origin_algebras = self.loop_algebras
         
         # task_func for `dfs_task`
         def __apply_display_setting(subject:"OperationNode", # noqa # type: ignore
@@ -515,19 +392,21 @@ class TreeRenderer:
             level = str(display_root.label)  
 
             # update display setting for the currently traversed node
-            target_level_args = self.tree_level_args.get(level, self.default_level_args)
+            target_level_args = getattr(self.tree_levels_args, level, self.default_level_args)
+            target_level_args = target_level_args.__dict__
 
             # disolve label field
             origin_node_id = subject.node_id
             if fold_repeat and int(level) > 1:
                 subject.node_id = subject.parent.node_id + f".{subject.node_id.split('.')[-1]}"
-            label = self.__resolve_argtext(text=target_level_args['label'], attr_owner=subject)
+            label = self.__resolve_argtext(text=target_level_args.get('label', self.default_level_args.label),
+                                           attr_owner=subject)
 
             # apply display setting
             display_root.__dict__.update({**target_level_args, 'label':label})
             
             if fold_repeat:  
-                loop_algebra = self.loop_algebras[0]
+                algebra = self.loop_algebras[0]
                 use_algebra = False
 
                 # if the repeat body contains more than one operations
@@ -543,17 +422,18 @@ class TreeRenderer:
                         # update node_id with a algebraic expression which indicates the loop
                         if level != '1':
                            if loop_idx == 0:
-                               repeat_op_node.node_id = repeat_op_node.parent.node_id + f'.{loop_algebra}'
+                               repeat_op_node.node_id = repeat_op_node.parent.node_id + f".{algebra}"
                            else:
-                               repeat_op_node.node_id = repeat_op_node.parent.node_id + f'.({loop_algebra}+{loop_idx})'
+                               repeat_op_node.node_id = repeat_op_node.parent.node_id + f".({algebra}+{loop_idx})"
                         else:
                             if loop_idx == 0:
-                                repeat_op_node.node_id = loop_algebra
+                                repeat_op_node.node_id = algebra
                             else:
-                                repeat_op_node.node_id = f'{loop_algebra}+{loop_idx}'
+                                repeat_op_node.node_id = f"{algebra}+{loop_idx}"
                         
                         # disoolve label field for the `rich.Tree` object of the currently traversed node
-                        label = self.__resolve_argtext(text=target_level_args['label'], attr_owner=repeat_op_node)
+                        label = self.__resolve_argtext(text=target_level_args.get('label', self.default_level_args.label), 
+                                                       attr_owner=repeat_op_node)
                         
                         # update display setting for the `rich.Tree` object of the currently traversed node
                         repeat_display_node = copy(repeat_op_node.display_root)
@@ -578,17 +458,18 @@ class TreeRenderer:
 
                     # update node_id with a algebraic expression which indicates the loop
                     if level != '1':
-                        subject.node_id = subject.parent.node_id + f'.{loop_algebra}'
+                        subject.node_id = subject.parent.node_id + f".{algebra}"
                     else:
-                        subject.node_id = loop_algebra
+                        subject.node_id = algebra
                     display_root.label = self.__resolve_argtext(text=target_level_args['label'], attr_owner=subject)
 
-                    if self.repeat_footer:
+                    block_footer = self.__resolve_argtext(text=self.repeat_footer, attr_owner=subject,
+                                                          loop_algebra=algebra, node_id=origin_node_id)
+                    if block_footer:
                         repeat_block_content = Group(
                             copy(display_root), # the tree structure of the circulating body
-                            Rule(characters='-', style=self.repeat_block_args.get('style','')), # a separator made up of '-'
-                            self.__resolve_argtext(text=self.repeat_footer, attr_owner=subject, 
-                                                 loop_algebra=loop_algebra, node_id=origin_node_id),
+                            Rule(characters='-', style='dim ' + getattr(self.repeat_block_args, 'style','')), # a separator made up of '-'
+                            "[dim]" + block_footer + "[/]",
                             fit=True
                         )
                     else:
@@ -596,9 +477,11 @@ class TreeRenderer:
                     
                     # make a pannel to show repeat information
                     repeat_block = Panel(repeat_block_content)
-                    title = self.__resolve_argtext(text=self.repeat_block_args.get('title', ''), attr_owner=subject, 
-                                                   loop_algebra=loop_algebra)
-                    repeat_block.__dict__.update({**self.repeat_block_args, 'title':title})
+                    title = self.__resolve_argtext(text=getattr(self.repeat_block_args, 'title', ''), attr_owner=subject, 
+                                                   loop_algebra=algebra)
+                    repeat_block.__dict__.update({**self.repeat_block_args.__dict__, 
+                                                  'title':title,
+                                                  'border_style': self.repeat_block_args.border_style + ' ' + self.repeat_block_args.style})
                     
                     # overwrite the label of the first node in repeat block 
                     subject.display_root.label = repeat_block
@@ -613,34 +496,23 @@ class TreeRenderer:
             return None
         
         # apply display setting for each node by dfs traversal
-        dfs_task(dfs_subject=self.opnode,
+        dfs_task(dfs_subject=copy_tree,
                  adj_func=lambda x:x.childs.values(),
                  task_func=__apply_display_setting,
-                 visited_signal_func=lambda x:str(id(x)),
                  visited=[])
 
-        # store the rendered result
-        if fold_repeat:
-            self.render_fold_tree = self.opnode.display_root
-        else:
-            self.render_unfold_tree = self.opnode.display_root
+        self.loop_algebras = origin_algebras
         
-        return self.opnode.display_root
-
-    def resolve_attr(self, attr_val:Any) -> str:
-        """
-        Function to process the attribute value resolved by regex.
-
-        Args:
-            attr_val (Any): The attribute value resolved by regex.
-
-        Returns:
-            str: the processed result. Must be a string!
-        """
-        return str(attr_val)
+        # cache the rendered result
+        if fold_repeat:
+            self.render_fold_tree = copy_tree.display_root
+        else:
+            self.render_unfold_tree = copy_tree.display_root
+        
+        return copy_tree.display_root
 
     def __resolve_argtext(self,
-                          text:Union[str, Callable[[dict], str]], 
+                          text:Union[str, Callable[[dict], Union[str,None]]], 
                           attr_owner:"OperationNode", # noqa # type: ignore
                           **kwargs) -> str: 
         """
@@ -664,10 +536,12 @@ class TreeRenderer:
         if isinstance(text, Callable):
             text = text(attr_dict)
         
+        if text is None:
+            return ""
+        
         if not isinstance(text, str):
-            warnings.warn(message='The received text(see below) to be resolved is not a string, cannot go ahead.\n' + \
-                                  f'Type: {type(text)}\n Content: {text}',
-                          category=UserWarning)
+            raise TypeError("The received text(see below) to be resolved is not a string nor None, cannot go ahead.\n" + \
+                            f"Type: {type(text)}\nContent: {text}")
 
         res_str = re.sub(pattern=r'(?<!\\)<(.*?)(?<!\\)>',
                          repl=lambda match: self.resolve_attr(attr_dict.get(match.group(1), None)),
@@ -676,110 +550,59 @@ class TreeRenderer:
                          repl=lambda x: x.group().replace('\\', ''),
                          string=res_str)
         return res_str
-
-    def __deepcopy__(self, memo) -> "TreeRenderer":
-        new_obj = TreeRenderer()
-        memo[id(self)] = new_obj
-        new_obj.__dict__.update(self.__dict__)
-        return new_obj
     
 class TabularRenderer:
 
-    def __init__(self, 
-                 node:"OperationNode"):  # noqa # type: ignore
+    def __init__(self, node:"OperationNode"):  # noqa # type: ignore
 
         self.opnode = node
 
         # underlying data
         self.__stats_data = {stat_name:DataFrame() for stat_name in node.statistics}
-
-        # basic display format for each column
-        self.__default_col_args = {
-            'justify': 'center',
-            'vertical': 'middle',
-            'overflow': 'fold'
-        }
-
-        self.__default_tb_args = {
-            'style': 'spring_green4',
-            'highlight': True,
-
-            'title': None,
-            'title_style': 'bold',
-            'title_justify': 'center',
-            'title_align': 'center',
-
-            'show_header': True,
-            'header_style': 'bold',
-
-            'show_footer': False,
-            'footer_style': 'italic',
-
-            'show_lines': False,
-
-            'show_edge': True,
-            'box': ROUNDED,
-            'safe_box': True,
-
-            'expand': False,
-            'leading': 0,
-        }
             
     @property
-    def tb_args(self):
-        return self.__default_tb_args
+    def tb_args(self) -> NAMESPACE_TYPE:
+        return __cfg__.table_display_args
     
     @property
-    def col_args(self):
-        return self.__default_col_args
+    def col_args(self) -> NAMESPACE_TYPE:
+        return __cfg__.table_column_args
 
     @property
-    def datas(self):
-        return self.__stats_data
-
-    @property
-    def valid_export_format(self) -> Sequence[str]:
-        return ('csv', 'xlsx')
+    def valid_export_format(self) -> List[str]:
+        return ['csv', 'xlsx']
 
     @tb_args.setter
     def tb_args(self, custom_args:Dict[str, Any]):
         if not isinstance(custom_args, dict):
-            raise TypeError(f'The new value of `TabularRenderer.tb_args` must be a dict. But got {type(custom_args)}.')
-    
-        valid_setting_keys = tuple(Table().__dict__.keys())
-        self.__default_tb_args.update(custom_args)
-        self.__default_tb_args = {k:v for k, v in self.__default_tb_args.items() if k in valid_setting_keys}
-
+            raise TypeError(f"You can only overwrite `{self.__class__.__name__}.tb_args` with a dict. " + \
+                            f"But got {type(custom_args)}.")
+        
+        valid_setting_keys = set(Table().__dict__.keys())
+        passin_keys = set(custom_args.keys())
+        invalid_keys = passin_keys - valid_setting_keys
+        if invalid_keys:
+            raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.table.Table`, " + \
+                           "refer to https://rich.readthedocs.io/en/latest/tables.html for valid args.")
+        self.tb_args.__dict__.update(custom_args)
+        
+        self.tb_args.mark_change()
+        
     @col_args.setter
     def col_args(self, custom_args:Dict[str, Any]):
         if not isinstance(custom_args, dict):
-            raise TypeError(f'The new value of `TabularRenderer.col_args` must be a dict. But got {type(custom_args)}.')
-
-        valid_setting_keys = tuple(Column().__dict__.keys())
-        self.__default_col_args.update(custom_args)
-        self.__default_col_args = {k:v for k, v in self.__default_col_args.items() if k in valid_setting_keys}
-
-    def __new_col(self, 
-                  df:DataFrame,
-                  col_name:str, 
-                  col_func:Callable[[Dict], Any],
-                  used_cols:List[str],
-                  return_type=None,
-                  col_idx:int = -1) -> DataFrame:
-        assert len(used_cols) > 0, 'You need to specify the columns used in the function for creating new columns, \
-                                     and pass them to `newcol_dependcol` as a list.'
-        for used_name in used_cols:
-            assert used_name in df.columns, f'Column `{used_name}` is not in the table.\nValid columns are {df.columns}.'
-
-        final_cols = df.columns[:]
-        col_idx = (col_idx if col_idx >= 0 else len(df.columns)+col_idx+1) % (len(df.columns)+1)
-        final_cols.insert(col_idx, col_name)
-
-        return df.with_columns(
-            struct(used_cols)
-            .map_elements(col_func, return_dtype=return_type)
-            .alias(col_name)
-        ).select(final_cols)
+            raise TypeError(f"You can only overwrite `{self.__class__.__name__}.col_args` with a dict. " + \
+                            f"But got {type(custom_args)}.")
+        
+        valid_setting_keys = set(Column().__dict__.keys())
+        passin_keys = set(custom_args.keys())
+        invalid_keys = passin_keys - valid_setting_keys
+        if invalid_keys:
+            raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.table.Column`, " + \
+                           "refer to https://rich.readthedocs.io/en/latest/columns.html for valid args.")
+        self.col_args.__dict__.update(custom_args)
+        
+        self.col_args.mark_change()
 
     def df2tb(self, df:DataFrame, show_raw:bool = False) -> Table:
         # create rich table
@@ -787,14 +610,15 @@ class TabularRenderer:
         tb = Table(*tb_fields)
 
         # apply overall display settings
-        tb.__dict__.update(self.tb_args)
+        tb.__dict__.update(self.tb_args.__dict__)
 
         # apply column settings to all columns
         for tb_col in tb.columns:
-            tb_col.__dict__.update(self.col_args)
+            tb_col.__dict__.update(self.col_args.__dict__)
+            tb_col.highlight = self.tb_args.highlight # compatiable with higher version of rich
         
         # collect each column's none replacing string
-        col_none_str = {col_name:getattr(df[col_name].drop_nulls().first(), 'none_str', '-') 
+        col_none_str = {col_name:getattr(df[col_name].drop_nulls()[0], 'none_str', '-') 
                         for col_name, col_type in df.schema.items()}
         
         # fill table
@@ -813,11 +637,16 @@ class TabularRenderer:
         return tb
 
     def clear(self, stat_name:Optional[str]=None):
-        if stat_name:
-            self.__stats_data[stat_name].clear()
+        if stat_name is not None and not isinstance(stat_name,str):
+            raise TypeError(f"`stat_name` must be a string or None, but got {type(stat_name)}.")
+            
+        valid_stat_name = self.opnode.statistics
+        if isinstance(stat_name,str):
+            if stat_name not in valid_stat_name:
+                raise ValueError(f"`{stat_name}` not in the supported statistics {valid_stat_name}.")
+            self.__stats_data[stat_name] = DataFrame()
         else:
-            for stat in self.__stats_data.values():
-                stat.clear()
+            self.__stats_data = {stat_name:DataFrame() for stat_name in valid_stat_name}
 
     def export(self, 
                df:DataFrame, 
@@ -826,20 +655,22 @@ class TabularRenderer:
                file_suffix:str='',
                raw_data:bool=False):
         
+        save_path = os.path.abspath(save_path)
+        
         # get save path
         if format is None:
             format = os.path.splitext(save_path)[-1]
-            assert '.' in format, 'File foramat unknown!\n' + \
-                                  f'Please specify a file path, not a dierectory path like {save_path}.\n' + \
-                                  f'Or specify a file format using `format=xxx`, now we support exporting to {self.valid_export_format} file.'
+            if '.' not in format:
+                raise ValueError(f"File foramat unknown! Please specify a file format like {save_path}.\n" + \
+                                 f"Or you can specify a file format using `format=xxx`, now we support exporting to {self.valid_export_format} file.")
                                   
         format = format.strip('.')
-        assert format in self.valid_export_format, \
-                f'`{format}` file is not supported, now we only support exporting {self.valid_export_format} file.'
+        if format not in self.valid_export_format:
+            raise ValueError(f"`{format}` file is not supported, now we only support exporting to {self.valid_export_format} file.")
         
-        _, file_path = perfect_savepath(origin_path=save_path,
-                                       target_ext=format,
-                                       default_filename=f'{self.opnode.name}_{file_suffix}') 
+        _, file_path = resolve_savepath(origin_path=save_path,
+                                        target_ext=format,
+                                        default_filename=f"{self.opnode.name}_{file_suffix}") 
         
         # deal with invalid data
         df = deepcopy(df)
@@ -849,7 +680,7 @@ class TabularRenderer:
         df = df.with_columns([
             col(col_name).map_elements(lambda s: getattr(s,'raw_data',s.val) if raw_data else str(s),
                                        return_dtype=float if raw_data else str)
-            for col_name, obj_cls in obj_cols.items()
+            for col_name in obj_cols.keys()
         ])            
         
         # export 
@@ -866,21 +697,19 @@ class TabularRenderer:
         
         # output saving message
         if file_suffix:
-            print(f'{file_suffix.capitalize()} data saved to [b magenta]{file_path}[/]')
+            print(f"{file_suffix.capitalize()} data saved to [b magenta]{file_path}[/]")
         else:
-            print(f'Data saved to [b magenta]{file_path}[/]')
+            print(f"Data saved to [b magenta]{file_path}[/]")
     
     def __call__(self,
-                 stat_name:str, 
+                 stat_name:str,
                  *, 
                  raw_data:bool=False,
                  pick_cols:List[str]=[],
+                 exclude_cols:List[str]=[],
                  custom_cols:Dict[str, str]={},
-                 table_settings:Dict[str, Any]={},
-                 column_settings:Dict[str, Any]={},
                  newcol_name:str='',
                  newcol_func:Callable[[Dict[str, Any]], Any]=lambda col_dict: col_dict,
-                 newcol_dependcol:List[str]=[],
                  newcol_type=None,
                  newcol_idx:int=-1,
                  save_to:Optional[str]=None,
@@ -888,55 +717,68 @@ class TabularRenderer:
         """render rich tabel according to the statistics dataframe.
         Note that `pick_cols` work before `custom_col`
         """
-        
-        assert isinstance(newcol_idx, int), f'`newcol_idx` must be an integer, but got {type(newcol_idx)}.'
-        assert stat_name in self.opnode.statistics, \
-            f"`{stat_name}` not in the supported statistics {self.opnode.statistics}"
-        
-        stat:"Statistic" = getattr(self.opnode, stat_name) # noqa # type: ignore
-        data:DataFrame = self.datas[stat_name]
 
-        valid_fields = data.columns or stat.tb_fields
+        if stat_name not in self.opnode.statistics:
+            raise ValueError(f"`{stat_name}` not in the supported statistics {self.opnode.statistics}.")
+        if not isinstance(newcol_idx, int):
+            raise ValueError(f"`newcol_idx` must be an integer, but got {type(newcol_idx)}.")
+        if not isinstance(custom_cols, dict):
+            raise ValueError(f"`custom_cols` must be a dict, but got {type(custom_cols)}.")
+        
+        data:DataFrame = self.__stats_data[stat_name]
+        valid_fields = data.columns or getattr(self.opnode, stat_name).tb_fields
     
         def __fill_cell(subject:"OperationNode", # noqa # type: ignore
                         pre_res=None):
-            if not subject.is_leaf:
+            if subject.node_id == '0':
                 return
 
             val_getter = attrgetter(*valid_fields)
 
             node_stat = getattr(subject, stat_name)
-
-            stat_infos = node_stat.detail_val
-            if stat_infos:
-                for rec in stat_infos: # rec: NamedTuple
-                    vals = val_getter(rec)
-                    val_collector.append(vals)
-            else:
-                val_collector.append(['-']*len(valid_fields))
+            
+            try:
+                stat_infos = node_stat.detail_val
+                if stat_infos:
+                    for rec in stat_infos: # rec: NamedTuple
+                        vals = val_getter(rec)
+                        val_collector.append(vals)
+            except RuntimeError:
+                nocall_nodes.append(f"({subject.node_id}){subject.name}")
 
         # only when the table is empty, then explore the data using dfs
         if data.is_empty():            
             val_collector = []
+            nocall_nodes = []
             dfs_task(dfs_subject=self.opnode,
                      adj_func=lambda x: x.childs.values(),
                      task_func=__fill_cell,
-                     visited_signal_func=lambda x: str(id(x)),
                      visited=[])
             
             data = DataFrame(data=val_collector, schema=valid_fields, orient='row')
-            self.datas[stat_name] = data
+            self.__stats_data[stat_name] = data
+            
+            if nocall_nodes:
+                warnings.warn(message=f"{', '.join(nocall_nodes)}\nThe modules above might be defined but not explicitly called. " + \
+                                       "They will be ignored in the measuring, so will not appear in the table below.",
+                              category=RuntimeWarning,)
         
         # pick columns, order defined by `pick_cols`
         if pick_cols:
-            invalid_cols = tuple(filter(lambda col_name:col_name not in data.columns, pick_cols))
-            assert not invalid_cols, f'Column names {invalid_cols} not found in supported columns {data.columns}.'
-            data = data.select(pick_cols)
+            invalid_cols = tuple(filter(lambda col_name:col_name not in valid_fields, pick_cols))
+            if invalid_cols:
+                raise ValueError(f"Column names {invalid_cols} not found in supported columns {data.columns}.")
+        else:
+            pick_cols = valid_fields
+        # not use set is to keep order
+        final_cols = [col_name for col_name in pick_cols if col_name not in exclude_cols] 
+        data = data.select(final_cols)
         
         # custom columns name, order defined by `custom_col`
         if custom_cols:
             invalid_cols = tuple(filter(lambda col_name:col_name not in data.columns, custom_cols.keys()))
-            assert not invalid_cols, f'Column names {invalid_cols} not found in supported columns {data.columns}.'
+            if invalid_cols:
+                raise ValueError(f"Column names {invalid_cols} not found in supported columns {data.columns}.")
             data = data.rename(custom_cols)
         
         # add new column
@@ -944,21 +786,18 @@ class TabularRenderer:
             data = self.__new_col(df=data,
                                   col_name=newcol_name,
                                   col_func=newcol_func,
-                                  used_cols=newcol_dependcol,
                                   return_type=newcol_type,
                                   col_idx=newcol_idx)
-            self.datas[stat_name] = data
+            self.__stats_data[stat_name] = data
 
-        self.tb_args = table_settings
-        self.col_args = column_settings
         tb = self.df2tb(df=data, show_raw=raw_data)
 
         if save_to:
             save_to = os.path.abspath(save_to)  
             if '.' not in os.path.basename(save_to):
-                assert save_format in self.valid_export_format, \
-                    f"Argument `save_format` must be one in {self.valid_export_format}, but got {save_format}\n" + \
-                    "Alternatively, you can set `save_to` to a concrete file path, like `path/to/file.xlsx`"
+                if save_format not in self.valid_export_format:
+                    raise ValueError(f"Argument `save_format` must be one in {self.valid_export_format}, but got {save_format}.\n" + \
+                                     "Alternatively, you can set `save_to` to a concrete file path, like `path/to/file.xlsx`")
             
             self.export(df=data,
                         save_path=save_to,
@@ -967,3 +806,20 @@ class TabularRenderer:
                         raw_data=raw_data)
 
         return tb, data
+    
+    def __new_col(self, 
+                  df:DataFrame,
+                  col_name:str, 
+                  col_func:Callable[[Dict], Any],
+                  return_type=None,
+                  col_idx:int = -1) -> DataFrame:
+
+        final_cols = df.columns[:]
+        col_idx = (col_idx if col_idx >= 0 else len(df.columns)+col_idx+1) % (len(df.columns)+1)
+        final_cols.insert(col_idx, col_name)
+
+        return df.with_columns(
+            struct(df.columns)
+            .map_elements(col_func, return_dtype=return_type)
+            .alias(col_name)
+        ).select(final_cols)
