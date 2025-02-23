@@ -10,6 +10,8 @@ from rich import box
 
 from torchmeter.utils import indent_str
 
+__all__ = ["get_config", "Config"]
+
 DEFAULT_FIELDS = ['render_interval',
                   'tree_fold_repeat', 'tree_repeat_block_args', 'tree_levels_args', 
                   'table_column_args','table_display_args', 
@@ -133,7 +135,8 @@ def dict_to_namespace(d):
     """
     Recursively converts a dictionary to a FlagNameSpace object.
     """
-    assert isinstance(d, dict), f"Input must be a dictionary, but got {type(d)}"
+    if not isinstance(d, dict):
+        raise TypeError(f"Input must be a dictionary, but got {type(d)}")
     
     ns = FlagNameSpace()
     for k, v in d.items():
@@ -165,7 +168,8 @@ def namespace_to_dict(ns, safe_resolve=False):
     """
     Recursively converts a FlagNameSpace object to a dictionary.
     """
-    assert isinstance(ns, SimpleNamespace), f"Input must be an instance of SimpleNamespace, but got {type(ns)}"
+    if not isinstance(ns, SimpleNamespace):
+        raise TypeError(f"Input must be an instance of SimpleNamespace, but got {type(ns)}")
 
     d = {}
     for k, v in ns.__dict__.items():
@@ -209,12 +213,14 @@ class FlagNameSpace(SimpleNamespace):
         self.mark_unchange()
             
     def __setattr__(self, key, value):
-        assert key != self.__flag_key, f"`{key}` is preserved for internal use, could never be changed."
+        if key == self.__flag_key:
+            raise AttributeError(f"`{key}` is preserved for internal use, could never be changed.")
         super().__setattr__(key, value)
         self.mark_change()
     
     def __delattr__(self, key):
-        assert key != self.__flag_key, f"`{key}` is preserved for internal use, can not be deleted."
+        if key == self.__flag_key:
+            raise AttributeError(f"`{key}` is preserved for internal use, could never be deleted.")
         super().__delattr__(key)
         self.mark_change()
     
@@ -263,13 +269,16 @@ class Config(metaclass=ConfigMeta):
     
     @config_file.setter
     def config_file(self, config_file:Optional[str]=None):
-        assert config_file is None or isinstance(config_file, str), \
-                f"You must pass in a string or None to change config or use the default config, \
-                  but got {type(config_file)}."
+        if config_file is not None and not isinstance(config_file, str):
+            raise TypeError("You must pass in a string or None to change config or use the default config, " + \
+                            f"but got {type(config_file)}.")
                 
         if config_file:
             config_file = os.path.abspath(config_file)
-            assert os.path.exists(config_file), f"Config file {config_file} does not exist."
+            if not os.path.isfile(config_file):
+                raise FileNotFoundError(f"Config file {config_file} does not exist.")
+            if not config_file.endswith('.yaml'):
+                raise ValueError(f"Config file must be a yaml file, but got {config_file}")
         
         self.__cfg_file = config_file
         self.__load()
@@ -331,15 +340,15 @@ class Config(metaclass=ConfigMeta):
         s = '• Config file: ' + (self.config_file if self.config_file else 'None(default setting below)') + '\n'
         for field_name, field_vals in d.items():
             not_container = False
-            field_vals_repr = [f'\n• {field_name}: ']
+            field_vals_repr = [f"\n• {field_name}: "]
             
             if isinstance(field_vals, dict):
-                field_vals_repr.extend([f'{k} = {v} ' for k,v in field_vals.items()])
+                field_vals_repr.extend([f"{k} = {v} " for k,v in field_vals.items()])
             elif isinstance(field_vals, list):
-                field_vals_repr.extend([f'- {v}' for v in field_vals])
+                field_vals_repr.extend([f"- {v}" for v in field_vals])
             else:
                 not_container = True
-                field_vals_repr.append(f'{field_vals}')
+                field_vals_repr.append(str(field_vals))
             
             # concat field name and field value if it is not a container
             if len(field_vals_repr) == 2 and not_container:

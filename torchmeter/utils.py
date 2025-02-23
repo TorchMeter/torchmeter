@@ -1,27 +1,35 @@
 import os
-import sys
-from rich import print
+from time import perf_counter
 from inspect import signature
 from functools import partial
-from typing import Any, Callable, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Iterable, List, Sequence, Tuple, Union
 
-def perfect_savepath(origin_path:str, 
-                     target_ext:Optional[str],
+from rich.status import Status
+
+__all__ = ["dfs_task", "dfs_task", "data_repr",
+           "Timer"]
+
+def resolve_savepath(origin_path:str, 
+                     target_ext:str,
                      default_filename:str='Data'):
     origin_path = os.path.abspath(origin_path)
     dir, file = os.path.split(origin_path)
-    if '.' in file: # specify a file path
+    
+    # origin_path is a file path
+    if '.' in file: 
         os.makedirs(dir, exist_ok=True)
         save_dir = dir
-        save_file = os.path.join(dir, os.path.splitext(file)[0]+f'.{target_ext}')
-    else: # specify a dir path
+        save_file = os.path.join(dir, os.path.splitext(file)[0]+f".{target_ext}")
+    
+    # origin_path is a dir path
+    else: 
         os.makedirs(origin_path, exist_ok=True)
         save_dir = origin_path
-        save_file = os.path.join(origin_path, f'{default_filename}.{target_ext}')
+        save_file = os.path.join(origin_path, f"{default_filename}.{target_ext}")
     
     return save_dir, save_file
 
-def check_args(func:Callable, *required_args:Tuple[str]) -> List:
+def hasargs(func:Callable, *required_args:Tuple[str]) -> None:
     """
     Check if the function `func` has all the required arguments.
 
@@ -32,37 +40,21 @@ def check_args(func:Callable, *required_args:Tuple[str]) -> List:
 
     Returns:
     ---
-        List: A list containing names of missing arguments.
-    
-    Example:
-    ---
-    ```python
-    def test_func(a, bb, c_c, d9):
-        pass
-
-    check_args(test_func, 'a', 'bb', 'c_c', 'd9') 
-    # >>> []
-
-    check_args(test_func, 'A', 'e') 
-    # >>> ['A', 'e']
-    ```
+        None
     """
     if not required_args:
-        return []
+        return 
         
     missing_args = [arg for arg in required_args 
                         if arg not in signature(func).parameters]
-    if missing_args:
-        print(f'[bold red]Missing following args in function `{func.__name__}()`:[/]')
-        for arg in missing_args:
-            print(f'[red][-] [bold]`{arg}`[/]')
     
-    return missing_args
+    if missing_args:
+        raise RuntimeError(f"Function `{func.__name__}()` is missing following required args: {missing_args}.")
 
 def dfs_task(dfs_subject:Any,
              adj_func:Callable[[Any], Iterable],
              task_func:Callable[[Any, Any], Any],
-             visited_signal_func:Callable[[Any], Any]=lambda x:x,
+             visited_signal_func:Callable[[Any], Any]=lambda x:id(x),
              *,
              visited:List=[]) -> Any: 
     """
@@ -132,13 +124,7 @@ def dfs_task(dfs_subject:Any,
         ```
     """
     
-    missing_args = check_args(task_func, 'subject', 'pre_res')
-    if missing_args:
-        print(f'[bold red]Argument `task_func` of `{dfs_task.__name__}()` should be passed in a function with two parameters:')
-        print('[bold red]1. [magenta]`subject`[/magenta]: the first argument, used to receive the currently traversed object[/]')
-        print('[bold red]2. [magenta]`pre_res`[/magenta]: the second argument, used to receive the result of the previous level task[/]')
-        sys.exit(1)
-    del missing_args
+    hasargs(task_func, 'subject', 'pre_res')
 
     visited_signal = visited_signal_func(dfs_subject)
     
@@ -155,42 +141,60 @@ def dfs_task(dfs_subject:Any,
     
     return task_res
 
-class Verboser:
-    def __init__(self, 
-                 enable:bool=True, 
-                 enter_text:str='',
-                 enter_args:dict={},
-                 exit_text:str='',
-                 exit_args:dict={}):
-        """
-        A context manager to print specific text when entering and exiting the context.
+def indent_str(s:Union[str, Sequence[str]], 
+               indent:int=4, 
+               guideline:bool=True,
+               process_first:bool=True) -> str:
+    res = []
+    split_lines = s.split('\n') if isinstance(s, str) else s
+    guideline = False if len(split_lines) == 1 else guideline
+    
+    for line in split_lines:
+        indent_line = '│' if guideline else ' ' 
+        indent_line += ' '*(indent-1) + str(line)
+        res.append(indent_line)
 
-        Args:
-        ---
-            - `enable` (bool, optional): Whether to enable the functionality. Defaults to True.
-            
-            - `enter_text` (str, optional): The text to print when entering the context. Defaults to ''.
-            
-            - `enter_args` (dict, optional): The arguments to pass to `rich.print()` when entering the manager. Defaults to {}.
-            
-            - `exit_text` (str, optional): The text to print when exiting the context. Defaults to ''.
-            
-            - `exit_args` (dict, optional): The arguments to pass to `rich.print()` when exiting the manager. Defaults to {}.
-        """
-        self.enable = enable
+    if not process_first:
+        res[0] = res[0][indent:]
+
+    if guideline:
+        res[-1] = '└─' + res[-1][2:]
+    
+    return '\n'.join(res)
+
+def data_repr(val:Any):
+    get_type = lambda val: type(val).__name__
+
+    item_repr = lambda val_type, val: (f"[dim]Shape[/]([b green]{list(val.shape)}[/])" if hasattr(val, 'shape') else f"[b green]{val}[/]") + f" [dim]<{val_type}>[/]"
+
+    val_type = get_type(val)
+    if isinstance(val, (list, tuple, set, dict)) and len(val) > 0:
+        if isinstance(val, dict):
+            inner_repr:List[str] = [f"{item_repr(get_type(k),k)}: {data_repr(v)}" for k, v in val.items()]
+        else:
+            inner_repr:List[str] = [data_repr(i) for i in val]
         
-        self.enter_text = enter_text
-        self.enter_args = enter_args
-        
-        self.exit_text = exit_text
-        self.exit_args = exit_args
+        res_repr = f"[dim]{val_type}[/]("
+        res_repr += ',\n'.join(inner_repr)
+        res_repr += ')'
+
+        return indent_str(res_repr, indent=len(f"{val_type}("), process_first=False)
+    
+    else:
+        return item_repr(val_type, val)
+
+class Timer(Status):
+    def __init__(self, task_desc:str,
+                 *args, **kwargs):
+        super(Timer, self).__init__(status=task_desc, *args, **kwargs)
+        self.task_desc = task_desc
     
     def __enter__(self):
-        if self.enable:
-            print(self.enter_text, **self.enter_args)
+        super().__enter__()
+        self.__start_time = perf_counter()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.enable:
-            print(self.exit_text, **self.exit_args)
-        return False
+        ellapsed_time = perf_counter() - self.__start_time
+        super().__exit__(exc_type, exc_val, exc_tb)
+        self.console.print(f"[b blue]Finish {self.task_desc} in [green]{ellapsed_time:.4f}[/green] seconds[/]")
