@@ -15,6 +15,8 @@ from torch.cuda import synchronize as cuda_sync
 from torchmeter.unit import UNIT_TYPE, auto_unit
 from torchmeter.unit import CountUnit, BinaryUnit, TimeUnit, SpeedUnit
 
+__all__ = ["ParamsMeter", "CalMeter", "MemMeter", "ITTPMeter"]
+
 OPN_TYPE = TypeVar("OperationNode")
 
 class UpperLinkData:
@@ -51,7 +53,7 @@ class UpperLinkData:
             base = auto_unit(self.val/self.access_cnt, self.__unit_sys)
         else:
             base = str(self.val/self.access_cnt)
-        return base + (f"[dim]\nx {self.access_cnt}[/]" if self.access_cnt > 1 else "")
+        return base + (f" [dim](×{self.access_cnt})[/]" if self.access_cnt > 1 else "")
 
 class MetricsData:
 
@@ -102,10 +104,10 @@ class MetricsData:
 class Statistics(ABC):
 
     def __new__(cls, *args, **kwargs):
-        assert hasattr(cls, 'detail_val_container'), \
-            f"Class '{cls.__name__}' must have the class attribute 'detail_val_container', which should be a NamedTuple"
-        assert hasattr(cls, 'overview_val_container'), \
-            f"Class '{cls.__name__}' must have the class attribute 'overview_val_container', which should be a NamedTuple"
+        if not hasattr(cls, 'detail_val_container'):
+            raise AttributeError(f"Class '{cls.__name__}' must have the class attribute 'detail_val_container', which should be a NamedTuple")
+        if not hasattr(cls, 'overview_val_container'):
+            raise AttributeError(f"Class '{cls.__name__}' must have the class attribute 'overview_val_container', which should be a NamedTuple")
         return super().__new__(cls)        
 
     @property
