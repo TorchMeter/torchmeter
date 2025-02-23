@@ -480,7 +480,7 @@ class TreeRenderer:
                     title = self.__resolve_argtext(text=getattr(self.repeat_block_args, 'title', ''), attr_owner=subject, 
                                                    loop_algebra=algebra)
                     repeat_block.__dict__.update({**self.repeat_block_args.__dict__, 
-                                                  'title':title, 
+                                                  'title':title,
                                                   'border_style': self.repeat_block_args.border_style + ' ' + self.repeat_block_args.style})
                     
                     # overwrite the label of the first node in repeat block 
