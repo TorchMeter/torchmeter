@@ -8,7 +8,7 @@ from rich.tree import Tree
 from torchmeter.utils import dfs_task, Timer
 from torchmeter.statistic import ParamsMeter, CalMeter, MemMeter, ITTPMeter
 
-__all__ = ('OperationNode', 'OperationTree')
+__all__ = ["OperationNode", "OperationTree"]
 
 class OperationNode:
    
@@ -65,7 +65,7 @@ class OperationNode:
         return self.__ittp
     
     def __repr__(self):
-        op_str = str(self.type) if self.is_leaf else str(self.operation)            
+        op_str = str(self.type) if not self.is_leaf else str(self.operation)            
         return f"{self.node_id} {self.name}: {op_str}"
     
 class OperationTree:
