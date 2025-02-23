@@ -1,6 +1,9 @@
 from typing import Union
 from enum import Enum, IntEnum, IntFlag, unique
 
+__all__ = ["CountUnit", "BinaryUnit", "TimeUnit", "SpeedUnit",
+           "auto_unit"]
+
 @unique
 class CountUnit(IntEnum):
     T:int = 1e12

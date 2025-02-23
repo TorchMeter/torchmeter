@@ -6,6 +6,9 @@ from typing import Any, Callable, Iterable, List, Sequence, Tuple, Union
 
 from rich.status import Status
 
+__all__ = ["dfs_task", "dfs_task", "data_repr",
+           "Timer"]
+
 def resolve_savepath(origin_path:str, 
                      target_ext:str,
                      default_filename:str='Data'):
@@ -45,7 +48,8 @@ def hasargs(func:Callable, *required_args:Tuple[str]) -> None:
     missing_args = [arg for arg in required_args 
                         if arg not in signature(func).parameters]
     
-    assert not missing_args, f"Function `{func.__name__}()` is missing follewing required args: {missing_args}."
+    if missing_args:
+        raise RuntimeError(f"Function `{func.__name__}()` is missing following required args: {missing_args}.")
 
 def dfs_task(dfs_subject:Any,
              adj_func:Callable[[Any], Iterable],
@@ -180,7 +184,7 @@ def data_repr(val:Any):
         return item_repr(val_type, val)
 
 class Timer(Status):
-    def __init__(self, /, task_desc:str,
+    def __init__(self, task_desc:str,
                  *args, **kwargs):
         super(Timer, self).__init__(status=task_desc, *args, **kwargs)
         self.task_desc = task_desc
