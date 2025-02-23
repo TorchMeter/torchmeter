@@ -1,6 +1,6 @@
 from inspect import signature
 from functools import partial
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Union
 
 import torch.nn as nn
 from tqdm import tqdm
@@ -14,6 +14,7 @@ from torch import Tensor
 from torch import device as tc_device
 
 from torchmeter.config import get_config
+from torchmeter.statistic import Statistics
 from torchmeter.engine import OperationTree
 from torchmeter.utils import indent_str, data_repr
 from torchmeter.display import TreeRenderer, TabularRenderer, render_perline
@@ -189,15 +190,20 @@ class Meter:
         # remove hooks after measurement
         list(map(lambda x:x.remove() if x is not None else None, hook_ls))
 
+        del pb
+
         return self.optree.root.ittp
 
     @property
     def model_info(self) -> "rich.text.Text": # noqa # type: ignore
         forward_args:Tuple[str] = tuple(signature(self.model.forward).parameters.keys())
-        ipt_dict = {forward_args[args_idx]: anony_ipt for args_idx, anony_ipt in enumerate(self.ipt['args'])}
-        ipt_dict.update(self.ipt['kwargs'])
-        ipt_repr = [f"{args_name} = {data_repr(args_val)}" for args_name, args_val in ipt_dict.items()]
-        ipt_repr = ',\n'.join(ipt_repr) 
+        if self._is_ipt_empty():
+            ipt_repr = "[dim]Not Provided\n(give an inference first)[/]"
+        else:
+            ipt_dict = {forward_args[args_idx]: anony_ipt for args_idx, anony_ipt in enumerate(self.ipt['args'])}
+            ipt_dict.update(self.ipt['kwargs'])
+            ipt_repr = [f"{args_name} = {data_repr(args_val)}" for args_name, args_val in ipt_dict.items()]
+            ipt_repr = ',\n'.join(ipt_repr) 
 
         infos = '\n'.join([
             f"• [b]Model    :[/b] {self.optree.root.name}",
@@ -223,9 +229,16 @@ class Meter:
         else:
             raise ValueError(f"Invalid node_id: {node_id}. Use `Meter(your_model).subnodes` to check valid ones.")
 
-    def stat_info(self, stat_name:str):
-        stat = getattr(self, stat_name)
+    def stat_info(self, stat_or_statname:Union[str, Statistics]):
+        if isinstance(stat_or_statname, str):
+            stat = getattr(self, stat_or_statname)
+        elif isinstance(stat_or_statname, Statistics):
+            stat = stat_or_statname
+        else:
+            raise TypeError(f"Invalid type for stat_or_statname: {type(stat_or_statname)}. " + \
+                            "Please pass in the statistics name or the statistics object itself.")
 
+        stat_name = stat.name
         infos:List[str] = [f"• [b]Statistics:[/b] {stat_name}"]
         if stat_name == 'ittp':
             infos.append(f"• [b]Benchmark Times:[/b] {self.ittp_benchmark_time}")
@@ -285,7 +298,8 @@ class Meter:
 
         TREE_TABLE_GAP = __cfg__.combine.horizon_gap # the horizontal gap between tree and table
         
-        tb, data = self.table_renderer(stat=getattr(self,stat_name), **tb_kwargs)
+        stat = getattr(self, stat_name)
+        tb, data = self.table_renderer(stat_name=stat_name, **tb_kwargs)
         
         if not show:
             return tb, data
@@ -327,7 +341,7 @@ class Meter:
                          expand=True)
         
         model_info = self.model_info
-        stat_info = self.stat_info(stat_name=stat_name)
+        stat_info = self.stat_info(stat_or_statname=stat)
         model_info.style = 'dim'
         stat_info.style = 'dim'
         footer.add_renderable(model_info)
@@ -345,11 +359,14 @@ class Meter:
         origin_height = console.height
         console.width = main_content_width
         console.height = main_content_height + footer_height
-
-        render_perline(renderable=canvas, console=console)
-
-        console.width = origin_width
-        console.height = origin_height
+        
+        try: 
+            render_perline(renderable=canvas, console=console)
+        finally:
+            # if user interupt the display in case that render_interval > 0
+            # still restore the console size
+            console.width = origin_width
+            console.height = origin_height
         
         return tb, data
 

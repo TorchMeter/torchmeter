@@ -702,7 +702,7 @@ class TabularRenderer:
             print(f"Data saved to [b magenta]{file_path}[/]")
     
     def __call__(self,
-                 stat:"Statistic",  # noqa # type: ignore
+                 stat_name:str,
                  *, 
                  raw_data:bool=False,
                  pick_cols:List[str]=[],
@@ -718,8 +718,6 @@ class TabularRenderer:
         Note that `pick_cols` work before `custom_col`
         """
 
-        stat_name:"Statistic" = stat.name  # noqa # type: ignore
-
         if stat_name not in self.opnode.statistics:
             raise ValueError(f"`{stat_name}` not in the supported statistics {self.opnode.statistics}.")
         if not isinstance(newcol_idx, int):
@@ -728,8 +726,7 @@ class TabularRenderer:
             raise ValueError(f"`custom_cols` must be a dict, but got {type(custom_cols)}.")
         
         data:DataFrame = self.__stats_data[stat_name]
-
-        valid_fields = data.columns or stat.tb_fields
+        valid_fields = data.columns or getattr(self.opnode, stat_name).tb_fields
     
         def __fill_cell(subject:"OperationNode", # noqa # type: ignore
                         pre_res=None):
