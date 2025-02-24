@@ -11,7 +11,7 @@ __all__ = ["dfs_task", "dfs_task", "data_repr",
 
 def resolve_savepath(origin_path:str, 
                      target_ext:str,
-                     default_filename:str='Data'):
+                     default_filename:str='Data') -> Tuple[str, str]:
     origin_path = os.path.abspath(origin_path)
     dir, file = os.path.split(origin_path)
     
@@ -29,7 +29,7 @@ def resolve_savepath(origin_path:str,
     
     return save_dir, save_file
 
-def hasargs(func:Callable, *required_args:Tuple[str]) -> None:
+def hasargs(func:Callable, *required_args:str) -> None:
     """
     Check if the function `func` has all the required arguments.
 
@@ -130,12 +130,12 @@ def dfs_task(dfs_subject:Any,
     
     if visited_signal not in visited:
         visited.append(visited_signal)
-        task_res = task_func(subject=dfs_subject)
+        task_res = task_func(subject=dfs_subject)   # type: ignore
         
         for adj in adj_func(dfs_subject): 
-            dfs_task(dfs_subject=adj, 
+            dfs_task(dfs_subject=adj,  
                      adj_func=adj_func,
-                     task_func=partial(task_func, pre_res=task_res),
+                     task_func=partial(task_func, pre_res=task_res), # type: ignore
                      visited_signal_func=visited_signal_func, 
                      visited=visited)
     
@@ -162,7 +162,7 @@ def indent_str(s:Union[str, Sequence[str]],
     
     return '\n'.join(res)
 
-def data_repr(val:Any):
+def data_repr(val:Any) -> str:
     get_type = lambda val: type(val).__name__
 
     item_repr = lambda val_type, val: (f"[dim]Shape[/]([b green]{list(val.shape)}[/])" if hasattr(val, 'shape') else f"[b green]{val}[/]") + f" [dim]<{val_type}>[/]"
@@ -172,7 +172,7 @@ def data_repr(val:Any):
         if isinstance(val, dict):
             inner_repr:List[str] = [f"{item_repr(get_type(k),k)}: {data_repr(v)}" for k, v in val.items()]
         else:
-            inner_repr:List[str] = [data_repr(i) for i in val]
+            inner_repr = [data_repr(i) for i in val]
         
         res_repr = f"[dim]{val_type}[/]("
         res_repr += ',\n'.join(inner_repr)
@@ -184,9 +184,9 @@ def data_repr(val:Any):
         return item_repr(val_type, val)
 
 class Timer(Status):
-    def __init__(self, task_desc:str,
-                 *args, **kwargs):
-        super(Timer, self).__init__(status=task_desc, *args, **kwargs)
+    def __init__(self, task_desc:str, 
+                 *args, **kwargs) -> None:
+        super(Timer, self).__init__(status=task_desc, *args, **kwargs) # type: ignore
         self.task_desc = task_desc
     
     def __enter__(self):

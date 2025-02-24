@@ -1,41 +1,54 @@
-from inspect import signature
-from functools import partial
-from typing import Any, Dict, List, Tuple, Union
+from __future__ import annotations
+from typing import TYPE_CHECKING
 
 import torch.nn as nn
-from tqdm import tqdm
 from rich import get_console
-from rich.rule import Rule
-from rich.panel import Panel
-from rich.layout import Layout
 from rich.columns import Columns
-from rich.box import HORIZONTALS
 from torch import Tensor
 from torch import device as tc_device
 
 from torchmeter.config import get_config
 from torchmeter.statistic import Statistics
-from torchmeter.engine import OperationTree
-from torchmeter.utils import indent_str, data_repr
-from torchmeter.display import TreeRenderer, TabularRenderer, render_perline
+from torchmeter.display import render_perline
 
-__cfg__ = get_config()
+if TYPE_CHECKING:
+    import sys
+    from typing import Any, Dict, List, Tuple, Union
+    
+    from rich.tree import Tree
+    from rich.text import Text
+
+    from torchmeter.config import FlagNameSpace
+    from torchmeter.statistic import ParamsMeter, CalMeter, MemMeter, ITTPMeter
+    
+    if sys.version_info >= (3, 8):
+        from typing import TypedDict
+    else:
+        from typing_extensions import TypedDict
+
+    class IPT_TYPE(TypedDict):
+        args: Tuple[Any, ...]
+        kwargs: Dict[str, Any]
 
 __all__ = ["Meter"]
+__cfg__ = get_config()
 
 class Meter:
 
     def __init__(self, 
                  model: nn.Module,
-                 device:str='cpu') -> None:
+                 device:Union[str, tc_device]='cpu') -> None:
         
+        from torchmeter.engine import OperationTree
+        from torchmeter.display import TreeRenderer, TabularRenderer
+
         self.__device = tc_device(device)
 
         if not isinstance(model, nn.Module):
             raise TypeError(f"model must be a nn.Module, but got {type(model)}.")
         self.model = model.to(self.__device)
 
-        self.ipt = {'args':tuple(), 'kwargs':dict()} # TODO: self.ipt_infer()
+        self.ipt:IPT_TYPE = {'args':tuple(), 'kwargs':dict()} # TODO: self.ipt_infer()
 
         self.optree = OperationTree(self.model)
 
@@ -65,39 +78,39 @@ class Meter:
             self._ipt2device()
 
     @property
-    def tree_levels_args(self):
+    def tree_levels_args(self) -> FlagNameSpace:
         return self.tree_renderer.tree_levels_args
     
     @tree_levels_args.setter
     def tree_levels_args(self, custom_args:Dict[Any, Dict[str, Any]]) -> None:
-        self.tree_renderer.tree_levels_args = custom_args
+        self.tree_renderer.tree_levels_args = custom_args   # type: ignore
 
     @property
-    def tree_repeat_block_args(self):
+    def tree_repeat_block_args(self) -> FlagNameSpace:
         return self.tree_renderer.repeat_block_args
     
     @tree_repeat_block_args.setter
     def tree_repeat_block_args(self, custom_args:Dict[str, Any]) -> None:
-        self.tree_renderer.repeat_block_args = custom_args
+        self.tree_renderer.repeat_block_args = custom_args # type: ignore
 
     @property
-    def table_display_args(self):
+    def table_display_args(self) -> FlagNameSpace:
         return self.table_renderer.tb_args
 
     @table_display_args.setter
     def table_display_args(self, custom_args:Dict[str, Any]) -> None:
-        self.table_renderer.tb_args = custom_args
+        self.table_renderer.tb_args = custom_args       # type: ignore
 
     @property
-    def table_column_args(self):
+    def table_column_args(self) -> FlagNameSpace:
         return self.table_renderer.col_args
 
     @table_column_args.setter
     def table_column_args(self, custom_args:Dict[str, Any]) -> None:
-        self.table_renderer.col_args = custom_args
+        self.table_renderer.col_args = custom_args      # type: ignore
 
     @property
-    def structure(self):
+    def structure(self) -> Tree:
         fold_repeat = __cfg__.tree_fold_repeat
         
         is_rpbk_change = __cfg__.tree_repeat_block_args.is_change()
@@ -121,7 +134,7 @@ class Meter:
         return rendered_tree
 
     @property
-    def param(self):
+    def param(self) -> ParamsMeter:
         if not self.__measure_param:
             list(map(lambda node: node.param.measure(), self.optree.all_nodes))
             self.__measure_param = True
@@ -129,7 +142,7 @@ class Meter:
         return self.optree.root.param
     
     @property
-    def cal(self):
+    def cal(self) -> CalMeter:
         if not self.__measure_cal:
             if self._is_ipt_empty():
                 raise RuntimeError("Input unknown! You should perform at least one feed-forward inference before measuring calculation!") 
@@ -148,7 +161,7 @@ class Meter:
         return self.optree.root.cal
 
     @property
-    def mem(self):
+    def mem(self) -> MemMeter:
         if not self.__measure_mem:
             if self._is_ipt_empty():
                 raise RuntimeError("Input unknown! You should perform at least one feed-forward inference before measuring the memory cost!") 
@@ -167,9 +180,13 @@ class Meter:
         return self.optree.root.mem
 
     @property
-    def ittp(self):
+    def ittp(self) -> ITTPMeter:
+
+        from tqdm import tqdm
+
         if self._is_ipt_empty():
-            raise RuntimeError("Input unknown! You should perform at least one feed-forward inference before measuring the inference time or throughput!") 
+            raise RuntimeError("Input unknown! " + \
+                               "You should perform at least one feed-forward inference before measuring the inference time or throughput!") 
 
         self._ipt2device()
 
@@ -195,15 +212,18 @@ class Meter:
         return self.optree.root.ittp
 
     @property
-    def model_info(self) -> "rich.text.Text": # noqa # type: ignore
-        forward_args:Tuple[str] = tuple(signature(self.model.forward).parameters.keys())
+    def model_info(self) -> Text:
+        from inspect import signature
+        from torchmeter.utils import indent_str, data_repr
+
+        forward_args:Tuple[str, ...] = tuple(signature(self.model.forward).parameters.keys())
         if self._is_ipt_empty():
             ipt_repr = "[dim]Not Provided\n(give an inference first)[/]"
         else:
             ipt_dict = {forward_args[args_idx]: anony_ipt for args_idx, anony_ipt in enumerate(self.ipt['args'])}
             ipt_dict.update(self.ipt['kwargs'])
-            ipt_repr = [f"{args_name} = {data_repr(args_val)}" for args_name, args_val in ipt_dict.items()]
-            ipt_repr = ',\n'.join(ipt_repr) 
+            ipt_repr_ls = [f"{args_name} = {data_repr(args_val)}" for args_name, args_val in ipt_dict.items()] 
+            ipt_repr = ',\n'.join(ipt_repr_ls) 
 
         infos = '\n'.join([
             f"• [b]Model    :[/b] {self.optree.root.name}",
@@ -219,7 +239,7 @@ class Meter:
     def subnodes(self) -> List[str]:
         return [f"({node.node_id}) {node.name}" for node in self.optree.all_nodes]
 
-    def rebase(self, node_id:str) -> "Meter":
+    def rebase(self, node_id:str) -> Meter:
         id_generator = ( (node_idx, node.node_id) for node_idx, node in enumerate(self.optree.all_nodes) )
 
         for idx, valid_id in id_generator:
@@ -229,7 +249,7 @@ class Meter:
         else:
             raise ValueError(f"Invalid node_id: {node_id}. Use `Meter(your_model).subnodes` to check valid ones.")
 
-    def stat_info(self, stat_or_statname:Union[str, Statistics]):
+    def stat_info(self, stat_or_statname:Union[str, Statistics]) -> Text:
         if isinstance(stat_or_statname, str):
             stat = getattr(self, stat_or_statname)
         elif isinstance(stat_or_statname, Statistics):
@@ -239,21 +259,25 @@ class Meter:
                             "Please pass in the statistics name or the statistics object itself.")
 
         stat_name = stat.name
-        infos:List[str] = [f"• [b]Statistics:[/b] {stat_name}"]
+        infos_ls:List[str] = [f"• [b]Statistics:[/b] {stat_name}"]
         if stat_name == 'ittp':
-            infos.append(f"• [b]Benchmark Times:[/b] {self.ittp_benchmark_time}")
-        infos.extend([
+            infos_ls.append(f"• [b]Benchmark Times:[/b] {self.ittp_benchmark_time}")
+        infos_ls.extend([
             f"• [b]{k}:[/b] {v}" for k, v in stat.crucial_data.items()
         ])
                     
-        infos = '\n'.join(infos)
+        infos = '\n'.join(infos_ls)
         
         console = get_console()
         return console.render_str(infos)
 
-    def overview(self, *order:Tuple[str]) -> Columns:
+    def overview(self, *order:str) -> Columns:
         """Overview of all statistics"""
         
+        from functools import partial
+        from rich.panel import Panel
+        from rich.box import HORIZONTALS
+
         order = order or self.optree.root.statistics
         
         invalid_stat = tuple(filter(lambda x: x not in self.optree.root.statistics, order))
@@ -296,6 +320,9 @@ class Meter:
         
         """
 
+        from rich.rule import Rule
+        from rich.layout import Layout
+
         TREE_TABLE_GAP = __cfg__.combine.horizon_gap # the horizontal gap between tree and table
         
         stat = getattr(self, stat_name)
@@ -327,7 +354,7 @@ class Meter:
             main_content = Layout()
             main_content.split_row(Layout(tree, name='left', size=tree_width + TREE_TABLE_GAP),
                                    Layout(tb, name='right', size=actual_tb_width))
-            tree_height = len(console.render_lines(tree))
+            tree_height = len(console.render_lines(tree)) # type: ignore
         
         temp_options = console.options.update_width(actual_tb_width) 
         tb_height = len(console.render_lines(tb, options=temp_options))
@@ -335,7 +362,7 @@ class Meter:
         main_content_width = tree_width + actual_tb_width + (0 if no_tree else TREE_TABLE_GAP)
 
         # get footer content
-        footer = Columns(title=Rule('[gray54]s u m m a r y[/]', characters='-', style='gray54'),
+        footer = Columns(title=Rule('[gray54]s u m m a r y[/]', characters='-', style='gray54'), # type: ignore
                          padding=(1,1),
                          equal=True, 
                          expand=True)
@@ -361,7 +388,7 @@ class Meter:
         console.height = main_content_height + footer_height
         
         try: 
-            render_perline(renderable=canvas, console=console)
+            render_perline(renderable=canvas)
         finally:
             # if user interupt the display in case that render_interval > 0
             # still restore the console size

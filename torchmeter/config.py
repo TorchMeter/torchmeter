@@ -1,7 +1,9 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import os
 import warnings
 from threading import Lock
-from typing import Optional
 from enum import Enum, unique
 from types import SimpleNamespace
 
@@ -9,6 +11,22 @@ import yaml
 from rich import box
 
 from torchmeter.utils import indent_str
+
+if TYPE_CHECKING:
+    import sys
+
+    if sys.version_info >= (3, 10):
+        from typing import TypeAlias
+    else:
+        from typing_extensions import TypeAlias
+
+    from typing import Any, Dict, Optional, Sequence, Union, List
+
+    CFG_CONTENT_TYPE: TypeAlias = Union[
+        int, float, str, bool, None,
+        Sequence["CFG_CONTENT_TYPE"],
+        Dict[str, "CFG_CONTENT_TYPE"]
+    ]
 
 __all__ = ["get_config", "Config"]
 
@@ -131,7 +149,7 @@ UNSAFE_KV = {
 }
 
 
-def dict_to_namespace(d):
+def dict_to_namespace(d: Dict[str, Any]) -> FlagNameSpace:
     """
     Recursively converts a dictionary to a FlagNameSpace object.
     """
@@ -164,14 +182,14 @@ def dict_to_namespace(d):
             
     return ns
 
-def namespace_to_dict(ns, safe_resolve=False):
+def namespace_to_dict(ns, safe_resolve=False) -> Dict[str, CFG_CONTENT_TYPE]:
     """
     Recursively converts a FlagNameSpace object to a dictionary.
     """
     if not isinstance(ns, SimpleNamespace):
         raise TypeError(f"Input must be an instance of SimpleNamespace, but got {type(ns)}")
 
-    d = {}
+    d:Dict[str, CFG_CONTENT_TYPE] = {}
     for k, v in ns.__dict__.items():
         # transform the unrepresent value to its name defined in corresponding Enum
         if k in UNSAFE_KV and safe_resolve:
@@ -181,7 +199,7 @@ def namespace_to_dict(ns, safe_resolve=False):
             d[k] = namespace_to_dict(v, safe_resolve=safe_resolve)
             
         elif isinstance(v, list):
-            _list = []
+            _list: List[CFG_CONTENT_TYPE] = []
             for item in v:
                 if isinstance(item, SimpleNamespace):
                     _list.append(namespace_to_dict(item, safe_resolve=safe_resolve))
@@ -194,7 +212,7 @@ def namespace_to_dict(ns, safe_resolve=False):
             
     return d
 
-def get_config():
+def get_config() -> Config:
     cfg_file = os.environ.get('TORCHMETER_CONFIG', None)
     return Config(config_file=cfg_file)
 
@@ -202,7 +220,7 @@ class FlagNameSpace(SimpleNamespace):
     
     __flag_key = '__FLAG'
     
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
         
         cnt = 1
@@ -212,7 +230,7 @@ class FlagNameSpace(SimpleNamespace):
         
         self.mark_unchange()
             
-    def __setattr__(self, key, value):
+    def __setattr__(self, key: str, value: Any) -> None:
         if key == self.__flag_key:
             raise AttributeError(f"`{key}` is preserved for internal use, could never be changed.")
         super().__setattr__(key, value)
@@ -224,17 +242,17 @@ class FlagNameSpace(SimpleNamespace):
         super().__delattr__(key)
         self.mark_change()
     
-    def is_change(self):
+    def is_change(self) -> bool:
         res = getattr(self, self.__flag_key) or \
               any(args.is_change() for args in self.__dict__.values() 
                     if isinstance(args, self.__class__))
         self.__dict__[self.__flag_key] = res
         return res
     
-    def mark_change(self):
+    def mark_change(self) -> None:
         self.__dict__[self.__flag_key] = True
     
-    def mark_unchange(self):
+    def mark_unchange(self) -> None:
         self.__dict__[self.__flag_key] = False
         list(map(lambda x: x.mark_unchange() if isinstance(x, self.__class__) else None, 
                  self.__dict__.values()))        
@@ -245,7 +263,7 @@ class ConfigMeta(type):
     _instances = None
     _thread_lock = Lock()
 
-    def __call__(cls, *args, **kwargs):
+    def __call__(cls, *args, **kwargs) -> Config:
         with cls._thread_lock:
             if cls._instances is None:
                 instance = super().__call__(*args, **kwargs)
@@ -256,19 +274,27 @@ class Config(metaclass=ConfigMeta):
     
     """You can only read or write the predefined fields in the instance"""
     
+    render_interval: float
+    tree_fold_repeat: bool
+    tree_repeat_block_args: FlagNameSpace
+    tree_levels_args: FlagNameSpace
+    table_column_args: FlagNameSpace
+    table_display_args: FlagNameSpace
+    combine: FlagNameSpace
+
     __slots__ = DEFAULT_FIELDS + ['__cfg_file']
     
-    def __init__(self, config_file:Optional[str]=None):
+    def __init__(self, config_file:Optional[str]=None) -> None:
         self.__cfg_file = None
         
         self.config_file = config_file
     
     @property
-    def config_file(self):
+    def config_file(self) -> Optional[str]:
         return self.__cfg_file
     
     @config_file.setter
-    def config_file(self, config_file:Optional[str]=None):
+    def config_file(self, config_file:Optional[str]=None) -> None:
         if config_file is not None and not isinstance(config_file, str):
             raise TypeError("You must pass in a string or None to change config or use the default config, " + \
                             f"but got {type(config_file)}.")
@@ -284,7 +310,7 @@ class Config(metaclass=ConfigMeta):
         self.__load()
         self.check_integrity()
             
-    def __load(self):
+    def __load(self) -> None:
         if self.config_file is None:
             raw_data = yaml.safe_load(DEFAULT_CFG)
         else:
@@ -297,11 +323,11 @@ class Config(metaclass=ConfigMeta):
                 continue
             setattr(self, field, getattr(ns, field))          
 
-    def restore(self):
+    def restore(self) -> None:
         self.__load()
         self.check_integrity()
 
-    def check_integrity(self):
+    def check_integrity(self) -> None:
         default_cfg = yaml.safe_load(DEFAULT_CFG)
         for field in DEFAULT_FIELDS:
             if not hasattr(self, field):
@@ -310,8 +336,8 @@ class Config(metaclass=ConfigMeta):
                 ns = dict_to_namespace({field:default_cfg[field]})
                 setattr(self, field, getattr(ns, field))
     
-    def asdict(self, safe_resolve=False):
-        d = {}
+    def asdict(self, safe_resolve=False) -> Dict[str, CFG_CONTENT_TYPE]:
+        d:Dict[str, CFG_CONTENT_TYPE] = {}
         for field in DEFAULT_FIELDS:
             field_val = getattr(self, field)
             if isinstance(field_val, SimpleNamespace):
@@ -326,7 +352,7 @@ class Config(metaclass=ConfigMeta):
                 d[field] = field_val
         return d
     
-    def dump(self, save_path:str):
+    def dump(self, save_path:str) -> None:
         d = self.asdict(safe_resolve=True)
 
         with open(save_path, 'w') as f:
@@ -334,7 +360,7 @@ class Config(metaclass=ConfigMeta):
                            indent=2, sort_keys=False,
                            encoding='utf-8', allow_unicode=True)        
     
-    def __repr__(self):
+    def __repr__(self) -> str:
         d = self.asdict(safe_resolve=True)
 
         s = '• Config file: ' + (self.config_file if self.config_file else 'None(default setting below)') + '\n'

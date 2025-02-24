@@ -1,9 +1,11 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 from time import perf_counter
 from collections import namedtuple
 from abc import ABC, abstractmethod
 from operator import attrgetter, mul
 from functools import reduce, partial
-from typing import Any, Callable, Dict, List, NamedTuple, Optional, TypeVar, Tuple
 
 import numpy as np
 import torch.nn as nn
@@ -12,12 +14,31 @@ from torch import no_grad, Tensor
 from torch.cuda import Event as cuda_event
 from torch.cuda import synchronize as cuda_sync
 
-from torchmeter.unit import UNIT_TYPE, auto_unit
+from torchmeter.unit import auto_unit
 from torchmeter.unit import CountUnit, BinaryUnit, TimeUnit, SpeedUnit
 
-__all__ = ["ParamsMeter", "CalMeter", "MemMeter", "ITTPMeter"]
+if TYPE_CHECKING:
+    from typing import Any, Callable, Dict, List
+    from typing import Optional, Tuple, Union, Type, NamedTuple, Sequence
 
-OPN_TYPE = TypeVar("OperationNode")
+    from tqdm import tqdm
+    from numpy.typing import NDArray
+    from torch import device as tc_device
+    from torch.utils.hooks import RemovableHandle
+
+    from torchmeter.engine import OperationNode
+
+    UNIT_TYPE = Optional[Union[Type[CountUnit], 
+                               Type[BinaryUnit], 
+                               Type[TimeUnit], 
+                               Type[SpeedUnit]]]
+
+    SEQ_DATA = NDArray[Union[np.int_, np.float_]]
+
+    FLOAT = Union[float, np.float_]
+    SEQ_FUNC = Callable[[SEQ_DATA], FLOAT]
+
+__all__ = ["ParamsMeter", "CalMeter", "MemMeter", "ITTPMeter"]
 
 class UpperLinkData:
 
@@ -25,9 +46,9 @@ class UpperLinkData:
                  '__parent_data', '__unit_sys']
 
     def __init__(self, 
-                 val:int=0, parent_data:Optional["UpperLinkData"]=None,
-                 unit_sys:Optional[UNIT_TYPE]=None,
-                 none_str:str='-'):
+                 val:int=0, parent_data:Optional[UpperLinkData]=None,
+                 unit_sys:UNIT_TYPE=None,
+                 none_str:str='-') -> None:
         self.val = val
         self.__parent_data = parent_data    
         self.__unit_sys = unit_sys
@@ -35,20 +56,20 @@ class UpperLinkData:
         self.none_str = none_str # Use when there is a "None" in the column where this data is located while rendering the table.
     
     @property
-    def raw_data(self):
+    def raw_data(self) -> float:
         return float(self.val)
     
-    def __iadd__(self, other):
+    def __iadd__(self, other) -> UpperLinkData:
         self.val += other
         self.__upper_update(other)
         # self.access_cnt += 1
         return self
     
-    def __upper_update(self, other:int):
+    def __upper_update(self, other:int) -> None:
         if self.__parent_data is not None:
             self.__parent_data += other
     
-    def __repr__(self):
+    def __repr__(self) -> str:
         if self.__unit_sys is not None:
             base = auto_unit(self.val/self.access_cnt, self.__unit_sys)
         else:
@@ -61,40 +82,40 @@ class MetricsData:
                  '__unit_sys', 'none_str']
 
     def __init__(self, 
-                 reduce_func:Optional[Callable]=np.mean, 
-                 unit_sys:Optional[UNIT_TYPE]=CountUnit,
-                 none_str:str='-'):
-        self.vals = np.array([])
+                 reduce_func:Optional[SEQ_FUNC]=np.mean, 
+                 unit_sys:UNIT_TYPE=CountUnit,
+                 none_str:str='-') -> None:
+        self.vals:SEQ_DATA = np.array([])
         self.reduce_func = reduce_func if reduce_func is not None else np.mean
         self.__unit_sys = unit_sys
         self.none_str = none_str
 
     @property
-    def metrics(self):
+    def metrics(self) -> FLOAT:
         return self.reduce_func(self.vals) if self.vals.any() else 0.
     
     @property
-    def iqr(self):
+    def iqr(self) -> FLOAT:
         if self.vals.any():
             return np.percentile(self.vals, 75) - np.percentile(self.vals, 25)
         else:
             return 0.
     
     @property
-    def val(self) -> Tuple[float, float]:
+    def val(self) -> Tuple[FLOAT, FLOAT]:
         return self.metrics, self.iqr
     
     @property
-    def raw_data(self):
+    def raw_data(self) -> FLOAT:
         return self.metrics
     
-    def append(self, new_val:Any):
+    def append(self, new_val:Any) -> None:
         self.vals = np.append(self.vals, new_val)
 
-    def clear(self):
+    def clear(self) -> None:
         self.vals = np.array([])
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if self.__unit_sys is not None:
             return f"{auto_unit(self.metrics, self.__unit_sys)}" + ' ± ' + \
                    f"{auto_unit(self.iqr, self.__unit_sys)}"
@@ -102,6 +123,9 @@ class MetricsData:
             return f"{self.metrics:.2f} ± {self.iqr:.2f}"
 
 class Statistics(ABC):
+
+    detail_val_container: NamedTuple
+    overview_val_container: NamedTuple
 
     def __new__(cls, *args, **kwargs):
         if not hasattr(cls, 'detail_val_container'):
@@ -135,22 +159,22 @@ class Statistics(ABC):
         ...
 
     @abstractmethod
-    def measure(self):
+    def measure(self, *args, **kwargs):
         """To measure the statistics"""
         ...
 
     @property
-    def tb_fields(self) -> Tuple[str]:
+    def tb_fields(self) -> Tuple[str,...]:
         return self.detail_val_container._fields
     
     @property
-    def ov_fields(self) -> Tuple[str]:
+    def ov_fields(self) -> Tuple[str,...]:
         return self.overview_val_container._fields
     
     def init_linkdata(self,
                       attr_name:str,
                       init_val:int=0,
-                      opparent:Optional[OPN_TYPE]=None,
+                      opparent:Optional[OperationNode]=None,
                       **kwargs) -> UpperLinkData:
         if opparent is None:
             link_data = UpperLinkData(val=init_val, **kwargs)
@@ -161,7 +185,7 @@ class Statistics(ABC):
                                       **kwargs)
         return link_data
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         repr_str = self.val.__class__.__name__ + '\n'
 
         max_len = max(len(f) for f in self.ov_fields)
@@ -177,31 +201,28 @@ class Statistics(ABC):
 
 class ParamsMeter(Statistics):
 
-    detail_val_container:NamedTuple = namedtuple(typename='Params_INFO', 
-                                                 defaults=(None,)*6,
-                                                 field_names=['Operation_Id', 
-                                                              'Operation_Name',
-                                                              'Operation_Type',
-                                                              'Param_Name', 
-                                                              'Requires_Grad', 
-                                                              'Numeric_Num'],)
+    detail_val_container = namedtuple(      # type: ignore
+        typename='Params_INFO', 
+        field_names=['Operation_Id', 'Operation_Name', 'Operation_Type', 
+                     'Param_Name', 'Requires_Grad', 'Numeric_Num'],
+        defaults=[None]*6                   # type: ignore
+    )
     
-    overview_val_container:NamedTuple = namedtuple(typename='Params_INFO', 
-                                                   defaults=(None,)*5,
-                                                   field_names=['Operation_Id', 
-                                                                'Operation_Name',
-                                                                'Operation_Type',
-                                                                'Total_Params', 
-                                                                'Learnable_Params'])
+    overview_val_container = namedtuple(    # type: ignore
+        typename='Params_INFO', 
+        field_names=['Operation_Id', 'Operation_Name', 'Operation_Type', 
+                     'Total_Params', 'Learnable_Params'],
+        defaults=[None]*5                   # type: ignore
+    )
 
-    def __init__(self, opnode: OPN_TYPE):
+    def __init__(self, opnode: OperationNode) -> None:
         self._opnode = opnode
-        self._model = opnode.operation
+        self._model:nn.Module = opnode.operation
         
-        self.__stat_ls = [] # record all parameters' information
+        self.__stat_ls:List[NamedTuple] = [] # record all parameters' information
         self.is_measured = False # used for cache
 
-        _opparent = opnode.parent
+        _opparent:Optional[OperationNode] = opnode.parent
         self.__RegNum = self.init_linkdata(attr_name='RegNum', init_val=0, opparent=_opparent, unit_sys=CountUnit)
         self.__TotalNum = self.init_linkdata(attr_name='TotalNum', init_val=0, opparent=_opparent, unit_sys=CountUnit)
 
@@ -225,11 +246,12 @@ class ParamsMeter(Statistics):
     @property
     def val(self) -> NamedTuple:
         self.measure()
-        return self.overview_val_container(Operation_Id=self._opnode.node_id,
-                                           Operation_Name=self._opnode.name,
-                                           Operation_Type=self._opnode.type,
-                                           Total_Params=self.TotalNum,
-                                           Learnable_Params=self.RegNum)
+        return self.overview_val_container(
+            Operation_Id=self._opnode.node_id,   # type: ignore
+            Operation_Name=self._opnode.name,    # type: ignore
+            Operation_Type=self._opnode.type,    # type: ignore
+            Total_Params=self.TotalNum,          # type: ignore
+            Learnable_Params=self.RegNum)        # type: ignore
 
     @property
     def crucial_data(self) -> Dict[str, str]:
@@ -246,10 +268,12 @@ class ParamsMeter(Statistics):
             return
         
         if not self._model._parameters:
-            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                            Operation_Name=self._opnode.name,
-                                                            Operation_Type=self._opnode.type,
-                                                            Numeric_Num=UpperLinkData(val=0, unit_sys=CountUnit)))
+            self.__stat_ls.append(self.detail_val_container(            # type: ignore
+                Operation_Id=self._opnode.node_id,                      # type: ignore
+                Operation_Name=self._opnode.name,                       # type: ignore
+                Operation_Type=self._opnode.type,                       # type: ignore
+                Numeric_Num=UpperLinkData(val=0, unit_sys=CountUnit))   # type: ignore
+            )
         else:
             for param_name, param_val in self._model._parameters.items(): 
                 if param_val is None:
@@ -261,12 +285,14 @@ class ParamsMeter(Statistics):
                     p_reg = True
                     self.__RegNum += p_num
 
-                self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                                Operation_Name=self._opnode.name,
-                                                                Operation_Type=self._opnode.type,
-                                                                Param_Name=param_name,
-                                                                Requires_Grad=p_reg,
-                                                                Numeric_Num=UpperLinkData(val=p_num, unit_sys=CountUnit)))
+                self.__stat_ls.append(self.detail_val_container(    # type: ignore
+                    Operation_Id=self._opnode.node_id,              # type: ignore
+                    Operation_Name=self._opnode.name,               # type: ignore
+                    Operation_Type=self._opnode.type,               # type: ignore
+                    Param_Name=param_name,                          # type: ignore
+                    Requires_Grad=p_reg,                            # type: ignore
+                    Numeric_Num=UpperLinkData(val=p_num, unit_sys=CountUnit))   # type: ignore
+                )
                 
                 self.__TotalNum += p_num
         
@@ -274,34 +300,28 @@ class ParamsMeter(Statistics):
 
 class CalMeter(Statistics):
 
-    detail_val_container:NamedTuple = namedtuple(typename='Calculation_INFO', 
-                                                 defaults=(None,)*9,
-                                                 field_names=['Operation_Id', 
-                                                              'Operation_Name', 
-                                                              'Operation_Type',
-                                                              'Kernel_Size',  # Kernel_Size([H,W])
-                                                              'Bias', 
-                                                              'Input',  # Input([B,C,H,W])'
-                                                              'Output',  # Output([B,C,H,W])'
-                                                              'MACs', 
-                                                              'FLOPs'])
+    detail_val_container:NamedTuple = namedtuple(       # type: ignore
+        typename='Calculation_INFO', 
+        field_names=['Operation_Id', 'Operation_Name', 'Operation_Type', 
+                     'Kernel_Size', 'Bias', 
+                     'Input', 'Output', 
+                     'MACs', 'FLOPs'],
+        defaults=(None,)*9)                             # type: ignore
     
-    overview_val_container:NamedTuple = namedtuple(typename='Calculation_INFO', 
-                                                   defaults=(None,)*5,
-                                                   field_names=['Operation_Id', 
-                                                                'Operation_Type',
-                                                                'Operation_Name', 
-                                                                'MACs', 
-                                                                'FLOPs'])
+    overview_val_container:NamedTuple = namedtuple(     # type: ignore
+        typename='Calculation_INFO', 
+        field_names=['Operation_Id', 'Operation_Type', 'Operation_Name', 
+                     'MACs', 'FLOPs'],
+        defaults=(None,)*5)                             # type: ignore
 
-    def __init__(self, opnode: OPN_TYPE):
+    def __init__(self, opnode: OperationNode) -> None:
         self._opnode = opnode
-        self._model = opnode.operation
+        self._model:nn.Module = opnode.operation
         
-        self.__stat_ls = [] # record the flops and macs information of each operation
+        self.__stat_ls:List[NamedTuple] = [] # record the flops and macs information of each operation
         self.is_measured = False 
 
-        _opparent = opnode.parent
+        _opparent:Optional[OperationNode] = opnode.parent
         self.__Macs = self.init_linkdata(attr_name='Macs', init_val=0, opparent=_opparent, 
                                          unit_sys=CountUnit, none_str='Not Supported')
         self.__Flops = self.init_linkdata(attr_name='Flops', init_val=0, opparent=_opparent, 
@@ -327,11 +347,13 @@ class CalMeter(Statistics):
     @property
     def val(self) -> NamedTuple:
         self.__is_valid_access()
-        return self.overview_val_container(Operation_Id=self._opnode.node_id,
-                                           Operation_Type=self._opnode.type,
-                                           Operation_Name=self._opnode.name,
-                                           MACs=self.Macs,
-                                           FLOPs=self.Flops)
+        return self.overview_val_container(      # type: ignore
+            Operation_Id=self._opnode.node_id,   # type: ignore
+            Operation_Type=self._opnode.type,    # type: ignore
+            Operation_Name=self._opnode.name,    # type: ignore
+            MACs=self.Macs,                      # type: ignore
+            FLOPs=self.Flops                     # type: ignore
+        )
 
     @property
     def crucial_data(self) -> Dict[str, str]:
@@ -342,9 +364,9 @@ class CalMeter(Statistics):
         res_dict = {key.ljust(max_keylen): value for key, value in res_dict.items()}
         return res_dict
 
-    def measure(self):
+    def measure(self) -> Optional[RemovableHandle]:
         if self.is_measured:
-            return
+            return None
         
         hook = self.__regist_hook(self._model) # torch.utils.hooks.RemovableHandle
 
@@ -352,7 +374,7 @@ class CalMeter(Statistics):
 
         return hook
 
-    def __is_valid_access(self):
+    def __is_valid_access(self) -> bool:
         if self.is_measured:
             if not (self.Flops.val + self.Macs.val) and \
                not self.__stat_ls and \
@@ -364,6 +386,8 @@ class CalMeter(Statistics):
         return True
 
     def __iopt_repr(self, iopt) -> str:
+        repr: Sequence[str]
+
         if isinstance(iopt, Tensor):
             return str(list(iopt.shape))
         
@@ -421,15 +445,16 @@ class CalMeter(Statistics):
             self.Macs.access_cnt += 1
             self.Flops.access_cnt += 1
         else:
-            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                            Operation_Name=self._opnode.name,
-                                                            Operation_Type=self._opnode.type,
-                                                            Kernel_Size=list(module.kernel_size),
-                                                            Bias=bool(is_bias),
-                                                            Input=self.__iopt_repr(input),
-                                                            Output=self.__iopt_repr(output),
-                                                            MACs=self.Macs,
-                                                            FLOPs=self.Flops)
+            self.__stat_ls.append(self.detail_val_container(
+                Operation_Id=self._opnode.node_id,
+                Operation_Name=self._opnode.name,
+                Operation_Type=self._opnode.type,
+                Kernel_Size=list(module.kernel_size),
+                Bias=bool(is_bias),
+                Input=self.__iopt_repr(input),
+                Output=self.__iopt_repr(output),
+                MACs=self.Macs,
+                FLOPs=self.Flops)
             )
     
     def __linear_hook(self, module, input, output):
@@ -447,14 +472,15 @@ class CalMeter(Statistics):
             self.Macs.access_cnt += 1
             self.Flops.access_cnt += 1
         else:
-            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                            Operation_Name=self._opnode.name,
-                                                            Operation_Type=self._opnode.type,
-                                                            Bias=bool(is_bias),
-                                                            Input=self.__iopt_repr(input),
-                                                            Output=self.__iopt_repr(output),
-                                                            MACs=self.Macs,
-                                                            FLOPs=self.Flops)
+            self.__stat_ls.append(self.detail_val_container(
+                Operation_Id=self._opnode.node_id,
+                Operation_Name=self._opnode.name,
+                Operation_Type=self._opnode.type,
+                Bias=bool(is_bias),
+                Input=self.__iopt_repr(input),
+                Output=self.__iopt_repr(output),
+                MACs=self.Macs,
+                FLOPs=self.Flops)
             )
 
     def __BN_hook(self, module, input, output):
@@ -467,13 +493,14 @@ class CalMeter(Statistics):
             self.Macs.access_cnt += 1
             self.Flops.access_cnt += 1
         else:
-            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                            Operation_Name=self._opnode.name,
-                                                            Operation_Type=self._opnode.type,
-                                                            Input=self.__iopt_repr(input),
-                                                            Output=self.__iopt_repr(output),
-                                                            MACs=self.Macs,
-                                                            FLOPs=self.Flops)
+            self.__stat_ls.append(self.detail_val_container(
+                Operation_Id=self._opnode.node_id,
+                Operation_Name=self._opnode.name,
+                Operation_Type=self._opnode.type,
+                Input=self.__iopt_repr(input),
+                Output=self.__iopt_repr(output),
+                MACs=self.Macs,
+                FLOPs=self.Flops)
             )
 
     def __activate_hook(self, module, input, output):
@@ -501,13 +528,14 @@ class CalMeter(Statistics):
             self.Macs.access_cnt += 1
             self.Flops.access_cnt += 1
         else:
-            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                            Operation_Name=self._opnode.name,
-                                                            Operation_Type=self._opnode.type,
-                                                            Input=self.__iopt_repr(input),
-                                                            Output=self.__iopt_repr(output),
-                                                            MACs=self.Macs,
-                                                            FLOPs=self.Flops)
+            self.__stat_ls.append(self.detail_val_container(
+                Operation_Id=self._opnode.node_id,
+                Operation_Name=self._opnode.name,
+                Operation_Type=self._opnode.type,
+                Input=self.__iopt_repr(input),
+                Output=self.__iopt_repr(output),
+                MACs=self.Macs,
+                FLOPs=self.Flops)
             )
 
     def __pool_hook(self, module, input, output):
@@ -529,14 +557,15 @@ class CalMeter(Statistics):
             self.Macs.access_cnt += 1
             self.Flops.access_cnt += 1
         else:
-            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                            Operation_Name=self._opnode.name,
-                                                            Operation_Type=self._opnode.type,
-                                                            Kernel_Size=list(k) if len(k)>1 else [k[0]]*2,
-                                                            Input=self.__iopt_repr(input),
-                                                            Output=self.__iopt_repr(output),
-                                                            MACs=self.Macs,
-                                                            FLOPs=self.Flops)
+            self.__stat_ls.append(self.detail_val_container(
+                Operation_Id=self._opnode.node_id,
+                Operation_Name=self._opnode.name,
+                Operation_Type=self._opnode.type,
+                Kernel_Size=list(k) if len(k)>1 else [k[0]]*2,
+                Input=self.__iopt_repr(input),
+                Output=self.__iopt_repr(output),
+                MACs=self.Macs,
+                FLOPs=self.Flops)
             )
 
     def __container_hook(self, module, input, output):
@@ -544,55 +573,51 @@ class CalMeter(Statistics):
             self.Macs.access_cnt += 1
             self.Flops.access_cnt += 1
         else:
-            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                            Operation_Name=self._opnode.name,
-                                                            Operation_Type=self._opnode.type,
-                                                            Input=self.__iopt_repr(input),
-                                                            Output=self.__iopt_repr(output),
-                                                            MACs=self.Macs,
-                                                            FLOPs=self.Flops)
+            self.__stat_ls.append(self.detail_val_container(
+                Operation_Id=self._opnode.node_id,
+                Operation_Name=self._opnode.name,
+                Operation_Type=self._opnode.type,
+                Input=self.__iopt_repr(input),
+                Output=self.__iopt_repr(output),
+                MACs=self.Macs,
+                FLOPs=self.Flops)
             )
 
     def __not_support_hook(self, module, input, output):
         if not len(self.__stat_ls):
-            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                            Operation_Name=self._opnode.name,
-                                                            Operation_Type=self._opnode.type,
-                                                            Input=self.__iopt_repr(input),
-                                                            Output=self.__iopt_repr(output))
+            self.__stat_ls.append(self.detail_val_container(
+                Operation_Id=self._opnode.node_id,
+                Operation_Name=self._opnode.name,
+                Operation_Type=self._opnode.type,
+                Input=self.__iopt_repr(input),
+                Output=self.__iopt_repr(output))
             )
 
 class MemMeter(Statistics):
 
-    detail_val_container:NamedTuple = namedtuple(typename='Memory_INFO', 
-                                                 defaults=(None,)*7,
-                                                 field_names=['Operation_Id', 
-                                                              'Operation_Name', 
-                                                              'Operation_Type',
-                                                              'Param_Cost', 
-                                                              'Buffer_Cost', 
-                                                              'Output_Cost',  
-                                                              'Total'])
+    detail_val_container:NamedTuple = namedtuple(                         # type: ignore
+        typename='Memory_INFO', 
+        field_names=['Operation_Id', 'Operation_Name', 'Operation_Type',
+                     'Param_Cost', 'Buffer_Cost', 'Output_Cost',  
+                     'Total'],
+        defaults=(None,)*7)                                               # type: ignore
     
-    overview_val_container:NamedTuple = namedtuple(typename='Memory_INFO', 
-                                                   defaults=(None,)*7,
-                                                   field_names=['Operation_Id', 
-                                                                'Operation_Type',
-                                                                'Operation_Name', 
-                                                                'Param_Cost', 
-                                                                'Buffer_Cost', 
-                                                                'Output_Cost',  
-                                                                'Total'])
+    overview_val_container:NamedTuple = namedtuple(                       # type: ignore
+        typename='Memory_INFO', 
+        field_names=['Operation_Id', 'Operation_Type', 'Operation_Name',
+                     'Param_Cost', 'Buffer_Cost', 'Output_Cost',
+                     'Total'],
+        defaults=(None,)*7)                                               # type: ignore
 
-    def __init__(self, opnode: OPN_TYPE):
+    def __init__(self, opnode: OperationNode) -> None:
         self._opnode = opnode
-        self._model = opnode.operation
-        self.is_inplace = getattr(self._model, 'inplace', False)
+        self._model:nn.Module = opnode.operation
+        self.is_inplace:bool = getattr(self._model, 'inplace', False)
         
-        self.__stat_ls = [] # record the flops and macs information of each operation
+        self.__stat_ls:List[NamedTuple] = [] # record the flops and macs information of each operation
         self.is_measured = False # used for cache
 
-        _opparent = opnode.parent
+        _opparent:Optional[OperationNode] = opnode.parent
         self.__ParamCost = self.init_linkdata(attr_name='ParamCost', init_val=0, opparent=_opparent, unit_sys=BinaryUnit)
         self.__BufferCost = self.init_linkdata(attr_name='BufferCost', init_val=0, opparent=_opparent, unit_sys=BinaryUnit)
         self.__OutputCost = self.init_linkdata(attr_name='OutputCost', init_val=0, opparent=_opparent, unit_sys=BinaryUnit)
@@ -626,13 +651,15 @@ class MemMeter(Statistics):
     @property
     def val(self) -> NamedTuple:
         self.__is_valid_access()
-        return self.overview_val_container(Operation_Id=self._opnode.node_id,
-                                           Operation_Type=self._opnode.type,
-                                           Operation_Name=self._opnode.name,
-                                           Param_Cost=self.ParamCost,
-                                           Buffer_Cost=self.BufferCost,
-                                           Output_Cost=self.OutputCost,
-                                           Total=self.TotalCost)
+        return self.overview_val_container(         # type: ignore
+            Operation_Id=self._opnode.node_id,      # type: ignore
+            Operation_Type=self._opnode.type,       # type: ignore
+            Operation_Name=self._opnode.name,       # type: ignore
+            Param_Cost=self.ParamCost,              # type: ignore
+            Buffer_Cost=self.BufferCost,            # type: ignore
+            Output_Cost=self.OutputCost,            # type: ignore
+            Total=self.TotalCost                    # type: ignore
+        )
 
     @property
     def crucial_data(self) -> Dict[str, str]:
@@ -645,9 +672,9 @@ class MemMeter(Statistics):
         res_dict = {key.ljust(max_keylen): value for key, value in res_dict.items()}
         return res_dict
 
-    def measure(self):
+    def measure(self) -> Optional[RemovableHandle]:
         if self.is_measured:
-            return
+            return None
         
         hook = self._model.register_forward_hook(self.__hook_func)
         
@@ -685,17 +712,19 @@ class MemMeter(Statistics):
             total_cost = opt_cost
         else:
             total_cost = param_cost + buffer_cost + opt_cost
-            self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                            Operation_Name=self._opnode.name,
-                                                            Operation_Type=self._opnode.type + ('(inplace)' if self.is_inplace else ''),
-                                                            Param_Cost=None if self._opnode.is_leaf and not param_cost else self.ParamCost, 
-                                                            Buffer_Cost=None if self._opnode.is_leaf and not buffer_cost else self.BufferCost, 
-                                                            Output_Cost=None if self._opnode.is_leaf and not opt_cost else self.OutputCost, 
-                                                            Total=None if self._opnode.is_leaf and not total_cost else self.TotalCost))
+            self.__stat_ls.append(self.detail_val_container(
+                Operation_Id=self._opnode.node_id,
+                Operation_Name=self._opnode.name,
+                Operation_Type=self._opnode.type + ('(inplace)' if self.is_inplace else ''),
+                Param_Cost=None if self._opnode.is_leaf and not param_cost else self.ParamCost, 
+                Buffer_Cost=None if self._opnode.is_leaf and not buffer_cost else self.BufferCost, 
+                Output_Cost=None if self._opnode.is_leaf and not opt_cost else self.OutputCost, 
+                Total=None if self._opnode.is_leaf and not total_cost else self.TotalCost)
+            )
         
         self.__TotalCost += total_cost
 
-    def __is_valid_access(self):
+    def __is_valid_access(self) -> bool:
         if self.is_measured:
             if not self.__stat_ls and not isinstance(self._model, (nn.ModuleDict, nn.ModuleList)):
                 raise RuntimeError("This module might be defined but not explicitly called, so no data is collected.")
@@ -706,27 +735,23 @@ class MemMeter(Statistics):
 
 class ITTPMeter(Statistics):
 
-    detail_val_container:NamedTuple = namedtuple(typename='InferTime_Throughput_INFO', 
-                                                 defaults=(None,)*5,
-                                                 field_names=['Operation_Id', 
-                                                              'Operation_Name', 
-                                                              'Operation_Type',
-                                                              'Infer_Time', 
-                                                              'Throughput'])
+    detail_val_container:NamedTuple = namedtuple(                           # type: ignore
+        typename='InferTime_Throughput_INFO', 
+        field_names=['Operation_Id', 'Operation_Name', 'Operation_Type',
+                     'Infer_Time', 'Throughput'],
+        defaults=(None,)*5)                                                 # type: ignore
     
-    overview_val_container:NamedTuple = namedtuple(typename='InferTime_Throughput_INFO', 
-                                                   defaults=(None,)*5,
-                                                   field_names=['Operation_Id', 
-                                                                'Operation_Name',
-                                                                'Operation_Type',
-                                                                'Infer_Time', 
-                                                                'Throughput'])
+    overview_val_container:NamedTuple = namedtuple(                         # type: ignore
+        typename='InferTime_Throughput_INFO', 
+        field_names=['Operation_Id', 'Operation_Name','Operation_Type',
+                     'Infer_Time', 'Throughput'],
+        defaults=(None,)*5,)                                                 # type: ignore
                                                                 
-    def __init__(self, opnode: OPN_TYPE):
+    def __init__(self, opnode: OperationNode) -> None:
         self._opnode = opnode
-        self._model = opnode.operation
+        self._model:nn.Module = opnode.operation
         
-        self.__stat_ls = [] # record the inference time and throughput of each operation
+        self.__stat_ls:List[NamedTuple] = [] # record the inference time and throughput of each operation
         self.is_measured = False
 
         self.__InferTime = MetricsData(reduce_func=np.median, unit_sys=TimeUnit)
@@ -752,11 +777,13 @@ class ITTPMeter(Statistics):
     @property
     def val(self) -> NamedTuple:
         self.__is_valid_access()
-        return self.overview_val_container(Operation_Id=self._opnode.node_id,
-                                           Operation_Type=self._opnode.type,
-                                           Operation_Name=self._opnode.name,
-                                           Infer_Time=self.__InferTime,
-                                           Throughput=self.__Throughput)
+        return self.overview_val_container(         # type: ignore
+            Operation_Id=self._opnode.node_id,      # type: ignore
+            Operation_Type=self._opnode.type,       # type: ignore
+            Operation_Name=self._opnode.name,       # type: ignore
+            Infer_Time=self.__InferTime,            # type: ignore
+            Throughput=self.__Throughput            # type: ignore
+        )
 
     @property
     def crucial_data(self) -> Dict[str, str]:
@@ -767,18 +794,20 @@ class ITTPMeter(Statistics):
         res_dict = {key.ljust(max_keylen): value for key, value in res_dict.items()}
         return res_dict
 
-    def measure(self, device, repeat:int=50, global_process=None):
+    def measure(self, device:tc_device, repeat:int=50, global_process:Optional[tqdm]=None) -> RemovableHandle:
         
-        hook = self._model.register_forward_hook(partial(self.__hook_func, 
-                                                         device=device, 
-                                                         repeat=repeat,
-                                                         global_process=global_process))
+        hook = self._model.register_forward_hook(
+            partial(self.__hook_func, 
+                    device=device, 
+                    repeat=repeat,
+                    global_process=global_process)
+        )
         
         self.is_measured = True
         
         return hook
 
-    def __hook_func(self, module, input, output, device, repeat:int=50, global_process=None):
+    def __hook_func(self, module, input, output, device:tc_device, repeat:int=50, global_process:Optional[tqdm]=None):
         self.__InferTime.clear()
         self.__Throughput.clear()
         self.__stat_ls.clear()
@@ -786,22 +815,27 @@ class ITTPMeter(Statistics):
         module._forward_hooks.clear()
         module.eval()
 
-        start_timer = perf_counter if device.type=='cpu' else cuda_event(enable_timing=True)
-        end_timer = perf_counter if device.type=='cpu' else cuda_event(enable_timing=True)
-                    
+        
+        start_event = cuda_event(enable_timing=True)
+        end_event = cuda_event(enable_timing=True)
+        cpu_timer = perf_counter
+        gpu_start_timer = start_event.record
+        gpu_end_timer = end_event.record
+
+        cuda_sync()  # WAIT FOR GPU SYNC  
         with no_grad():
             for _ in range(repeat):
-                start_time = start_timer() if device.type == 'cpu' else start_timer.record()
+                start_time = cpu_timer() if device.type == 'cpu' else gpu_start_timer()
 
                 module(*input)
 
-                end_time = end_timer() if device.type == 'cpu' else end_timer.record()
+                end_time = cpu_timer() if device.type == 'cpu' else gpu_end_timer()
 
                 if device.type == 'cpu':
                     it = end_time-start_time
                 else:
                     cuda_sync()  # WAIT FOR GPU SYNC
-                    it = start_timer.elapsed_time(end_timer)*1e-3 # ms -> s
+                    it = start_event.elapsed_time(end_event)*1e-3 # ms -> s    # type: ignore
 
                 tp = input[0].shape[0]/it
                 self.__InferTime.append(it) 
@@ -810,13 +844,15 @@ class ITTPMeter(Statistics):
                 if global_process is not None:
                     global_process.update(1)
 
-        self.__stat_ls.append(self.detail_val_container(Operation_Id=self._opnode.node_id,
-                                                        Operation_Name=self._opnode.name,
-                                                        Operation_Type=self._opnode.type,
-                                                        Infer_Time=self.InferTime,
-                                                        Throughput=self.Throughput))
+        self.__stat_ls.append(
+            self.detail_val_container(Operation_Id=self._opnode.node_id,   # type: ignore
+                                      Operation_Name=self._opnode.name,    # type: ignore
+                                      Operation_Type=self._opnode.type,    # type: ignore
+                                      Infer_Time=self.InferTime,           # type: ignore
+                                      Throughput=self.Throughput)          # type: ignore
+        )
 
-    def __is_valid_access(self):
+    def __is_valid_access(self) -> bool:
         if self.is_measured:
             if not self.__stat_ls and not isinstance(self._model, (nn.ModuleDict, nn.ModuleList)):
                 raise RuntimeError("This module might be defined but not explicitly called, so no data is collected.")
