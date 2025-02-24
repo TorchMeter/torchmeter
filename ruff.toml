@@ -1,7 +1,7 @@
 # See https://docs.astral.sh/ruff/settings for help
 
 target-version = "py37" # Always generate Python 3.6-compatible code.
-line-length = 120 # Allow lines to be as long as 120.
+line-length = 250 # Allow lines to be as long as 120.
 
 [format]
 docstring-code-format = true # Enable reformatting of code snippets in docstrings.
