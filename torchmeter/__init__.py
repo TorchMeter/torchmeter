@@ -14,10 +14,9 @@ Torchmeter: An `all-in-one` tool for `Pytorch` model analysis, measuring:
 Project: https://github.com/Ahzyuan/torchmeter
 """
 
-__version__ = '0.1.0'
+__version__ = "0.1.0"
 
 from torchmeter.core import Meter
-from torchmeter.display import render_perline
-from torchmeter.engine import OperationNode, OperationTree
+from torchmeter.config import get_config
 
-__aLL__ = ["Meter", "render_perline", "OperationTree", "OperationNode"]
+__aLL__ = ["Meter", "get_config"]

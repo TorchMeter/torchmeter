@@ -1,6 +1,8 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import re
 from collections import OrderedDict
-from typing import List, Optional, Tuple
 
 import torch.nn as nn
 from rich.tree import Tree
@@ -8,38 +10,43 @@ from rich.tree import Tree
 from torchmeter.utils import dfs_task, Timer
 from torchmeter.statistic import ParamsMeter, CalMeter, MemMeter, ITTPMeter
 
+if TYPE_CHECKING:
+    from typing import List, Optional, Tuple
+
+    OPNODE_LIST = List["OperationNode"]
+
 __all__ = ["OperationNode", "OperationTree"]
 
 class OperationNode:
    
-    statistics:Tuple[str] = ('param', 'cal', 'mem', 'ittp') # all statistics stored as attributes
+    statistics:Tuple[str, ...] = ('param', 'cal', 'mem', 'ittp') # all statistics stored as attributes
 
     def __init__(self, 
                  module:nn.Module,
                  name:Optional[str]=None,
                  node_id:str='0',
-                 parent:Optional["OperationNode"]=None,
+                 parent:Optional[OperationNode]=None,
                  render_when_repeat:bool=False):
 
         # basic info
         self.operation = module
-        self.type = module.__class__.__name__
-        self.name = name if name else self.type
+        self.type:str = module.__class__.__name__
+        self.name:str = name if name else self.type
         self.node_id:str = node_id # index in the model tree, e.g. '1.2.1'
         
         # hierarchical info
-        self.parent:"OperationNode" = parent
+        self.parent:Optional[OperationNode] = parent
         self.childs:OrderedDict[str, "OperationNode"] = OrderedDict() # e.g. {'1.2.1': OperationNode, ...} 
         self.is_leaf:bool = len(module._modules) == 0
         
         # repeat info
-        self.repeat_winsz = 1 # size of repeat block
-        self.repeat_time = 1
+        self.repeat_winsz:int = 1 # size of repeat block
+        self.repeat_time:int = 1
         self.repeat_body:List[Tuple[str, str]] = [] # the ids and names of the nodes in the same repeat block
         
         # display info 
-        self.display_root:Tree = None # set in `OperationTree.__build()`
-        self.render_when_repeat = render_when_repeat # whether to render when enable `fold_repeat`, set in `OperationTree.__build()`
+        self.display_root:Tree # set in `OperationTree.__build()`
+        self.render_when_repeat:bool = render_when_repeat # whether to render when enable `fold_repeat`, set in `OperationTree.__build()`
         self.is_folded = False # whether the node is folded in a repeat block, set in `OperationTree.__build()`
 
         # statistic info (all read-only)
@@ -64,13 +71,13 @@ class OperationNode:
     def ittp(self) -> ITTPMeter:
         return self.__ittp
     
-    def __repr__(self):
+    def __repr__(self) -> str:
         op_str = str(self.type) if not self.is_leaf else str(self.operation)            
         return f"{self.node_id} {self.name}: {op_str}"
     
 class OperationTree:
 
-    def __init__(self, model:nn.Module):
+    def __init__(self, model:nn.Module) -> None:
         
         self.root = OperationNode(module=model, render_when_repeat=True)
         
@@ -80,12 +87,12 @@ class OperationTree:
                                          task_func=OperationTree.__build,
                                          visited=[])
 
-        self.all_nodes = [self.root] + nonroot_nodes
+        self.all_nodes:OPNODE_LIST = [self.root] + nonroot_nodes
             
     @staticmethod
-    def __build(subject:"OperationNode",
-                pre_res:Tuple[List["OperationNode"], Optional[Tree]]=([],)) \
-                    -> Tuple[List["OperationNode"], Optional[Tree]]:
+    def __build(subject:OperationNode,
+                pre_res:Tuple[OPNODE_LIST, Optional[Tree]]=([],None)) \
+                    -> Tuple[OPNODE_LIST, Optional[Tree]]:
         """
         Private method.
         
@@ -114,14 +121,14 @@ class OperationTree:
         all_nodes, *display_parent = pre_res
         
         # build display tree
-        if display_parent:
-            display_parent = display_parent[0]
-        
+        if display_parent and display_parent[0] is not None:
+            display_parent_node = display_parent[0]
+            
             # create a tree node of rich.Tree, and record the level of the node in attribute 'label'
-            display_node = Tree(label=str(int(display_parent.label)+1))
+            display_node = Tree(label=str(int(display_parent_node.label)+1))  # type: ignore
             
             # add the current node to the father node
-            display_parent.children.append(display_node)
+            display_parent_node.children.append(display_node)                 # type: ignore
         else:
             # situation of root node
             display_node = Tree(label='0')
@@ -199,6 +206,6 @@ class OperationTree:
                     
         return (all_nodes, display_node)
     
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.root.__repr__()
     
