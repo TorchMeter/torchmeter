@@ -212,9 +212,11 @@ def namespace_to_dict(ns, safe_resolve=False) -> Dict[str, CFG_CONTENT_TYPE]:
             
     return d
 
-def get_config() -> Config:
-    cfg_file = os.environ.get('TORCHMETER_CONFIG', None)
-    return Config(config_file=cfg_file)
+def get_config(config_file:Optional[str]=None) -> Config:
+    cfg_file = os.environ.get('TORCHMETER_CONFIG', config_file)
+    cfg = Config() # always exist an instance cause display.py and core.py depend on it
+    cfg.config_file = cfg_file
+    return cfg
 
 class FlagNameSpace(SimpleNamespace):
     
@@ -260,15 +262,15 @@ class FlagNameSpace(SimpleNamespace):
 class ConfigMeta(type):
     """To achieve sigleton pattern"""
     
-    _instances = None
-    _thread_lock = Lock()
+    __instances = None
+    __thread_lock = Lock()
 
-    def __call__(cls, *args, **kwargs) -> Config:
-        with cls._thread_lock:
-            if cls._instances is None:
-                instance = super().__call__(*args, **kwargs)
-                cls._instances = instance
-        return cls._instances
+    def __call__(cls) -> Config:
+        with cls.__thread_lock:
+            if cls.__instances is None:
+                instance = super().__call__()
+                cls.__instances = instance
+        return cls.__instances
 
 class Config(metaclass=ConfigMeta):
     
@@ -284,29 +286,30 @@ class Config(metaclass=ConfigMeta):
 
     __slots__ = DEFAULT_FIELDS + ['__cfg_file']
     
-    def __init__(self, config_file:Optional[str]=None) -> None:
-        self.__cfg_file = None
-        
-        self.config_file = config_file
-    
+    def __init__(self) -> None:
+        """Load default settings by default"""
+        self.__cfg_file:Optional[str] = None
+        self.__load()
+            
     @property
     def config_file(self) -> Optional[str]:
         return self.__cfg_file
     
     @config_file.setter
-    def config_file(self, config_file:Optional[str]=None) -> None:
-        if config_file is not None and not isinstance(config_file, str):
+    def config_file(self, file_path:Optional[str]=None) -> None:
+        if file_path is not None and not isinstance(file_path, str):
             raise TypeError("You must pass in a string or None to change config or use the default config, " + \
-                            f"but got {type(config_file)}.")
+                            f"but got {type(file_path)}.")
                 
-        if config_file:
-            config_file = os.path.abspath(config_file)
-            if not os.path.isfile(config_file):
-                raise FileNotFoundError(f"Config file {config_file} does not exist.")
-            if not config_file.endswith('.yaml'):
-                raise ValueError(f"Config file must be a yaml file, but got {config_file}")
+        if file_path:
+            file_path = os.path.abspath(file_path)
+            if not os.path.isfile(file_path):
+                raise FileNotFoundError(f"Config file {file_path} does not exist.")
+            if not file_path.endswith('.yaml'):
+                raise ValueError(f"Config file must be a yaml file, but got {file_path}")
         
-        self.__cfg_file = config_file
+            self.__cfg_file = file_path
+        
         self.__load()
         self.check_integrity()
             
@@ -328,13 +331,18 @@ class Config(metaclass=ConfigMeta):
         self.check_integrity()
 
     def check_integrity(self) -> None:
-        default_cfg = yaml.safe_load(DEFAULT_CFG)
+        # no need to check integrity when loading default settings
+        if self.config_file is None:
+            return None
+        
+        with open(self.config_file, 'r') as f:
+            custom_cfg = yaml.safe_load(f)
+        
         for field in DEFAULT_FIELDS:
-            if not hasattr(self, field):
-                warnings.warn(message=f"Config file {self.config_file} does not contain '{field}' key, \
-                                        using default config instead.")
-                ns = dict_to_namespace({field:default_cfg[field]})
-                setattr(self, field, getattr(ns, field))
+            if field not in custom_cfg:
+                warnings.warn(message=f"Config file {self.config_file} does not contain '{field}' field, " + \
+                                      "using default settings instead.",
+                              category=UserWarning)
     
     def asdict(self, safe_resolve=False) -> Dict[str, CFG_CONTENT_TYPE]:
         d:Dict[str, CFG_CONTENT_TYPE] = {}
@@ -359,7 +367,11 @@ class Config(metaclass=ConfigMeta):
             yaml.safe_dump(d, f, 
                            indent=2, sort_keys=False,
                            encoding='utf-8', allow_unicode=True)        
-    
+
+    def __delattr__(self, name: str) -> None:
+        # every attribute of Config object is important and should be there
+        raise RuntimeError("You cannot delete attributes from Config object.")
+
     def __repr__(self) -> str:
         d = self.asdict(safe_resolve=True)
 
