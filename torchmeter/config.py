@@ -212,9 +212,11 @@ def namespace_to_dict(ns, safe_resolve=False) -> Dict[str, CFG_CONTENT_TYPE]:
             
     return d
 
-def get_config() -> Config:
-    cfg_file = os.environ.get('TORCHMETER_CONFIG', None)
-    return Config(config_file=cfg_file)
+def get_config(config_file:Optional[str]=None) -> Config:
+    cfg_file = os.environ.get('TORCHMETER_CONFIG', config_file)
+    cfg = Config() # always exist an instance cause display.py and core.py depend on it
+    cfg.config_file = cfg_file
+    return cfg
 
 class FlagNameSpace(SimpleNamespace):
     
@@ -260,15 +262,15 @@ class FlagNameSpace(SimpleNamespace):
 class ConfigMeta(type):
     """To achieve sigleton pattern"""
     
-    _instances = None
-    _thread_lock = Lock()
+    __instances = None
+    __thread_lock = Lock()
 
-    def __call__(cls, *args, **kwargs) -> Config:
-        with cls._thread_lock:
-            if cls._instances is None:
-                instance = super().__call__(*args, **kwargs)
-                cls._instances = instance
-        return cls._instances
+    def __call__(cls) -> Config:
+        with cls.__thread_lock:
+            if cls.__instances is None:
+                instance = super().__call__()
+                cls.__instances = instance
+        return cls.__instances
 
 class Config(metaclass=ConfigMeta):
     
@@ -284,29 +286,30 @@ class Config(metaclass=ConfigMeta):
 
     __slots__ = DEFAULT_FIELDS + ['__cfg_file']
     
-    def __init__(self, config_file:Optional[str]=None) -> None:
-        self.__cfg_file = None
-        
-        self.config_file = config_file
-    
+    def __init__(self) -> None:
+        """Load default settings by default"""
+        self.__cfg_file:Optional[str] = None
+        self.__load()
+            
     @property
     def config_file(self) -> Optional[str]:
         return self.__cfg_file
     
     @config_file.setter
-    def config_file(self, config_file:Optional[str]=None) -> None:
-        if config_file is not None and not isinstance(config_file, str):
+    def config_file(self, file_path:Optional[str]=None) -> None:
+        if file_path is not None and not isinstance(file_path, str):
             raise TypeError("You must pass in a string or None to change config or use the default config, " + \
-                            f"but got {type(config_file)}.")
+                            f"but got {type(file_path)}.")
                 
-        if config_file:
-            config_file = os.path.abspath(config_file)
-            if not os.path.isfile(config_file):
-                raise FileNotFoundError(f"Config file {config_file} does not exist.")
-            if not config_file.endswith('.yaml'):
-                raise ValueError(f"Config file must be a yaml file, but got {config_file}")
+        if file_path:
+            file_path = os.path.abspath(file_path)
+            if not os.path.isfile(file_path):
+                raise FileNotFoundError(f"Config file {file_path} does not exist.")
+            if not file_path.endswith('.yaml'):
+                raise ValueError(f"Config file must be a yaml file, but got {file_path}")
         
-        self.__cfg_file = config_file
+            self.__cfg_file = file_path
+        
         self.__load()
         self.check_integrity()
             
