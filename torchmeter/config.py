@@ -331,13 +331,18 @@ class Config(metaclass=ConfigMeta):
         self.check_integrity()
 
     def check_integrity(self) -> None:
-        default_cfg = yaml.safe_load(DEFAULT_CFG)
+        # no need to check integrity when loading default settings
+        if self.config_file is None:
+            return None
+        
+        with open(self.config_file, 'r') as f:
+            custom_cfg = yaml.safe_load(f)
+        
         for field in DEFAULT_FIELDS:
-            if not hasattr(self, field):
-                warnings.warn(message=f"Config file {self.config_file} does not contain '{field}' key, \
-                                        using default config instead.")
-                ns = dict_to_namespace({field:default_cfg[field]})
-                setattr(self, field, getattr(ns, field))
+            if field not in custom_cfg:
+                warnings.warn(message=f"Config file {self.config_file} does not contain '{field}' field, " + \
+                                      "using default settings instead.",
+                              category=UserWarning)
     
     def asdict(self, safe_resolve=False) -> Dict[str, CFG_CONTENT_TYPE]:
         d:Dict[str, CFG_CONTENT_TYPE] = {}
@@ -362,7 +367,11 @@ class Config(metaclass=ConfigMeta):
             yaml.safe_dump(d, f, 
                            indent=2, sort_keys=False,
                            encoding='utf-8', allow_unicode=True)        
-    
+
+    def __delattr__(self, name: str) -> None:
+        # every attribute of Config object is important and should be there
+        raise RuntimeError("You cannot delete attributes from Config object.")
+
     def __repr__(self) -> str:
         d = self.asdict(safe_resolve=True)
 
