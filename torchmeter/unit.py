@@ -51,7 +51,7 @@ def auto_unit(val:Union[int, FLOAT], unit_system=CountUnit) -> str:
             if val % unit.value:
                 return f"{val / unit.value:.2f} {unit.name}"
             else:
-                return f"{val // unit.value} {unit.name}"
+                return f"{int(val // unit.value)} {unit.name}"
     if isinstance(val, int):
         return str(val)
     else:
