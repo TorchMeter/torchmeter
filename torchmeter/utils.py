@@ -2,12 +2,13 @@ import os
 from time import perf_counter
 from inspect import signature
 from functools import partial
-from typing import Any, Callable, Iterable, List, Sequence, Tuple, Union
+from typing import Any, List, Tuple
+from typing import Union, Optional, Callable, Iterable
 
+from rich.text import Text
 from rich.status import Status
 
-__all__ = ["dfs_task", "dfs_task", "data_repr",
-           "Timer"]
+__all__ = ["dfs_task", "data_repr", "Timer"]
 
 def resolve_savepath(origin_path:str, 
                      target_ext:str,
@@ -56,7 +57,7 @@ def dfs_task(dfs_subject:Any,
              task_func:Callable[[Any, Any], Any],
              visited_signal_func:Callable[[Any], Any]=lambda x:id(x),
              *,
-             visited:List=[]) -> Any: 
+             visited:Optional[List]=None) -> Any: 
     """
     Perform Depth-First Search (DFS) traversal on `dfs_subject`, 
     and complete the specified task at the same time.
@@ -128,9 +129,15 @@ def dfs_task(dfs_subject:Any,
 
     visited_signal = visited_signal_func(dfs_subject)
     
+    visited = visited or []
+    
     if visited_signal not in visited:
         visited.append(visited_signal)
-        task_res = task_func(subject=dfs_subject)   # type: ignore
+        try:
+            task_res = task_func(subject=dfs_subject)   # type: ignore
+        except TypeError:
+            # use empty list when no default value for `pre_res`
+            task_res = task_func(subject=dfs_subject, pre_res=[])   # type: ignore
         
         for adj in adj_func(dfs_subject): 
             dfs_task(dfs_subject=adj,  
@@ -139,26 +146,50 @@ def dfs_task(dfs_subject:Any,
                      visited_signal_func=visited_signal_func, 
                      visited=visited)
     
-    return task_res
+    try:
+        return task_res
+    except UnboundLocalError: # revisit visited node
+        return None
 
-def indent_str(s:Union[str, Sequence[str]], 
+def indent_str(s:Union[str, Iterable[str]], 
                indent:int=4, 
                guideline:bool=True,
                process_first:bool=True) -> str:
-    res = []
-    split_lines = s.split('\n') if isinstance(s, str) else s
-    guideline = False if len(split_lines) == 1 else guideline
+    if isinstance(s, str):
+        split_lines:List[str] = s.split("\n")
+        
+    elif hasattr(s, '__iter__'):
+        split_lines = []
+        for i in s:
+            if not isinstance(i,str):
+                raise TypeError("The input should be a string or an iterable object of strings, " + \
+                                f"but got {type(i)} when travering input.")
+            split_lines.extend(i.split("\n"))
+            
+    else:
+        raise TypeError("The input should be a string or a sequence of strings, " + \
+                        f"but got {type(s)}.")
     
-    for line in split_lines:
-        indent_line = '│' if guideline else ' ' 
-        indent_line += ' '*(indent-1) + str(line)
-        res.append(indent_line)
+    if not isinstance(indent, int):
+        raise TypeError(f"The indent should be an integer, but got {type(indent)}")
+    indent = max(indent, 0)
+        
+    res = []
+    guideline = not len(split_lines) == 1 and guideline
+    
+    if indent:
+        for line in split_lines:
+            indent_line = "│" if guideline else " " 
+            indent_line += " "*(indent-1) + line
+            res.append(indent_line)
 
-    if not process_first:
-        res[0] = res[0][indent:]
+        if not process_first:
+            res[0] = res[0][indent:]
 
-    if guideline:
-        res[-1] = '└─' + res[-1][2:]
+        if guideline:
+            res[-1] = "└─"[:indent].ljust(indent) + res[-1][indent:]
+    else:
+        res = split_lines
     
     return '\n'.join(res)
 
@@ -170,7 +201,11 @@ def data_repr(val:Any) -> str:
     val_type = get_type(val)
     if isinstance(val, (list, tuple, set, dict)) and len(val) > 0:
         if isinstance(val, dict):
-            inner_repr:List[str] = [f"{item_repr(get_type(k),k)}: {data_repr(v)}" for k, v in val.items()]
+            inner_repr_parts = [(item_repr(get_type(k),k), data_repr(v)) for k, v in val.items()]
+            inner_repr:List[str] = [indent_str(f"{record[0]}: {record[1]}", 
+                                               indent=2+Text.from_markup(record[0]).cell_len, 
+                                               guideline=False, process_first=False) 
+                                    for record in inner_repr_parts]
         else:
             inner_repr = [data_repr(i) for i in val]
         
@@ -180,6 +215,17 @@ def data_repr(val:Any) -> str:
 
         return indent_str(res_repr, indent=len(f"{val_type}("), process_first=False)
     
+    elif "function" in val_type and callable(val):
+        return f"[b green]{val.__name__}[/] [dim]<function>[/]"
+    
+    elif hasattr(val, 'shape'):
+        if any(not isinstance(i, int) for i in list(val.shape)):
+            return f"[b green]obj[/] [dim]<{val.__class__.__module__}.{val_type}>[/]"
+        return item_repr(val_type, val)
+    
+    elif val.__class__.__module__ != "builtins":
+        return f"[b green]obj[/] [dim]<{val.__class__.__module__}.{val_type}>[/]"
+
     else:
         return item_repr(val_type, val)
 
@@ -195,6 +241,6 @@ class Timer(Status):
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        ellapsed_time = perf_counter() - self.__start_time
+        elapsed_time = perf_counter() - self.__start_time
         super().__exit__(exc_type, exc_val, exc_tb)
-        self.console.print(f"[b blue]Finish {self.task_desc} in [green]{ellapsed_time:.4f}[/green] seconds[/]")
+        self.console.print(f"[b blue]Finish {self.task_desc} in [green]{elapsed_time:.4f}[/green] seconds[/]")
