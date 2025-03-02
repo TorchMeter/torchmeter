@@ -28,6 +28,10 @@ class OperationNode:
                  parent:Optional[OperationNode]=None,
                  render_when_repeat:bool=False):
 
+        if not isinstance(module, nn.Module):
+            raise TypeError(f"You must use an `nn.Module` instance to instantiate `{self.__class__.__name__}`, " + \
+                            f"but got {type(module).__name__}.")
+        
         # basic info
         self.operation = module
         self.type:str = module.__class__.__name__
@@ -79,6 +83,10 @@ class OperationTree:
 
     def __init__(self, model:nn.Module) -> None:
         
+        if not isinstance(model, nn.Module):
+            raise TypeError(f"You must use an `nn.Module` instance to instantiate `{self.__class__.__name__}`, " + \
+                            f"but got {type(model).__name__}.")
+        
         self.root = OperationNode(module=model, render_when_repeat=True)
         
         with Timer(task_desc="Scanning model"):
@@ -91,7 +99,7 @@ class OperationTree:
             
     @staticmethod
     def __build(subject:OperationNode,
-                pre_res:Tuple[OPNODE_LIST, Optional[Tree]]=([],None)) \
+                pre_res:Tuple[Optional[OPNODE_LIST], Optional[Tree]]=(None, None)) \
                     -> Tuple[OPNODE_LIST, Optional[Tree]]:
         """
         Private method.
@@ -119,6 +127,7 @@ class OperationTree:
         """
         
         all_nodes, *display_parent = pre_res
+        all_nodes = all_nodes if all_nodes else []
         
         # build display tree
         if display_parent and display_parent[0] is not None:
