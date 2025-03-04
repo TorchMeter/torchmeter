@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from rich.text import Text
 
     from torchmeter.config import FlagNameSpace
-    from torchmeter.statistic import ParamsMeter, CalMeter, MemMeter, ITTPMeter
+    from torchmeter.statistic import ParamsMeter, CalMeter, MemMeter, IttpMeter
     
     if sys.version_info >= (3, 8):
         from typing import TypedDict
@@ -180,7 +180,7 @@ class Meter:
         return self.optree.root.mem
 
     @property
-    def ittp(self) -> ITTPMeter:
+    def ittp(self) -> IttpMeter:
 
         from tqdm import tqdm
 

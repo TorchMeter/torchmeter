@@ -8,7 +8,7 @@ import torch.nn as nn
 from rich.tree import Tree
 
 from torchmeter.utils import dfs_task, Timer
-from torchmeter.statistic import ParamsMeter, CalMeter, MemMeter, ITTPMeter
+from torchmeter.statistic import ParamsMeter, CalMeter, MemMeter, IttpMeter
 
 if TYPE_CHECKING:
     from typing import List, Optional, Tuple
@@ -57,7 +57,7 @@ class OperationNode:
         self.__param = ParamsMeter(opnode=self)
         self.__cal = CalMeter(opnode=self)
         self.__mem = MemMeter(opnode=self)
-        self.__ittp = ITTPMeter(opnode=self)
+        self.__ittp = IttpMeter(opnode=self)
 
     @property
     def param(self) -> ParamsMeter:
@@ -72,7 +72,7 @@ class OperationNode:
         return self.__mem
     
     @property
-    def ittp(self) -> ITTPMeter:
+    def ittp(self) -> IttpMeter:
         return self.__ittp
     
     def __repr__(self) -> str:
