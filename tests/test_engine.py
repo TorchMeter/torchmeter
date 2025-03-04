@@ -6,7 +6,7 @@ import torch.nn as nn
 from torchmeter.engine import (
     OperationNode, OperationTree,
     ParamsMeter, CalMeter, 
-    MemMeter, ITTPMeter
+    MemMeter, IttpMeter
 )
 
 @pytest.fixture
@@ -102,7 +102,7 @@ class TestOPN:
             ("param", ParamsMeter),
             ("cal", CalMeter),
             ("mem", MemMeter),
-            ("ittp", ITTPMeter)
+            ("ittp", IttpMeter)
         ]
     )
     def test_statistic_attrs(self, linear_model, stat_name, stat_cls):
