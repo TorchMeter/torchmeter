@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
+import re
 from time import perf_counter
 from collections import namedtuple
 from abc import ABC, abstractmethod
@@ -18,7 +19,7 @@ from torchmeter.unit import auto_unit
 from torchmeter.unit import CountUnit, BinaryUnit, TimeUnit, SpeedUnit
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List
+    from typing import Callable, Dict, List
     from typing import Optional, Tuple, Union, Type, NamedTuple, Sequence
 
     from tqdm import tqdm
@@ -38,61 +39,98 @@ if TYPE_CHECKING:
     FLOAT = Union[float, np.float_]
     SEQ_FUNC = Callable[[SEQ_DATA], FLOAT]
 
-__all__ = ["ParamsMeter", "CalMeter", "MemMeter", "ITTPMeter"]
+__all__ = ["ParamsMeter", "CalMeter", "MemMeter", "IttpMeter"]
 
 class UpperLinkData:
 
-    __slots__ = ['val', 'none_str', 'access_cnt',
-                 '__parent_data', '__unit_sys']
+    __slots__ = ['val', 'none_str', 
+                 '__access_cnt', '__parent_data', '__unit_sys']
 
     def __init__(self, 
-                 val:int=0, parent_data:Optional[UpperLinkData]=None,
+                 val:Union[int, float]=0, parent_data:Optional[UpperLinkData]=None,
                  unit_sys:UNIT_TYPE=None,
                  none_str:str='-') -> None:
+        
+        if not isinstance(val, (int, float)):
+            raise TypeError(f"`val` must be `int` or `float`, but got `{type(val).__name__}`.")
+        
+        if not isinstance(parent_data, (UpperLinkData, type(None))):
+            raise TypeError("`parent_data` must be an instance of `UpperLinkData` or `None`, " + \
+                            f"but got `{type(parent_data).__name__}`.")
+        
+        if unit_sys not in (None, CountUnit, BinaryUnit, TimeUnit, SpeedUnit):
+            raise TypeError("`unit_sys` must be `None` or one of `(CountUnit, BinaryUnit, TimeUnit, SpeedUnit)`, " + \
+                            f"but got `{type(unit_sys).__name__}`.")
+        
+        if not isinstance(none_str, str):
+            raise TypeError(f"`none_str` must be a string, but got `{type(none_str).__name__}`.")
+        
         self.val = val
         self.__parent_data = parent_data    
         self.__unit_sys = unit_sys
-        self.access_cnt = 1
+        self.__access_cnt = 1
         self.none_str = none_str # Use when there is a "None" in the column where this data is located while rendering the table.
     
     @property
     def raw_data(self) -> float:
         return float(self.val)
     
-    def __iadd__(self, other) -> UpperLinkData:
+    def mark_access(self) -> None:
+        self.__access_cnt += 1
+    
+    def __iadd__(self, other:Union[int, float]) -> UpperLinkData:
+        if not isinstance(other, (int, float)):
+            raise TypeError(f"Instances of {self.__class__.__name__} can only be added with `int` or `float` data, "
+                            f"but provided `{type(other).__name__}`.")
         self.val += other
         self.__upper_update(other)
-        # self.access_cnt += 1
+        # self.__access_cnt += 1
         return self
     
-    def __upper_update(self, other:int) -> None:
+    def __upper_update(self, other:Union[int, float]) -> None:
         if self.__parent_data is not None:
             self.__parent_data += other
     
     def __repr__(self) -> str:
         if self.__unit_sys is not None:
-            base = auto_unit(self.val/self.access_cnt, self.__unit_sys)
+            base = auto_unit(self.val/self.__access_cnt, self.__unit_sys)
         else:
-            base = str(self.val/self.access_cnt)
-        return base + (f" [dim](×{self.access_cnt})[/]" if self.access_cnt > 1 else "")
+            base = str(self.val/self.__access_cnt)
+        return base + (f" [dim](×{self.__access_cnt})[/]" if self.__access_cnt > 1 else "")
 
 class MetricsData:
 
-    __slots__ = ['vals', 'reduce_func',
-                 '__unit_sys', 'none_str']
+    __slots__ = ['vals', 'none_str',
+                 '__reduce_func', '__unit_sys', ]
 
     def __init__(self, 
                  reduce_func:Optional[SEQ_FUNC]=np.mean, 
                  unit_sys:UNIT_TYPE=CountUnit,
                  none_str:str='-') -> None:
+        if reduce_func is not None and not callable(reduce_func):
+            raise TypeError("`reduce_func` must be a callable object, " + \
+                            f"but got `{type(reduce_func).__name__}`.")
+        elif reduce_func is not None:
+            _ = reduce_func(np.array([1, 2, 3]))
+            if not isinstance(_, (int, float)):
+                raise RuntimeError("The return type of `reduce_func` must be `int` or `float`, " + \
+                                   f"but got `{type(_).__name__}`.")
+
+        if unit_sys not in (None, CountUnit, BinaryUnit, TimeUnit, SpeedUnit):
+            raise TypeError("`unit_sys` must be `None` or one of `(CountUnit, BinaryUnit, TimeUnit, SpeedUnit)`, " + \
+                            f"but got `{type(unit_sys).__name__}`.")
+        
+        if not isinstance(none_str, str):
+            raise TypeError(f"`none_str` must be a string, but got `{type(none_str).__name__}`.")
+        
         self.vals:SEQ_DATA = np.array([])
-        self.reduce_func = reduce_func if reduce_func is not None else np.mean
+        self.__reduce_func = reduce_func if reduce_func is not None else np.mean
         self.__unit_sys = unit_sys
         self.none_str = none_str
 
     @property
     def metrics(self) -> FLOAT:
-        return self.reduce_func(self.vals) if self.vals.any() else 0.
+        return self.__reduce_func(self.vals) if self.vals.any() else 0.
     
     @property
     def iqr(self) -> FLOAT:
@@ -109,7 +147,10 @@ class MetricsData:
     def raw_data(self) -> FLOAT:
         return self.metrics
     
-    def append(self, new_val:Any) -> None:
+    def append(self, new_val:Union[int, FLOAT]) -> None:
+        if not isinstance(new_val, (int, float)):
+            raise TypeError(f"Instances of {self.__class__.__name__} can only be appended with `int` or `float` data, " + \
+                            f"but got `{type(new_val).__name__}`.")
         self.vals = np.append(self.vals, new_val)
 
     def clear(self) -> None:
@@ -216,6 +257,10 @@ class ParamsMeter(Statistics):
     )
 
     def __init__(self, opnode: OperationNode) -> None:
+        if opnode.__class__.__name__ != 'OperationNode':
+            raise TypeError("Expected `opnode` to be an instance of `OperationNode`, " + \
+                            f"but got `{type(opnode).__name__}`.")
+            
         self._opnode = opnode
         self._model:nn.Module = opnode.operation
         
@@ -315,6 +360,9 @@ class CalMeter(Statistics):
         defaults=(None,)*5)                             # type: ignore
 
     def __init__(self, opnode: OperationNode) -> None:
+        if opnode.__class__.__name__ != 'OperationNode':
+            raise TypeError("Expected `opnode` to be an instance of `OperationNode`, " + \
+                            f"but got `{type(opnode).__name__}`.")
         self._opnode = opnode
         self._model:nn.Module = opnode.operation
         
@@ -396,12 +444,12 @@ class CalMeter(Statistics):
 
         elif isinstance(iopt, (tuple, list, set)):
             repr = tuple(map(self.__iopt_repr, iopt))
-            return '(' + ',\n'.join(repr) + ')' if len(repr) > 1 else repr[0]
+            return '(' + ',\n '.join(repr) + ')' if len(repr) > 1 else repr[0]
         
         elif isinstance(iopt, dict):
             repr = ["{}: {}".format(self.__iopt_repr(k), self.__iopt_repr(v))
                     for k, v in iopt.items()]
-            return '{' + ',\n'.join(repr) + '}' if len(repr) > 1 else repr[0]
+            return '{' + ',\n '.join(repr) + '}'
         
         else:
             return type(iopt).__name__
@@ -442,8 +490,8 @@ class CalMeter(Statistics):
         self.__Flops += FLOPs
         
         if len(self.__stat_ls):
-            self.Macs.access_cnt += 1
-            self.Flops.access_cnt += 1
+            self.Macs.mark_access()
+            self.Flops.mark_access()
         else:
             self.__stat_ls.append(self.detail_val_container(
                 Operation_Id=self._opnode.node_id,
@@ -469,8 +517,8 @@ class CalMeter(Statistics):
         self.__Flops += FLOPs
 
         if len(self.__stat_ls):
-            self.Macs.access_cnt += 1
-            self.Flops.access_cnt += 1
+            self.Macs.mark_access()
+            self.Flops.mark_access()
         else:
             self.__stat_ls.append(self.detail_val_container(
                 Operation_Id=self._opnode.node_id,
@@ -490,8 +538,8 @@ class CalMeter(Statistics):
         self.__Flops += FLOPs
 
         if len(self.__stat_ls):
-            self.Macs.access_cnt += 1
-            self.Flops.access_cnt += 1
+            self.Macs.mark_access()
+            self.Flops.mark_access()
         else:
             self.__stat_ls.append(self.detail_val_container(
                 Operation_Id=self._opnode.node_id,
@@ -525,8 +573,8 @@ class CalMeter(Statistics):
         self.__Flops += FLOPs
 
         if len(self.__stat_ls):
-            self.Macs.access_cnt += 1
-            self.Flops.access_cnt += 1
+            self.Macs.mark_access()
+            self.Flops.mark_access()
         else:
             self.__stat_ls.append(self.detail_val_container(
                 Operation_Id=self._opnode.node_id,
@@ -540,7 +588,10 @@ class CalMeter(Statistics):
 
     def __pool_hook(self, module, input, output):
         k = module.kernel_size
-        k = (k,) if isinstance(k, int) else k
+        if isinstance(k, int):
+            dimension = int(re.findall(r'\d+', module.__class__.__name__)[0])
+            k = (k,)*dimension
+
         n = reduce(mul, k)-1
         m = output.numel()
 
@@ -554,14 +605,14 @@ class CalMeter(Statistics):
         self.__Flops += FLOPs
 
         if len(self.__stat_ls):
-            self.Macs.access_cnt += 1
-            self.Flops.access_cnt += 1
+            self.Macs.mark_access()
+            self.Flops.mark_access()
         else:
             self.__stat_ls.append(self.detail_val_container(
                 Operation_Id=self._opnode.node_id,
                 Operation_Name=self._opnode.name,
                 Operation_Type=self._opnode.type,
-                Kernel_Size=list(k) if len(k)>1 else [k[0]]*2,
+                Kernel_Size=list(k),
                 Input=self.__iopt_repr(input),
                 Output=self.__iopt_repr(output),
                 MACs=self.Macs,
@@ -570,8 +621,8 @@ class CalMeter(Statistics):
 
     def __container_hook(self, module, input, output):
         if len(self.__stat_ls):
-            self.Macs.access_cnt += 1
-            self.Flops.access_cnt += 1
+            self.Macs.mark_access()
+            self.Flops.mark_access()
         else:
             self.__stat_ls.append(self.detail_val_container(
                 Operation_Id=self._opnode.node_id,
@@ -610,6 +661,10 @@ class MemMeter(Statistics):
         defaults=(None,)*7)                                               # type: ignore
 
     def __init__(self, opnode: OperationNode) -> None:
+        if opnode.__class__.__name__ != 'OperationNode':
+            raise TypeError("Expected `opnode` to be an instance of `OperationNode`, " + \
+                            f"but got `{type(opnode).__name__}`.")
+            
         self._opnode = opnode
         self._model:nn.Module = opnode.operation
         self.is_inplace:bool = getattr(self._model, 'inplace', False)
@@ -666,7 +721,7 @@ class MemMeter(Statistics):
         self.__is_valid_access()
         res_dict =  {'[b]Parameters[/] Memory Cost': f"{self.ParamCost}, {self.ParamCost.val*100/self.TotalCost.val:.2f} %",
                      '[b]Buffers[/] Memory Cost': f"{self.BufferCost}, {self.BufferCost.val*100/self.TotalCost.val:.2f} %",
-                     '[b]FeatureMap[/] Memory Cost': f"{self.OutputCost}, {self.OutputCost.val*100/self.TotalCost.val:.2f}",
+                     '[b]FeatureMap[/] Memory Cost': f"{self.OutputCost}, {self.OutputCost.val*100/self.TotalCost.val:.2f} %",
                      '[b]Total Memory Cost[/]': str(self.TotalCost)}
         max_keylen = max([len(key) for key in res_dict.keys()])
         res_dict = {key.ljust(max_keylen): value for key, value in res_dict.items()}
@@ -683,23 +738,14 @@ class MemMeter(Statistics):
         return hook
 
     def __hook_func(self, module, input, output):
-        param_cost = 0 # byte
-        for param in module._parameters.values():
-            if param is None:
-                continue
-            param_cost += param.numel() * param.element_size()
-        self.__ParamCost += param_cost
-        
-        buffer_cost = 0 # byte
-        for buffer in module.buffers():
-            buffer_cost += buffer.numel() * buffer.element_size()
-        self.__BufferCost += buffer_cost
-        
         opt_cost = 0
         if self._opnode.is_leaf and not self.is_inplace:
+            output = output if isinstance(output, tuple) else (output,)
             for opt in output:
                 if isinstance(opt, Tensor):
                     opt_cost += opt.numel() * opt.element_size() # byte
+                elif isinstance(opt, np.ndarray):
+                    opt_cost += opt.nbytes
                 elif isinstance(opt, str):
                     opt_cost += opt.__sizeof__()
                 else:
@@ -708,9 +754,21 @@ class MemMeter(Statistics):
         
         if len(self.__stat_ls):
             # duplicated access
-            self.OutputCost.access_cnt += 1
+            self.OutputCost.mark_access()
             total_cost = opt_cost
         else:
+            param_cost = 0 # byte
+            for param in module._parameters.values():
+                if param is None:
+                    continue
+                param_cost += param.numel() * param.element_size()
+            self.__ParamCost += param_cost 
+            
+            buffer_cost = 0 # byte
+            for buffer in module._buffers.values():
+                buffer_cost += buffer.numel() * buffer.element_size()
+            self.__BufferCost += buffer_cost
+
             total_cost = param_cost + buffer_cost + opt_cost
             self.__stat_ls.append(self.detail_val_container(
                 Operation_Id=self._opnode.node_id,
@@ -730,10 +788,10 @@ class MemMeter(Statistics):
                 raise RuntimeError("This module might be defined but not explicitly called, so no data is collected.")
         else:
             raise AttributeError("You should never access this property on your own " + \
-                                 "before accessing `Meter(your_model).cal`.")
+                                 "before accessing `Meter(your_model).mem`.")
         return True
 
-class ITTPMeter(Statistics):
+class IttpMeter(Statistics):
 
     detail_val_container:NamedTuple = namedtuple(                           # type: ignore
         typename='InferTime_Throughput_INFO', 
@@ -748,6 +806,10 @@ class ITTPMeter(Statistics):
         defaults=(None,)*5,)                                                 # type: ignore
                                                                 
     def __init__(self, opnode: OperationNode) -> None:
+        if opnode.__class__.__name__ != 'OperationNode':
+            raise TypeError("Expected `opnode` to be an instance of `OperationNode`, " + \
+                            f"but got `{type(opnode).__name__}`.")
+        
         self._opnode = opnode
         self._model:nn.Module = opnode.operation
         
@@ -796,6 +858,8 @@ class ITTPMeter(Statistics):
 
     def measure(self, device:tc_device, repeat:int=50, global_process:Optional[tqdm]=None) -> RemovableHandle:
         
+        self._model.to(device, non_blocking=True)
+
         hook = self._model.register_forward_hook(
             partial(self.__hook_func, 
                     device=device, 
@@ -822,7 +886,8 @@ class ITTPMeter(Statistics):
         gpu_start_timer = start_event.record
         gpu_end_timer = end_event.record
 
-        cuda_sync()  # WAIT FOR GPU SYNC  
+        if device.type != 'cpu':
+            cuda_sync()  # WAIT FOR GPU SYNC  
         with no_grad():
             for _ in range(repeat):
                 start_time = cpu_timer() if device.type == 'cpu' else gpu_start_timer()
@@ -837,7 +902,7 @@ class ITTPMeter(Statistics):
                     cuda_sync()  # WAIT FOR GPU SYNC
                     it = start_event.elapsed_time(end_event)*1e-3 # ms -> s    # type: ignore
 
-                tp = input[0].shape[0]/it
+                tp = input[0].shape[0]/it # TODO： batch infer
                 self.__InferTime.append(it) 
                 self.__Throughput.append(tp)
 
@@ -858,5 +923,5 @@ class ITTPMeter(Statistics):
                 raise RuntimeError("This module might be defined but not explicitly called, so no data is collected.")
         else:
             raise AttributeError("You should never access this property on your own " + \
-                                 "before accessing `Meter(your_model).cal`.")
+                                 "before accessing `Meter(your_model).ittp`.")
         return True
