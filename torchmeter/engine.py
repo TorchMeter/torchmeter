@@ -147,12 +147,12 @@ class OperationTree:
         
         # build operation tree
         copy_childs, str_childs = [], []
-        for access_idx, (module_name, module) in enumerate(subject.operation.named_children()):
+        for access_idx, (module_name, module) in enumerate(subject.operation._modules.items()):
             module_idx = (subject.node_id if subject.node_id != '0' else '') + \
                          ('.' if subject.node_id != '0' else '') + \
                          str(access_idx+1)
                          
-            child = OperationNode(module=module, 
+            child = OperationNode(module=module,    # type: ignore
                                   name=module_name,
                                   parent=subject,
                                   node_id=module_idx)
