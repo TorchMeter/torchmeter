@@ -13,10 +13,11 @@ from torchmeter.display import render_perline
 
 if TYPE_CHECKING:
     import sys
-    from typing import Any, Dict, List, Tuple, Union
+    from typing import Any, Dict, List, Tuple, Union, Optional
     
     from rich.tree import Tree
     from rich.text import Text
+    from polars import DataFrame
 
     from torchmeter.config import FlagNameSpace
     from torchmeter.statistic import ParamsMeter, CalMeter, MemMeter, IttpMeter
@@ -37,18 +38,19 @@ class Meter:
 
     def __init__(self, 
                  model: nn.Module,
-                 device:Union[str, tc_device]='cpu') -> None:
+                 device:Optional[Union[str, tc_device]]=None) -> None:
         
         from torchmeter.engine import OperationTree
         from torchmeter.display import TreeRenderer, TabularRenderer
 
-        self.__device = tc_device(device)
-
         if not isinstance(model, nn.Module):
             raise TypeError(f"model must be a nn.Module, but got {type(model)}.")
+        
+        device = device or self.__device_detect(model)
+        self.__device = tc_device(device) if isinstance(device, str) else device
         self.model = model.to(self.__device)
 
-        self.ipt:IPT_TYPE = {'args':tuple(), 'kwargs':dict()} # TODO: self.ipt_infer()
+        self._ipt:IPT_TYPE = {'args':tuple(), 'kwargs':dict()} # TODO: self.ipt_infer()
 
         self.optree = OperationTree(self.model)
 
@@ -62,16 +64,70 @@ class Meter:
         self.ittp_benchmark_time = 100
 
     def __call__(self, *args, **kwargs) -> Any:
-        self.ipt = {'args': args, 'kwargs': kwargs}
+        self._ipt = {'args': args, 'kwargs': kwargs}
         self._ipt2device()
-        return self.model(*self.ipt['args'], **self.ipt['kwargs'])
+        self.model.to(self.device)
+        return self.model(*self._ipt['args'], **self._ipt['kwargs'])
+    
+    def __getattr__(self, name: str) -> Any:
+        
+        try:
+            # get the property with same name defined in Meter from origin model
+            if name.startswith("ORIGIN_"):
+                name = name[7:]
+                raise AttributeError
+            return super().__getattribute__(name)
+        
+        except AttributeError:
+            return getattr(self.model, name)
+    
+    def __setattr__(self, name: str, value: Any) -> None:
+        
+        cls_attrs:Dict[str, bool] = self.__cls_property__()
+        notchange_cls_attrs = [k for k,v in cls_attrs.items() if not v]
+        
+        if name in notchange_cls_attrs:
+            raise AttributeError(f"`{name}` could never be set.")
+        
+        try:
+            # set the property with same name defined in Meter from origin model
+            if name.startswith("ORIGIN_"):
+                name = name[7:]
+                raise AttributeError
+            
+            super().__setattr__(name, value)
+            
+        except AttributeError:
+            setattr(self.model, name, value)
+    
+    def __delattr__(self, name:str) -> None:
+        
+        cls_attrs:Dict[str, bool] = self.__cls_property__()
+        
+        if name in cls_attrs:
+            raise AttributeError(f"`{name}` could never be deleted.")
+        
+        try:
+            # delete the property with same name defined in Meter from origin model
+            if name.startswith("ORIGIN_"):
+                name = name[7:]
+                raise AttributeError
+            
+            super().__delattr__(name)
+            
+        except AttributeError:
+            delattr(self.model, name)
+    
+    @property
+    def ipt(self):
+        return self._ipt
     
     @property
     def device(self) -> tc_device:
         return self.__device
     
     @device.setter
-    def device(self, new_device:str) -> None:
+    def device(self, new_device:Union[str, tc_device]) -> None:
         self.__device = tc_device(new_device)
         self.model.to(self.__device)
         if not self._is_ipt_empty():
@@ -125,7 +181,7 @@ class Meter:
         
         rendered_tree = self.tree_renderer() if cache_res is None else cache_res
         
-        if is_rpbk_change:
+        if is_rpbk_change and fold_repeat:
             __cfg__.tree_repeat_block_args.mark_unchange()
         if is_level_change:
             __cfg__.tree_levels_args.mark_unchange()
@@ -187,7 +243,11 @@ class Meter:
         if self._is_ipt_empty():
             raise RuntimeError("Input unknown! " + \
                                "You should perform at least one feed-forward inference before measuring the inference time or throughput!") 
-
+        if not isinstance(self.ittp_warmup, int):
+            raise TypeError(f"ittp_warmup must be an integer, but got {type(self.ittp_warmup).__name__}")
+        if self.ittp_warmup < 0:
+            raise ValueError(f"ittp_warmup must be greater than or equal to 0, but got {self.ittp_warmup}.")
+        
         self._ipt2device()
 
         for i in tqdm(range(self.ittp_warmup), desc='Warming Up'):
@@ -216,7 +276,7 @@ class Meter:
         from inspect import signature
         from torchmeter.utils import indent_str, data_repr
 
-        forward_args:Tuple[str, ...] = tuple(signature(self.model.forward).parameters.keys())
+        forward_args:List[str] = list(signature(self.model.forward).parameters.keys())
         if self._is_ipt_empty():
             ipt_repr = "[dim]Not Provided\n(give an inference first)[/]"
         else:
@@ -225,10 +285,11 @@ class Meter:
             ipt_repr_ls = [f"{args_name} = {data_repr(args_val)}" for args_name, args_val in ipt_dict.items()] 
             ipt_repr = ',\n'.join(ipt_repr_ls) 
 
+        forward_args = ["self"] + forward_args
         infos = '\n'.join([
             f"• [b]Model    :[/b] {self.optree.root.name}",
             f"• [b]Device   :[/b] {self.device}",
-            f"• [b]Signature:[/b] forward(self, {', '.join(forward_args)})",
+            f"• [b]Signature:[/b] forward({', '.join(forward_args)})",
             f"• [b]Input    :[/b] \n{indent_str(ipt_repr, indent=3, guideline=False)}"
         ])
         
@@ -239,7 +300,16 @@ class Meter:
     def subnodes(self) -> List[str]:
         return [f"({node.node_id}) {node.name}" for node in self.optree.all_nodes]
 
+    def to(self, new_device:Union[str, tc_device]) -> None:
+        self.device = new_device # type: ignore
+
     def rebase(self, node_id:str) -> Meter:
+        if not isinstance(node_id, str):
+            raise TypeError(f"node_id must be a string, but got `{type(node_id).__name__}`.")
+        
+        if node_id == "0":
+            return self
+        
         id_generator = ( (node_idx, node.node_id) for node_idx, node in enumerate(self.optree.all_nodes) )
 
         for idx, valid_id in id_generator:
@@ -282,7 +352,7 @@ class Meter:
         
         invalid_stat = tuple(filter(lambda x: x not in self.optree.root.statistics, order))
         if len(invalid_stat) > 0:
-            raise AttributeError(f"Invalid statistics: {invalid_stat}")
+            raise ValueError(f"Invalid statistics: {invalid_stat}")
         
         container = Columns(expand=True, align='center')
         format_cell = partial(Panel, safe_box=True, expand=False, highlight=True, box=HORIZONTALS)
@@ -295,6 +365,24 @@ class Meter:
         
         return container
 
+    def table_cols(self, stat_name:str) -> Tuple[str, ...]:
+        if not isinstance(stat_name, str):
+            raise TypeError(f"stat_name must be a string, but got `{type(stat_name).__name__}`.")
+        
+        stats_data_dict:Dict[str, DataFrame] = self.table_renderer.stats_data
+        
+        if stat_name not in stats_data_dict:
+            raise KeyError(f"Statistics `{stat_name}` in {tuple(stats_data_dict.keys())}.")
+        
+        stat_data:DataFrame = stats_data_dict[stat_name]
+        
+        if stat_data.is_empty():
+            cols:Tuple[str, ...] = getattr(self.optree.root, stat_name).tb_fields
+        else:
+            cols = tuple(stat_data.columns)
+        
+        return cols
+    
     def profile(self, 
                 stat_name:str, 
                 show=True, no_tree=False, 
@@ -323,7 +411,15 @@ class Meter:
         from rich.rule import Rule
         from rich.layout import Layout
 
-        TREE_TABLE_GAP = __cfg__.combine.horizon_gap # the horizontal gap between tree and table
+        # the horizontal gap between tree and table
+        TREE_TABLE_GAP = __cfg__.combine.horizon_gap
+
+        if not isinstance(stat_name, str):
+            raise TypeError(f"stat_name must be a string, but got `{type(stat_name).__name__}`.") 
+
+        if TREE_TABLE_GAP < 0:
+            raise ValueError("The gap between the rendered tree and the rendered table should be non-negative, " + \
+                             f"but got {TREE_TABLE_GAP}.")
         
         stat = getattr(self, stat_name)
         tb, data = self.table_renderer(stat_name=stat_name, **tb_kwargs)
@@ -334,13 +430,13 @@ class Meter:
         tree = None if no_tree else self.structure
         
         console = get_console()
-        tree_width = console.measure(tree).maximum if tree is not None else 0
+        tree_width = console.measure(tree).maximum if not no_tree else 0 # type: ignore
         desirable_tb_width = console.measure(tb).maximum
         actual_tb_width = min(desirable_tb_width, console.width - tree_width - TREE_TABLE_GAP)
         
         if actual_tb_width <= 5: # 5 is the minimum width of table
-            raise ValueError("The width of the terminal is too small, try to maximize the window or " + \
-                             "set a smaller `horizon_gap` value in your config and try again.")
+            raise RuntimeError("The width of the terminal is too small, try to maximize the window or " + \
+                               "set a smaller `horizon_gap` value in config and try again.")
         
         # when some cells in the table is overflown, we need to show a line between rows
         if actual_tb_width < desirable_tb_width:
@@ -390,7 +486,7 @@ class Meter:
         try: 
             render_perline(renderable=canvas)
         finally:
-            # if user interupt the display in case that render_interval > 0
+            # if user interupts the rendering when render_interval > 0
             # still restore the console size
             console.width = origin_width
             console.height = origin_height
@@ -398,24 +494,51 @@ class Meter:
         return tb, data
 
     def _is_ipt_empty(self) -> bool:
-        return not self.ipt['args'] and not self.ipt['kwargs']
+        return not self._ipt['args'] and not self._ipt['kwargs']
         
     def _ipt2device(self) -> None:
         if self._is_ipt_empty():
-            raise ValueError("No input data provided.")
+            raise RuntimeError("No input data provided.")
 
-        devices = set(arg.device for arg in self.ipt['args'] if isinstance(arg, Tensor))
-        devices.update(kwargs.device for kwargs in self.ipt['kwargs'].values() if isinstance(kwargs, Tensor))
+        devices = set(arg.device for arg in self._ipt['args'] if isinstance(arg, Tensor))
+        devices.update(kwargs.device for kwargs in self._ipt['kwargs'].values() if isinstance(kwargs, Tensor))
 
+        if not len(devices):
+            return
+        
         if len(devices) == 1 and next(iter(devices)) == self.device:
             return
 
-        self.ipt = {
+        self._ipt = {
             'args': tuple(x.to(self.device) if isinstance(x, Tensor) else x 
-                          for x in self.ipt['args']),
+                          for x in self._ipt['args']),
             'kwargs': {k: (v.to(self.device) if isinstance(v, Tensor) else v) 
-                       for k, v in self.ipt['kwargs'].items()}
+                       for k, v in self._ipt['kwargs'].items()}
         }
 
+    def __device_detect(self, model) -> Union[str, tc_device]:
+        
+        import warnings
+        
+        try:
+            model_first_param = next(model.parameters())
+            return model_first_param.device
+        
+        except StopIteration:
+            warnings.warn(category=UserWarning, message=\
+                "We can't detect the device where your model is located because no parameter was found in your model. " + \
+                "We'll move your model to CPU and do all subsequent analysis based on this CPU version. " + \
+                "If this isn't what you want, set a specific device when initializing the `Meter` class, " + \
+                "e.g. `Meter(your_model, device='cuda:0')`.")
+                          
+            return "cpu"
+        
     def __repr__(self) -> str:
         return f"Meter(model={self.optree}, device={self.device})"
+
+    @classmethod
+    def __cls_property__(cls) -> Dict[str, bool]:
+        """Return: cls_attr_name: can be set"""
+        return {k:v.fset is not None for k,v in cls.__dict__.items() 
+                if isinstance(v, property)}
+        
