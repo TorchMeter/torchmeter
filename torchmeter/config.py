@@ -20,7 +20,8 @@ if TYPE_CHECKING:
     else:
         from typing_extensions import TypeAlias
 
-    from typing import Any, Dict, Optional, Sequence, Union, List
+    from typing import Any, Dict, Sequence, Union, List
+    from typing import Callable, Optional
 
     CFG_CONTENT_TYPE: TypeAlias = Union[
         int, float, str, bool, None,
@@ -80,7 +81,7 @@ table_column_args:
     vertical: middle
     
     overflow: fold
-    no_warp: False
+    no_wrap: False
         
 table_display_args:
     style: spring_green4
@@ -144,10 +145,23 @@ class BOX(Enum):
     SQUARE = box.SQUARE
     SQUARE_DOUBLE_HEAD = box.SQUARE_DOUBLE_HEAD
 
+# all the keys should be str, while all the value should be enum
+# int each value, all the member's name should not be the same with its value's repr
 UNSAFE_KV = {
     'box': BOX
 }
 
+def list_to_callbacklist(ls: List[Any], 
+                         callback_func: Callable[[], Any]=lambda: None) -> CallbackList:
+    _list: List[Any] = []
+    for item in ls:
+        if isinstance(item, dict):
+            _list.append(dict_to_namespace(item))
+        elif isinstance(item, list):
+            _list.append(list_to_callbacklist(item, callback_func=callback_func))
+        else:
+            _list.append(item)
+    return CallbackList(_list, callback_func=callback_func)
 
 def dict_to_namespace(d: Dict[str, Any]) -> FlagNameSpace:
     """
@@ -157,6 +171,7 @@ def dict_to_namespace(d: Dict[str, Any]) -> FlagNameSpace:
         raise TypeError(f"Input must be a dictionary, but got {type(d)}")
     
     ns = FlagNameSpace()
+    
     for k, v in d.items():
         # overwrite the value of unsafe key to get the unrepresent value
         if k in UNSAFE_KV:
@@ -166,18 +181,15 @@ def dict_to_namespace(d: Dict[str, Any]) -> FlagNameSpace:
             setattr(ns, k, dict_to_namespace(v))
             
         elif isinstance(v, list):
-            _list = []
-            for item in v:
-                if isinstance(item, dict):
-                    _list.append(dict_to_namespace(item))
-                else:
-                    _list.append(item)
-            setattr(ns, k, _list)
+            setattr(ns, k, list_to_callbacklist(v, callback_func=ns.mark_change))
+        
+        elif isinstance(v, set):
+            setattr(ns, k, CallbackSet(v, callback_func=ns.mark_change))
             
         else:
-            if k.startswith("__FLAG"):
-                warnings.warn(f"Key {k} is not a valid level name and the settings will be ignored.")
-                continue
+            if not isinstance(k, str):
+                raise TypeError(f"Attribute name must be a string, but got `{type(k).__name__}`")
+            
             setattr(ns, k, v)
             
     return ns
@@ -190,7 +202,7 @@ def namespace_to_dict(ns, safe_resolve=False) -> Dict[str, CFG_CONTENT_TYPE]:
         raise TypeError(f"Input must be an instance of SimpleNamespace, but got {type(ns)}")
 
     d:Dict[str, CFG_CONTENT_TYPE] = {}
-    for k, v in ns.__dict__.items():
+    for k, v in ns.data_dict.items():
         # transform the unrepresent value to its name defined in corresponding Enum
         if k in UNSAFE_KV and safe_resolve:
             v = UNSAFE_KV[k](v).name
@@ -207,7 +219,7 @@ def namespace_to_dict(ns, safe_resolve=False) -> Dict[str, CFG_CONTENT_TYPE]:
                     _list.append(item)
             d[k] = _list
             
-        elif not k.startswith('__FLAG'):
+        else:
             d[k] = v
             
     return d
@@ -218,31 +230,84 @@ def get_config(config_file:Optional[str]=None) -> Config:
     cfg.config_file = cfg_file
     return cfg
 
+class CallbackList(list):
+    def __init__(self, *args, callback_func=lambda:None, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        
+        self._callback_func = callback_func
+        self._register_callback("append", "extend", "insert",
+                                "pop", "remove", "clear",
+                                "reverse", "sort",
+                                "__setitem__", "__delitem__",
+                                "__iadd__", "__imul__")
+    
+    def _register_callback(self, *methods) -> None:
+        for method_name in methods:
+            orig_method = getattr(self.__class__, method_name)
+            def wrapped_method(*args, _method=orig_method, **kwargs):
+                result = _method(*args, **kwargs)
+                self._callback_func()
+                return result
+            setattr(self.__class__, method_name, wrapped_method)  
+
+class CallbackSet(set):
+    def __init__(self, *args, callback_func=lambda:None, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        self._callback_func = callback_func
+        self._register_callback("add", "update", "difference_update",
+                                "intersection_update", "symmetric_difference_update",
+                                "discard", "pop", "remove", "clear",
+                                "__isub__", "__iand__",
+                                "__ixor__", "__ior__")
+    
+    def _register_callback(self, *methods):
+        for method_name in methods:
+            orig_method = getattr(self.__class__, method_name)
+            def wrapped_method(*args, _method=orig_method, **kwargs):
+                result = _method(*args, **kwargs)
+                self._callback_func()
+                return result
+            setattr(self.__class__, method_name, wrapped_method) 
+
 class FlagNameSpace(SimpleNamespace):
     
     __flag_key = '__FLAG'
     
     def __init__(self, **kwargs) -> None:
-        super().__init__(**kwargs)
-        
-        cnt = 1
-        while self.__flag_key in kwargs:
-            self.__flag_key += str(cnt)
-            cnt += 1
-        
+        list(map(lambda x: setattr(self, x, kwargs[x]), kwargs))        
         self.mark_unchange()
             
-    def __setattr__(self, key: str, value: Any) -> None:
-        if key == self.__flag_key:
-            raise AttributeError(f"`{key}` is preserved for internal use, could never be changed.")
+    def __setattr__(self, key: str, value: Any) -> None:                
+        if key in ("__flag_key", self.__flag_key):
+            raise AttributeError(f"`{key}` is preserved for internal use, " + \
+                                 "you should never try to set it to a new value.")
+        
+        if isinstance(value, dict):
+            value = dict_to_namespace(value)
+        elif isinstance(value, list):
+            value = list_to_callbacklist(value, callback_func=self.mark_change)
+        elif isinstance(value, set):
+            value = CallbackSet(value, callback_func=self.mark_change)
+        
         super().__setattr__(key, value)
+        
         self.mark_change()
     
     def __delattr__(self, key):
-        if key == self.__flag_key:
-            raise AttributeError(f"`{key}` is preserved for internal use, could never be deleted.")
+        if key in ("__flag_key", self.__flag_key):
+            raise AttributeError(f"`{key}` is preserved for internal use, " + \
+                                 "you should never try to delete it.")
+                    
         super().__delattr__(key)
+        
         self.mark_change()
+    
+    @property
+    def data_dict(self):
+        full_dict = self.__dict__.copy()
+        del full_dict[self.__flag_key]
+        return full_dict
     
     def is_change(self) -> bool:
         res = getattr(self, self.__flag_key) or \
@@ -308,8 +373,7 @@ class Config(metaclass=ConfigMeta):
             if not file_path.endswith('.yaml'):
                 raise ValueError(f"Config file must be a yaml file, but got {file_path}")
         
-            self.__cfg_file = file_path
-        
+        self.__cfg_file = file_path
         self.__load()
         self.check_integrity()
             
@@ -375,24 +439,29 @@ class Config(metaclass=ConfigMeta):
     def __repr__(self) -> str:
         d = self.asdict(safe_resolve=True)
 
-        s = '• Config file: ' + (self.config_file if self.config_file else 'None(default setting below)') + '\n'
-        for field_name, field_vals in d.items():
-            not_container = False
-            field_vals_repr = [f"\n• {field_name}: "]
+        def simple_data_repr(val:Any) -> str: 
+            val_repr = []         
             
-            if isinstance(field_vals, dict):
-                field_vals_repr.extend([f"{k} = {v} " for k,v in field_vals.items()])
-            elif isinstance(field_vals, list):
-                field_vals_repr.extend([f"- {v}" for v in field_vals])
+            if isinstance(val, dict):
+                val_repr.append("dict{")
+                val_repr.extend([f"{k} = {simple_data_repr(v)}" for k,v in val.items()])
+                # val_repr[-1] += "}"
+                val_repr.append("}")
+            
+            elif isinstance(val, (tuple, list, set)):
+                val_repr.append(f"{type(val).__name__}(")
+                val_repr.extend([f"- {simple_data_repr(v)}" for v in val])
+                # val_repr[-1] += ")"
+                val_repr.append(")")
+            
             else:
-                not_container = True
-                field_vals_repr.append(str(field_vals))
-            
-            # concat field name and field value if it is not a container
-            if len(field_vals_repr) == 2 and not_container:
-                field_vals_repr = [''.join(field_vals_repr)]
-                
-            s += indent_str(field_vals_repr, indent=4, process_first=False) + '\n'
+                return f"{val} | <{type(val).__name__}>"
+
+            return indent_str(val_repr, indent=4, process_first=False)
+        
+        s = '• Config file: ' + (self.config_file if self.config_file else 'None(default setting below)') + "\n"*2
+        for field_name, field_vals in d.items():              
+            s += f"• {field_name}: " + simple_data_repr(field_vals) + "\n"*2
         return s
 
 if __name__ == '__main__':
