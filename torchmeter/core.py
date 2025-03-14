@@ -44,7 +44,7 @@ class Meter:
         from torchmeter.display import TreeRenderer, TabularRenderer
 
         if not isinstance(model, nn.Module):
-            raise TypeError(f"model must be a nn.Module, but got {type(model)}.")
+            raise TypeError(f"model must be a nn.Module, but got `{type(model).__name__}`.")
         
         device = device or self.__device_detect(model)
         self.__device = tc_device(device) if isinstance(device, str) else device
@@ -244,9 +244,9 @@ class Meter:
             raise RuntimeError("Input unknown! " + \
                                "You should perform at least one feed-forward inference before measuring the inference time or throughput!") 
         if not isinstance(self.ittp_warmup, int):
-            raise TypeError(f"ittp_warmup must be an integer, but got {type(self.ittp_warmup).__name__}")
+            raise TypeError(f"ittp_warmup must be an integer, but got `{type(self.ittp_warmup).__name__}`")
         if self.ittp_warmup < 0:
-            raise ValueError(f"ittp_warmup must be greater than or equal to 0, but got {self.ittp_warmup}.")
+            raise ValueError(f"ittp_warmup must be greater than or equal to 0, but got `{self.ittp_warmup}`.")
         
         self._ipt2device()
 
@@ -325,7 +325,7 @@ class Meter:
         elif isinstance(stat_or_statname, Statistics):
             stat = stat_or_statname
         else:
-            raise TypeError(f"Invalid type for stat_or_statname: {type(stat_or_statname)}. " + \
+            raise TypeError(f"Invalid type for stat_or_statname: `{type(stat_or_statname).__name__}`. " + \
                             "Please pass in the statistics name or the statistics object itself.")
 
         stat_name = stat.name
@@ -419,7 +419,7 @@ class Meter:
 
         if TREE_TABLE_GAP < 0:
             raise ValueError("The gap between the rendered tree and the rendered table should be non-negative, " + \
-                             f"but got {TREE_TABLE_GAP}.")
+                             f"but got `{TREE_TABLE_GAP}`.")
         
         stat = getattr(self, stat_name)
         tb, data = self.table_renderer(stat_name=stat_name, **tb_kwargs)

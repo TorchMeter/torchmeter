@@ -180,7 +180,7 @@ def render_perline(renderable: RenderableType) -> None:
     
     time_sep:float = __cfg__.render_interval
     if time_sep < 0:
-        raise ValueError(f"The `render_interval` value defined in config must be non-negative, but got {time_sep}")
+        raise ValueError(f"The `render_interval` value defined in config must be non-negative, but got `{time_sep}`")
 
     console:Console = get_console()
 
@@ -375,8 +375,8 @@ class TreeRenderer:
             - `TypeError`: if the new value is not a dict.
         """
         if not isinstance(custom_args, dict):
-            raise TypeError(f"You can only overwrite `{self.__class__.__name__}.default_level_args` with a dict. " + \
-                            f"But got {type(custom_args)}.")
+            raise TypeError(f"You can only overwrite `{self.__class__.__name__}.default_level_args` with a dict, " + \
+                            f"but got `{type(custom_args).__name__}`.")
         
         valid_setting_keys = set(signature(Tree).parameters.keys())
         passin_keys = set(custom_args.keys())
@@ -407,8 +407,8 @@ class TreeRenderer:
             `TypeError`: if the new value is not a dict or a list of dict.
         """
         if not isinstance(custom_args, dict):
-            raise TypeError(f"You can only overwrite `{self.__class__.__name__}.tree_levels_args` with a dict. " + \
-                            f"But got {type(custom_args)}.")
+            raise TypeError(f"You can only overwrite `{self.__class__.__name__}.tree_levels_args` with a dict, " + \
+                            f"but got `{type(custom_args).__name__}`.")
                                                             
         # filt out invalid level definations and invalid display settings
         valid_setting_keys = set(signature(Tree).parameters.keys())
@@ -416,7 +416,7 @@ class TreeRenderer:
             # assure level is a non-negative integer, 'default' or 'all'
             level = level.lower()
             if not level.isnumeric() and level not in ('default', 'all'):
-                warnings.warn(message=f"The `level` key should be numeric, `default` or `all`, but got {level}.\n" + \
+                warnings.warn(message=f"The `level` key should be numeric, `default` or `all`, but got `{level}`.\n" + \
                                       "This setting will be ignored.\n",
                               category=UserWarning)
                 continue
@@ -459,8 +459,8 @@ class TreeRenderer:
             - `TypeError`: if the new value is not a dict.
         """
         if not isinstance(custom_args, dict):
-            raise TypeError(f"You can only overwrite `{self.__class__.__name__}.repeat_block_args` with a dict. " + \
-                            f"But got {type(custom_args)}.")
+            raise TypeError(f"You can only overwrite `{self.__class__.__name__}.repeat_block_args` with a dict, " + \
+                            f"but got `{type(custom_args).__name__}`.")
                                                         
         footer_key = list(filter(lambda x: x.lower() == 'repeat_footer', custom_args.keys()))
         if footer_key:
@@ -765,8 +765,8 @@ class TabularRenderer:
     @tb_args.setter # type: ignore
     def tb_args(self, custom_args:Dict[str, Any]):
         if not isinstance(custom_args, dict):
-            raise TypeError(f"You can only overwrite `{self.__class__.__name__}.tb_args` with a dict. " + \
-                            f"But got {type(custom_args)}.")
+            raise TypeError(f"You can only overwrite `{self.__class__.__name__}.tb_args` with a dict, " + \
+                            f"but got `{type(custom_args).__name__}`.")
         
         valid_setting_keys = set(signature(Table).parameters.keys())
         passin_keys = set(custom_args.keys())
@@ -781,8 +781,8 @@ class TabularRenderer:
     @col_args.setter # type: ignore
     def col_args(self, custom_args:Dict[str, Any]):
         if not isinstance(custom_args, dict):
-            raise TypeError(f"You can only overwrite `{self.__class__.__name__}.col_args` with a dict. " + \
-                            f"But got {type(custom_args)}.")
+            raise TypeError(f"You can only overwrite `{self.__class__.__name__}.col_args` with a dict, " + \
+                            f"but got `{type(custom_args).__name__}`.")
         
         valid_setting_keys = set(signature(Column).parameters.keys())
         passin_keys = set(custom_args.keys())
@@ -833,7 +833,7 @@ class TabularRenderer:
 
     def clear(self, stat_name:Optional[str]=None) -> None:
         if not isinstance(stat_name, (str, type(None))):
-            raise TypeError(f"`stat_name` must be a string or None, but got {type(stat_name)}.")
+            raise TypeError(f"`stat_name` must be a string or None, but got `{type(stat_name).__name__}`.")
             
         valid_stat_name = self.opnode.statistics
         if isinstance(stat_name,str):
@@ -967,7 +967,7 @@ class TabularRenderer:
             
             if not val_collector:
                 raise RuntimeError(f"No {stat_name} data collected, the reasons are three-folds:\n" + \
-                                   "1. No module is called, make sure that your `forawrd` method is not empty.\n" + \
+                                   "1. No module is called, make sure that your model's `forward` method is not empty.\n" + \
                                    "2. The whole model is empty and has no sublayers.\n" + \
                                    "3. You use a single layer as a model, consider putting it in a class and try again.\n")
             data = DataFrame(data=val_collector, schema=valid_fields, orient='row')
@@ -1012,7 +1012,7 @@ class TabularRenderer:
             save_to = os.path.abspath(save_to)  
             if '.' not in os.path.basename(save_to):
                 if save_format not in self.valid_export_format:
-                    raise ValueError(f"Argument `save_format` must be one in {self.valid_export_format}, but got {save_format}.\n" + \
+                    raise ValueError(f"Argument `save_format` must be one in {self.valid_export_format}, but got `{save_format}`. " + \
                                      "Alternatively, you can set `save_to` to a concrete file path, like `path/to/file.xlsx`")
             
             self.export(df=data,

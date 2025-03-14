@@ -30,7 +30,7 @@ class OperationNode:
 
         if not isinstance(module, nn.Module):
             raise TypeError(f"You must use an `nn.Module` instance to instantiate `{self.__class__.__name__}`, " + \
-                            f"but got {type(module).__name__}.")
+                            f"but got `{type(module).__name__}`.")
         
         # basic info
         self.operation = module
@@ -85,7 +85,7 @@ class OperationTree:
         
         if not isinstance(model, nn.Module):
             raise TypeError(f"You must use an `nn.Module` instance to instantiate `{self.__class__.__name__}`, " + \
-                            f"but got {type(model).__name__}.")
+                            f"but got `{type(model).__name__}`.")
         
         self.root = OperationNode(module=model, render_when_repeat=True)
         

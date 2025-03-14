@@ -163,15 +163,15 @@ def indent_str(s:Union[str, Iterable[str]],
         for i in s:
             if not isinstance(i,str):
                 raise TypeError("The input should be a string or an iterable object of strings, " + \
-                                f"but got {type(i)} when travering input.")
+                                f"but got `{type(i).__name__}` when travering input.")
             split_lines.extend(i.split("\n"))
             
     else:
         raise TypeError("The input should be a string or a sequence of strings, " + \
-                        f"but got {type(s)}.")
+                        f"but got `{type(s).__name__}`.")
     
     if not isinstance(indent, int):
-        raise TypeError(f"The indent should be an integer, but got {type(indent)}")
+        raise TypeError(f"The indent should be an integer, but got `{type(indent).__name__}`")
     indent = max(indent, 0)
         
     res = []

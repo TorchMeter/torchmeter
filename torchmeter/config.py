@@ -168,7 +168,7 @@ def dict_to_namespace(d: Dict[str, Any]) -> FlagNameSpace:
     Recursively converts a dictionary to a FlagNameSpace object.
     """
     if not isinstance(d, dict):
-        raise TypeError(f"Input must be a dictionary, but got {type(d)}")
+        raise TypeError(f"Input must be a dictionary, but got `{type(d).__name__}`")
     
     ns = FlagNameSpace()
     
@@ -199,7 +199,7 @@ def namespace_to_dict(ns, safe_resolve=False) -> Dict[str, CFG_CONTENT_TYPE]:
     Recursively converts a FlagNameSpace object to a dictionary.
     """
     if not isinstance(ns, SimpleNamespace):
-        raise TypeError(f"Input must be an instance of SimpleNamespace, but got {type(ns)}")
+        raise TypeError(f"Input must be an instance of SimpleNamespace, but got `{type(ns).__name__}`")
 
     d:Dict[str, CFG_CONTENT_TYPE] = {}
     for k, v in ns.data_dict.items():
@@ -364,14 +364,14 @@ class Config(metaclass=ConfigMeta):
     def config_file(self, file_path:Optional[str]=None) -> None:
         if file_path is not None and not isinstance(file_path, str):
             raise TypeError("You must pass in a string or None to change config or use the default config, " + \
-                            f"but got {type(file_path)}.")
+                            f"but got `{type(file_path).__name__}`.")
                 
         if file_path:
             file_path = os.path.abspath(file_path)
             if not os.path.isfile(file_path):
                 raise FileNotFoundError(f"Config file {file_path} does not exist.")
             if not file_path.endswith('.yaml'):
-                raise ValueError(f"Config file must be a yaml file, but got {file_path}")
+                raise ValueError(f"Config file must be a yaml file, but got `{file_path}`")
         
         self.__cfg_file = file_path
         self.__load()
