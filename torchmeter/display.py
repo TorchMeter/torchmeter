@@ -556,9 +556,9 @@ class TreeRenderer:
                               pre_res=None) -> None:
 
             # skip repeat nodes and folded nodes when enable `fold_repeat`
-            if fold_repeat and subject.is_folded: 
+            if fold_repeat and subject._is_folded: 
                 return None
-            if fold_repeat and not subject.render_when_repeat:
+            if fold_repeat and not subject._render_when_repeat:
                 return None
             
             display_root:Tree = subject.display_root 
@@ -595,9 +595,9 @@ class TreeRenderer:
                 if subject.repeat_winsz > 1: 
                     use_algebra = True
 
-                    repeat_body = Tree('.', hide_root=True)
+                    repeat_body_tree = Tree('.', hide_root=True)
                     
-                    for loop_idx, (node_id, node_name) in enumerate(subject.repeat_body):
+                    for loop_idx, (node_id, node_name) in enumerate(subject._repeat_body):
                         repeat_op_node:OperationNode = subject.parent.childs[node_id]  # type: ignore
                         
                         # update node_id with a algebraic expression which indicates the loop
@@ -625,16 +625,16 @@ class TreeRenderer:
                         
                         # Delete repeat nodes and folded nodes (Note: operate in a copied tree)
                         repeat_display_node.children = [child.display_root for child in repeat_op_node.childs.values() 
-                                                            if child.render_when_repeat and not child.is_folded]
+                                                            if child._render_when_repeat and not child._is_folded]
                         
-                        repeat_body.children.append(repeat_display_node)        
+                        repeat_body_tree.children.append(repeat_display_node)        
                 
-                    display_root = repeat_body
+                    display_root = repeat_body_tree
                 else:
                     # for the case that the repeat body is only a single operation or the current node is just not a repeat node,
                     # just delete its repeat childs or the folded childs and need to do nothing more
                     display_root.children = [child.display_root for child in subject.childs.values() 
-                                                if child.render_when_repeat and not child.is_folded]                        
+                                                if child._render_when_repeat and not child._is_folded]                        
                 
                 # render the repeat body as a panel
                 if subject.repeat_time > 1:

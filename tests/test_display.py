@@ -1001,15 +1001,15 @@ class TestTreeRenderer:
 
         monkeypatch.setattr("torchmeter.display.__cfg__.tree_fold_repeat", True)
 
-        # skip control by `render_when_repeat`
+        # skip control by `_render_when_repeat`
         oproot = repeat_tree_renderer.opnode
-        monkeypatch.setattr(oproot, "render_when_repeat", False)
-        monkeypatch.setattr(oproot.childs["1"], "render_when_repeat", False)
-        monkeypatch.setattr(oproot.childs["2"], "render_when_repeat", False)
-        monkeypatch.setattr(oproot.childs["2"].childs["2.1"], "render_when_repeat", False)
-        monkeypatch.setattr(oproot.childs["2"].childs["2.2"], "render_when_repeat", False)
-        monkeypatch.setattr(oproot.childs["2"].childs["2.3"], "render_when_repeat", False)
-        monkeypatch.setattr(oproot.childs["2"].childs["2.4"], "render_when_repeat", False)
+        monkeypatch.setattr(oproot, "_render_when_repeat", False)
+        monkeypatch.setattr(oproot.childs["1"], "_render_when_repeat", False)
+        monkeypatch.setattr(oproot.childs["2"], "_render_when_repeat", False)
+        monkeypatch.setattr(oproot.childs["2"].childs["2.1"], "_render_when_repeat", False)
+        monkeypatch.setattr(oproot.childs["2"].childs["2.2"], "_render_when_repeat", False)
+        monkeypatch.setattr(oproot.childs["2"].childs["2.3"], "_render_when_repeat", False)
+        monkeypatch.setattr(oproot.childs["2"].childs["2.4"], "_render_when_repeat", False)
 
         res = repeat_tree_renderer()
 
@@ -1019,15 +1019,15 @@ class TestTreeRenderer:
         assert res.children[1].label == "1"
         assert all(c.label == "2" for c in res.children[1].children)
 
-        # skip control by `is_folded`
+        # skip control by `_is_folded`
         monkeypatch.undo()
-        oproot.is_folded = True
-        oproot.childs["1"].is_folded = True
-        oproot.childs["2"].is_folded = True
-        oproot.childs["2"].childs["2.1"].is_folded = True
-        oproot.childs["2"].childs["2.2"].is_folded = True
-        oproot.childs["2"].childs["2.3"].is_folded = True
-        oproot.childs["2"].childs["2.4"].is_folded = True
+        oproot._is_folded = True
+        oproot.childs["1"]._is_folded = True
+        oproot.childs["2"]._is_folded = True
+        oproot.childs["2"].childs["2.1"]._is_folded = True
+        oproot.childs["2"].childs["2.2"]._is_folded = True
+        oproot.childs["2"].childs["2.3"]._is_folded = True
+        oproot.childs["2"].childs["2.4"]._is_folded = True
 
         ## display tree is not change
         assert res.label == "0"
@@ -1043,18 +1043,18 @@ class TestTreeRenderer:
         repeat_tree_renderer.tree_levels_args = {"2": {"label": "<type>"}}
 
         res = repeat_tree_renderer()
-        repeat_body = res.children[1].children[0].label.renderable
+        repeat_body_tree = res.children[1].children[0].label.renderable
         
         # repeat body tree structure
-        assert isinstance(repeat_body, Tree) 
-        assert repeat_body.hide_root is True
+        assert isinstance(repeat_body_tree, Tree) 
+        assert repeat_body_tree.hide_root is True
 
-        assert len(repeat_body.children) == 2
-        assert all(isinstance(c, Tree) for c in repeat_body.children)
+        assert len(repeat_body_tree.children) == 2
+        assert all(isinstance(c, Tree) for c in repeat_body_tree.children)
         
         # repeat body tree content
-        assert "Linear" in repeat_body.children[0].label
-        assert "ReLU" in repeat_body.children[1].label
+        assert "Linear" in repeat_body_tree.children[0].label
+        assert "ReLU" in repeat_body_tree.children[1].label
 
     def test_repeat_block_rendering(self, repeat_tree_renderer, monkeypatch):
         """Test whether the repeat block(panel) can be rendered correctly"""
@@ -1074,8 +1074,8 @@ class TestTreeRenderer:
         assert isinstance(repeat_panel.renderable, Group)
         assert len(repeat_panel.renderable.renderables) == 3
 
-        repeat_body, divider, footer = repeat_panel.renderable.renderables
-        assert isinstance(repeat_body, Tree)
+        repeat_body_tree, divider, footer = repeat_panel.renderable.renderables
+        assert isinstance(repeat_body_tree, Tree)
         assert isinstance(divider, Rule)
         assert isinstance(footer, str)
         assert "Footer" in footer

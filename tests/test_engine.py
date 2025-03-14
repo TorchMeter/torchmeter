@@ -51,8 +51,7 @@ class TestOPN:
         node = OperationNode(
             module=linear_model,
             name="TestLinear",
-            node_id="1.2.3",
-            render_when_repeat=True
+            node_id="1.2.3"
         )
         
         assert node.operation == linear_model
@@ -64,9 +63,9 @@ class TestOPN:
         assert node.is_leaf is True
         assert node.repeat_winsz == 1
         assert node.repeat_time == 1
-        assert node.repeat_body == []
-        assert node.render_when_repeat is True
-        assert node.is_folded is False
+        assert node._repeat_body == []
+        assert node._render_when_repeat is False
+        assert node._is_folded is False
 
     def test_default_name(self, linear_model):
         """Test the default name is the type name when no name is provided"""
@@ -151,12 +150,12 @@ class TestOPT:
         # repeat-related attributes
         assert root.repeat_winsz == 1
         assert root.repeat_time == 1
-        assert root.repeat_body == []
+        assert root._repeat_body == []
 
         # display-related attributes
         assert root.display_root.label == "0"
-        assert root.render_when_repeat is True
-        assert root.is_folded is False
+        assert root._render_when_repeat is True
+        assert root._is_folded is False
 
     def test_sequential_model(self, sequential_model):
         """Test building operation tree for a sequential model"""
@@ -191,30 +190,30 @@ class TestOPT:
         # repeat-related attributes
         assert root.repeat_winsz == 1
         assert root.repeat_time == 1
-        assert root.repeat_body == []
+        assert root._repeat_body == []
         
         assert root.childs['1'].repeat_winsz == 2
         assert root.childs['1'].repeat_time == 2
-        assert root.childs['1'].repeat_body == [("1", "first_conv"),
+        assert root.childs['1']._repeat_body == [("1", "first_conv"),
                                                 ("2", "first_relu")]
         assert all(c.repeat_winsz == 1 for c in root.childs.values() if c.node_id != "1")
         assert all(c.repeat_time == 1 for c in root.childs.values() if c.node_id != "1")
-        assert all(not c.repeat_body for c in root.childs.values() if c.node_id != "1")
+        assert all(not c._repeat_body for c in root.childs.values() if c.node_id != "1")
         
         # display-related attributes
         assert all(hasattr(n, "display_root") for n in tree.all_nodes)
         assert root.display_root.label == "0"
         assert all(c.display_root.label == "1" for c in root.childs.values())
-        assert root.render_when_repeat is True
-        assert root.childs['1'].render_when_repeat is True
-        assert root.childs['2'].render_when_repeat is True
-        assert root.childs['3'].render_when_repeat is False
-        assert root.childs['4'].render_when_repeat is False
-        assert root.is_folded is False
-        assert root.childs['1'].is_folded is False
-        assert root.childs['2'].is_folded is True  # True because in the repeat_body
-        assert root.childs['3'].is_folded is False # False because skip the visit
-        assert root.childs['4'].is_folded is False # False because skip the visit
+        assert root._render_when_repeat is True
+        assert root.childs['1']._render_when_repeat is True
+        assert root.childs['2']._render_when_repeat is True
+        assert root.childs['3']._render_when_repeat is False
+        assert root.childs['4']._render_when_repeat is False
+        assert root._is_folded is False
+        assert root.childs['1']._is_folded is False
+        assert root.childs['2']._is_folded is True  # True because in the repeat_body
+        assert root.childs['3']._is_folded is False # False because skip the visit
+        assert root.childs['4']._is_folded is False # False because skip the visit
         
     def test_nested_model(self, nested_model):
         """Test building operation tree for a sequential model"""
@@ -259,34 +258,34 @@ class TestOPT:
         # repeat-related attributes
         assert root.repeat_winsz == 1
         assert root.repeat_time == 1
-        assert root.repeat_body == []
+        assert root._repeat_body == []
         
         assert all(c.repeat_winsz * c.repeat_time == 1 for c in root.childs.values())
-        assert all(not c.repeat_body for c in root.childs.values())
+        assert all(not c._repeat_body for c in root.childs.values())
         assert child_1.childs['1.1'].repeat_winsz == 2
         assert child_1.childs['1.1'].repeat_time == 2
-        assert child_1.childs['1.1'].repeat_body == [("1.1", "first_conv"),
+        assert child_1.childs['1.1']._repeat_body == [("1.1", "first_conv"),
                                                      ("1.2", "first_relu")]
         assert all(c.repeat_winsz * c.repeat_time == 1 for c in child_1.childs.values() if c.node_id != "1.1")
-        assert all(not c.repeat_body for c in child_1.childs.values() if c.node_id != "1.1")
+        assert all(not c._repeat_body for c in child_1.childs.values() if c.node_id != "1.1")
         
         # display-related attributes
         assert all(hasattr(n, "display_root") for n in tree.all_nodes)
         assert root.display_root.label == "0"
         assert all(c.display_root.label == "1" for c in root.childs.values())
         assert all(c.display_root.label == "2" for c in child_1.childs.values())
-        assert root.render_when_repeat is True
-        assert all(c.render_when_repeat is True for c in root.childs.values())
-        assert child_1.childs['1.1'].render_when_repeat is True
-        assert child_1.childs['1.2'].render_when_repeat is True
-        assert child_1.childs['1.3'].render_when_repeat is False
-        assert child_1.childs['1.4'].render_when_repeat is False
-        assert root.is_folded is False
-        assert all(c.is_folded is False for c in root.childs.values())
-        assert child_1.childs['1.1'].is_folded is False
-        assert child_1.childs['1.2'].is_folded is True  # True because in the repeat_body
-        assert child_1.childs['1.3'].is_folded is False # False because skip the visit
-        assert child_1.childs['1.4'].is_folded is False # False because skip the visit
+        assert root._render_when_repeat is True
+        assert all(c._render_when_repeat is True for c in root.childs.values())
+        assert child_1.childs['1.1']._render_when_repeat is True
+        assert child_1.childs['1.2']._render_when_repeat is True
+        assert child_1.childs['1.3']._render_when_repeat is False
+        assert child_1.childs['1.4']._render_when_repeat is False
+        assert root._is_folded is False
+        assert all(c._is_folded is False for c in root.childs.values())
+        assert child_1.childs['1.1']._is_folded is False
+        assert child_1.childs['1.2']._is_folded is True  # True because in the repeat_body
+        assert child_1.childs['1.3']._is_folded is False # False because skip the visit
+        assert child_1.childs['1.4']._is_folded is False # False because skip the visit
 
     def test_repeat_detection(self):
         """Test repeat detection"""
@@ -300,27 +299,27 @@ class TestOPT:
 
         assert root.repeat_winsz == 1
         assert root.repeat_time == 1
-        assert root.repeat_body == []
+        assert root._repeat_body == []
         
         assert all(c.repeat_winsz * c.repeat_time == 1 for c in root.childs.values() if c.name != "0")
-        assert all(not c.repeat_body for c in root.childs.values() if c.name != "0")
+        assert all(not c._repeat_body for c in root.childs.values() if c.name != "0")
         
         assert root.childs['1'].repeat_winsz == 1 # not 4 because all the layers in the repeat block are the same
         assert root.childs['1'].repeat_time == 4
-        assert root.childs['1'].repeat_body == [("1", "0")]
+        assert root.childs['1']._repeat_body == [("1", "0")]
             
-        assert root.render_when_repeat is True
-        assert root.childs['1'].render_when_repeat is True
-        assert root.childs['2'].render_when_repeat is False
-        assert root.childs['3'].render_when_repeat is False
-        assert root.childs['4'].render_when_repeat is False
-        assert root.childs['5'].render_when_repeat is True
-        assert root.is_folded is False
-        assert root.childs['1'].is_folded is False
-        assert root.childs['2'].is_folded is False  # True because in the repeat_body
-        assert root.childs['3'].is_folded is False  # False because skip the visit
-        assert root.childs['4'].is_folded is False  # False because skip the visit
-        assert root.childs['5'].is_folded is False 
+        assert root._render_when_repeat is True
+        assert root.childs['1']._render_when_repeat is True
+        assert root.childs['2']._render_when_repeat is False
+        assert root.childs['3']._render_when_repeat is False
+        assert root.childs['4']._render_when_repeat is False
+        assert root.childs['5']._render_when_repeat is True
+        assert root._is_folded is False
+        assert root.childs['1']._is_folded is False
+        assert root.childs['2']._is_folded is False  # True because in the repeat_body
+        assert root.childs['3']._is_folded is False  # False because skip the visit
+        assert root.childs['4']._is_folded is False  # False because skip the visit
+        assert root.childs['5']._is_folded is False 
 
     def test_display_tree_construction(self, nested_model):
         """Test building display tree"""
