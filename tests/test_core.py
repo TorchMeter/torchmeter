@@ -760,7 +760,7 @@ class TestMeter:
     def test_subnodes(self, repeat_num):
         """Test the subnodes property is set and retrieved correctly"""
         
-        metered_model = Meter(RepeatModel(repeat_nodes=repeat_num))
+        metered_model = Meter(RepeatModel(repeat_nodes=repeat_num), device="cpu")
         assert len(metered_model.subnodes) == repeat_num + 2 # 2: root + modulelist
         
     def test_rebase(self):
