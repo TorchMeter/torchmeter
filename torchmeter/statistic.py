@@ -368,6 +368,7 @@ class CalMeter(Statistics):
         
         self.__stat_ls:List[NamedTuple] = [] # record the flops and macs information of each operation
         self.is_measured = False 
+        self.__is_not_supported = False
 
         _opparent:Optional[OperationNode] = opnode.parent
         self.__Macs = self.init_linkdata(attr_name='Macs', init_val=0, opparent=_opparent, 
@@ -378,6 +379,10 @@ class CalMeter(Statistics):
     @property
     def name(self) -> str:
         return 'cal'
+
+    @property
+    def is_not_supported(self):
+        return self.__is_not_supported
 
     @property
     def Macs(self) -> UpperLinkData :
@@ -635,6 +640,8 @@ class CalMeter(Statistics):
             )
 
     def __not_support_hook(self, module, input, output):
+        self.__is_not_supported = True
+        
         if not len(self.__stat_ls):
             self.__stat_ls.append(self.detail_val_container(
                 Operation_Id=self._opnode.node_id,

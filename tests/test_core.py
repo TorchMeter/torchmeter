@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import patch, ANY
 from unittest.mock import MagicMock, PropertyMock
 
 import pytest
@@ -73,6 +73,8 @@ class TestMeter:
         assert cpu_model._Meter__measure_param is False
         assert cpu_model._Meter__measure_cal is False
         assert cpu_model._Meter__measure_mem is False
+        assert cpu_model._Meter__has_nocall_nodes is None
+        assert cpu_model._Meter__has_not_support_nodes is None
         
         assert hasattr(cpu_model, "ittp_warmup")
         assert hasattr(cpu_model, "ittp_benchmark_time")
@@ -791,6 +793,7 @@ class TestMeter:
         
         metered_model = Meter(ExampleModel())
         metered_model(torch_randn(1,10))
+        metered_model._Meter__has_nocall_nodes = False
         
         # verify output type
         # input a stat name
@@ -823,7 +826,154 @@ class TestMeter:
                           new_callable=PropertyMock) as mock_crucial_data:
             direct_res = metered_model.stat_info("mem")
             mock_crucial_data.assert_called_once()
+    
+    def test_stat_info_warning(self, monkeypatch):
+        """Test the logic of generating warning info"""
         
+        class NotSupportModel(nn.Module):
+            def __init__(self):
+                super(NotSupportModel, self).__init__()
+                self.layer0 = nn.Linear(10,5)
+                self.layer1 = nn.AdaptiveAvgPool1d(1)
+            def forward(self, x):
+                return self.layer1(x)
+        
+        metered_model = Meter(NotSupportModel(), device="cpu")
+        metered_model(torch_randn(1,10))
+        
+        nocall_flag = lambda :metered_model._Meter__has_nocall_nodes
+        notsupport_flag = lambda :metered_model._Meter__has_not_support_nodes
+        
+        assert nocall_flag() is None
+        assert notsupport_flag() is None
+        
+        # only take effect when the stat is cal or mem
+        metered_model.stat_info("param", show_warning=True)
+        assert nocall_flag() is None
+        assert notsupport_flag() is None
+        
+        metered_model.stat_info("ittp", show_warning=True)
+        assert nocall_flag() is None
+        assert notsupport_flag() is None
+        
+        metered_model.stat_info("mem", show_warning=True)
+        assert nocall_flag() is True
+        assert notsupport_flag() is None
+        
+        metered_model._Meter__has_nocall_nodes = None
+        metered_model.stat_info("cal", show_warning=True)
+        assert nocall_flag() is True
+        assert notsupport_flag() is True
+        
+        # verify show_warning option
+        metered_model._Meter__has_nocall_nodes = None
+        metered_model._Meter__has_not_support_nodes = None
+        metered_model.stat_info("cal", show_warning=False)
+        assert nocall_flag() is None
+        assert notsupport_flag() is None
+                
+        # verify __has_nocall_nodes flag is properly set &
+        # verify cache of __has_nocall_nodes 
+        with patch.object(MemMeter, "crucial_data",
+                          new_callable=PropertyMock) as mock_crucial_data:
+            ## when there is no nocalled nodes (crucial_data is mocked and will raise error)
+            metered_model.stat_info("mem", show_warning=True)
+            assert mock_crucial_data.call_count == 4 # 1: provide info to info_ls; 3: traverse all 3 nodes
+            assert nocall_flag() is False
+            
+            ## when the second traversal node is no called
+            mock_crucial_data.reset_mock()
+            metered_model._Meter__has_nocall_nodes = None
+            mock_crucial_data.side_effect = [{}, True, RuntimeError]
+            metered_model.stat_info("mem", show_warning=True)
+            assert mock_crucial_data.call_count == 3 # 1: provide info to info_ls; 2: traverse the leading 2 nodes
+            assert nocall_flag() is True
+            
+            # verify cache of __has_nocall_nodes
+            mock_crucial_data.reset_mock()
+            mock_crucial_data.side_effect = [{}]
+            metered_model.stat_info("mem", show_warning=True)
+            mock_crucial_data.assert_called_once() # 1: provide info to info_ls; 0: no need to traverse due to the cache
+
+        # verify __has_not_support_nodes flag is properly set &
+        # verify cache of __has_not_support_nodes
+        with patch.object(OperationNode, "cal", 
+                          new_callable=PropertyMock) as mock_cal:
+            
+            mock_cal_instance = MagicMock(spec=CalMeter)
+            type(mock_cal_instance).name = PropertyMock(return_value="cal")
+            mock_cal.return_value = mock_cal_instance
+            
+            ## when all nodes are supported
+            mock_cal_instance.is_not_supported = False
+            metered_model.stat_info("cal", show_warning=True)
+            assert notsupport_flag() is False
+
+            ## when any node is not supported
+            mock_cal_instance.is_not_supported = True
+            metered_model._Meter__has_not_support_nodes = None
+            metered_model.stat_info("cal", show_warning=True)
+            assert notsupport_flag() is True
+        
+            ## verify cache of __has_not_support_nodes
+            mock_cal.reset_mock()
+            metered_model._Meter__has_not_support_nodes = None
+            metered_model.stat_info("cal", show_warning=True)
+            assert mock_cal.call_count == 2 # 1: provide info to info_ls; 1: check each node.cal.is_not_supported
+            
+            mock_cal.reset_mock()
+            metered_model.stat_info("cal", show_warning=True)
+            assert mock_cal.call_count == 1 # 1: provide info to info_ls
+        
+        # verify warning info is added to info_ls correctly
+        with patch.object(OperationNode, "cal", 
+                          new_callable=PropertyMock) as mock_cal, \
+             patch.object(CalMeter, "crucial_data",
+                          new_callable=PropertyMock) as mock_crucial_data:
+            
+            mock_cal_instance = MagicMock(spec=CalMeter)
+            type(mock_cal_instance).name = PropertyMock(return_value="cal")
+            type(mock_cal_instance).crucial_data = mock_crucial_data
+            mock_cal.return_value = mock_cal_instance
+            
+            ## when there is no warning info, i.e. no nocalled nodes and not-supported nodes
+            mock_crucial_data.side_effect=[dict()]
+            mock_cal_instance.is_not_supported = False
+            metered_model._Meter__has_nocall_nodes = None
+            metered_model._Meter__has_not_support_nodes = None
+            res = metered_model.stat_info("cal", show_warning=True).plain
+            assert "Warning" not in res
+            
+            ## when there are only nocall nodes, but all nodes are supported
+            mock_crucial_data.side_effect=[dict(), RuntimeError]
+            mock_cal_instance.is_not_supported = False
+            metered_model._Meter__has_nocall_nodes = None
+            metered_model._Meter__has_not_support_nodes = None
+            res = metered_model.stat_info("cal", show_warning=True).plain
+            assert "Warning" in res
+            assert "not called" in res
+            assert "don't support" not in res
+            
+            ## when there are only not-supported nodes, but all nodes are called
+            mock_crucial_data.side_effect=[dict()]*10
+            mock_cal_instance.is_not_supported = True
+            metered_model._Meter__has_nocall_nodes = None
+            metered_model._Meter__has_not_support_nodes = None
+            res = metered_model.stat_info("cal", show_warning=True).plain
+            assert "Warning" in res
+            assert "not called" not in res
+            assert "don't support" in res
+            
+            ## when nocall nodes and not-supported nodes exist in the same time
+            mock_crucial_data.side_effect=[dict(), RuntimeError]
+            mock_cal_instance.is_not_supported = True
+            metered_model._Meter__has_nocall_nodes = None
+            metered_model._Meter__has_not_support_nodes = None
+            res = metered_model.stat_info("cal", show_warning=True).plain
+            assert "Warning" in res
+            assert "not called" in res
+            assert "don't support" in res
+         
     def test_overview(self):
         """Test the logic of overview method"""
         
@@ -855,11 +1005,27 @@ class TestMeter:
             metered_model.overview("invalid_stat")
         
         # verify content
-        ## if model info always exists, see the second second ablove
-        
-        ## each item is a panel of stat_info
-        res = metered_model.overview("mem", "cal")
-        assert all(isinstance(p, Panel) for p in res.renderables)
+        with patch.object(metered_model, "stat_info",
+                          wraps=metered_model.stat_info) as mock_stat_info:
+            ## whether model info always exists, see the second section above
+            
+            ## each item is a panel of stat_info
+            res = metered_model.overview("mem", "cal")
+            assert all(isinstance(p, Panel) for p in res.renderables)
+            assert mock_stat_info.call_count == 2
+            mock_stat_info.assert_any_call("mem", show_warning=True)
+            mock_stat_info.assert_any_call("cal", show_warning=True)
+            
+            ## default setting is True
+            metered_model.overview("param", "cal")
+            call_args_ls = mock_stat_info.call_args_list
+            assert all(call_args.kwargs["show_warning"] for call_args in call_args_ls)
+            
+            ## custom setting
+            mock_stat_info.reset_mock()
+            metered_model.overview("param", "cal", show_warning=False)
+            call_args_ls = mock_stat_info.call_args_list
+            assert all(not call_args.kwargs["show_warning"] for call_args in call_args_ls)
     
     def test_table_cols(self):
         """Test the logic of table_cols method"""
@@ -991,7 +1157,9 @@ class TestMeter:
         
         # verify main content generation
         with patch.object(Layout, "__init__", autospec=True, 
-                          side_effect=layout_init_wrapper) as mock_init_layout:
+                          side_effect=layout_init_wrapper) as mock_init_layout,\
+             patch.object(metered_model, "stat_info",
+                          wraps=metered_model.stat_info) as mock_stat_info:
             ## no tree, main content is a Table
             metered_model.profile("param", show=True, no_tree=True)
             main_content = renderable_getter(mock_init_layout.call_args_list[-2])
@@ -1017,6 +1185,7 @@ class TestMeter:
             assert isinstance(footer, Columns)
             assert len(footer.renderables) == 2
             assert all(isinstance(ctt, Text) for ctt in footer.renderables)
+            mock_stat_info.assert_called_with(stat_or_statname=ANY, show_warning=False)
             
             assert isinstance(footer.title, Rule)
         

@@ -63,6 +63,9 @@ class Meter:
         self.ittp_warmup = 50
         self.ittp_benchmark_time = 100
 
+        self.__has_nocall_nodes:Optional[bool] = None
+        self.__has_not_support_nodes:Optional[bool] = None
+
     def __call__(self, *args, **kwargs) -> Any:
         self._ipt = {'args': args, 'kwargs': kwargs}
         self._ipt2device()
@@ -83,7 +86,7 @@ class Meter:
     
     def __setattr__(self, name: str, value: Any) -> None:
         
-        cls_attrs:Dict[str, bool] = self.__cls_property__()
+        cls_attrs:Dict[str, bool] = self.__is_cls_attr_settable()
         notchange_cls_attrs = [k for k,v in cls_attrs.items() if not v]
         
         if name in notchange_cls_attrs:
@@ -102,7 +105,7 @@ class Meter:
     
     def __delattr__(self, name:str) -> None:
         
-        cls_attrs:Dict[str, bool] = self.__cls_property__()
+        cls_attrs:Dict[str, bool] = self.__is_cls_attr_settable()
         
         if name in cls_attrs:
             raise AttributeError(f"`{name}` could never be deleted.")
@@ -319,7 +322,7 @@ class Meter:
         else:
             raise ValueError(f"Invalid node_id: {node_id}. Use `Meter(your_model).subnodes` to check valid ones.")
 
-    def stat_info(self, stat_or_statname:Union[str, Statistics]) -> Text:
+    def stat_info(self, stat_or_statname:Union[str, Statistics], *, show_warning:bool=True) -> Text:
         if isinstance(stat_or_statname, str):
             stat = getattr(self, stat_or_statname)
         elif isinstance(stat_or_statname, Statistics):
@@ -330,18 +333,47 @@ class Meter:
 
         stat_name = stat.name
         infos_ls:List[str] = [f"• [b]Statistics:[/b] {stat_name}"]
+        
         if stat_name == 'ittp':
             infos_ls.append(f"• [b]Benchmark Times:[/b] {self.ittp_benchmark_time}")
+            
         infos_ls.extend([
             f"• [b]{k}:[/b] {v}" for k, v in stat.crucial_data.items()
         ])
+        
+        ## warning field, only works when stat is "cal" or "mem"
+        if show_warning and stat_name not in ("param", "ittp"):
+            if self.__has_nocall_nodes is None:
+                from operator import attrgetter
+                
+                crucial_data_getter = attrgetter(f"{stat_name}.crucial_data")
+                try:
+                    list(map(crucial_data_getter, self.optree.all_nodes))
+                    self.__has_nocall_nodes = False
+                except RuntimeError:
+                    self.__has_nocall_nodes = True  
+            
+            if stat_name == "cal" and self.__has_not_support_nodes is None:
+                self.__has_not_support_nodes = any(n.cal.is_not_supported 
+                                                   for n in self.optree.all_nodes)
+            
+            warns_ls = []
+            if self.__has_nocall_nodes:
+                warns_ls.append(" "*2 + "[dim yellow]:arrow_forward:  Some nodes are defined but not called explicitly.[/]")
+            if stat_name == "cal" and self.__has_not_support_nodes:
+                warns_ls.append(" "*2 + "[dim yellow]:arrow_forward:  Some modules don't support calculation measurement yet.[/]")
+            if warns_ls:
+                warns_ls.insert(0, "[dim yellow]:warning:  Warning: the result may be inaccurate, cause:[/]")
+                warns_ls.append(" "*2 + f"[dim cyan]:ballot_box_with_check:  use `Meter(your_model).profile('{stat_name}')` to see more.[/]")
+            
+            infos_ls.extend(warns_ls)
                     
         infos = '\n'.join(infos_ls)
         
         console = get_console()
         return console.render_str(infos)
 
-    def overview(self, *order:str) -> Columns:
+    def overview(self, *order:str, show_warning:bool=True) -> Columns:
         """Overview of all statistics"""
         
         from functools import partial
@@ -358,7 +390,7 @@ class Meter:
         format_cell = partial(Panel, safe_box=True, expand=False, highlight=True, box=HORIZONTALS)
         
         container.add_renderable(format_cell(self.model_info, title='[b]Model INFO[/]', border_style='orange1'))
-        container.renderables.extend([format_cell(self.stat_info(stat_name), 
+        container.renderables.extend([format_cell(self.stat_info(stat_name, show_warning=show_warning), 
                                                   title=f"[b]{stat_name.capitalize()} INFO[/]",
                                                   border_style='cyan') 
                                       for stat_name in order])
@@ -464,7 +496,7 @@ class Meter:
                          expand=True)
         
         model_info = self.model_info
-        stat_info = self.stat_info(stat_or_statname=stat)
+        stat_info = self.stat_info(stat_or_statname=stat, show_warning=False)
         model_info.style = 'dim'
         stat_info.style = 'dim'
         footer.add_renderable(model_info)
@@ -537,7 +569,7 @@ class Meter:
         return f"Meter(model={self.optree}, device={self.device})"
 
     @classmethod
-    def __cls_property__(cls) -> Dict[str, bool]:
+    def __is_cls_attr_settable(cls) -> Dict[str, bool]:
         """Return: cls_attr_name: can be set"""
         return {k:v.fset is not None for k,v in cls.__dict__.items() 
                 if isinstance(v, property)}

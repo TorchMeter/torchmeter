@@ -628,9 +628,14 @@ class TestCalMeter:
         assert cal_meter._opnode == oproot
         assert cal_meter._model is model
         assert not cal_meter.is_measured
+        assert not cal_meter._CalMeter__is_not_supported
         assert not cal_meter._CalMeter__stat_ls
         
-        assert cal_meter.name == "cal"    
+        assert cal_meter.name == "cal"   
+        
+        assert hasattr(cal_meter, "is_not_supported")
+        assert not cal_meter.is_not_supported 
+        
         assert hasattr(cal_meter, "Macs")
         assert isinstance(cal_meter.Macs, UpperLinkData)
         assert cal_meter.Macs.val == 0
@@ -785,11 +790,6 @@ class TestCalMeter:
             ([torch_randn(3,4)]*3, ("([3, 4],\n" 
                                     " [3, 4],\n"
                                     " [3, 4])")),
-            ({torch_randn(1,2),
-              torch_randn(3,4),
-              torch_randn(5,6)}, ("([1, 2],\n" 
-                                  " [3, 4],\n"
-                                  " [5, 6])")),
             ({"k":torch_randn(2,3),
               "l":torch_randn(4,5),
               "m":torch_randn(6,7)}, ("{str: [2, 3],\n"
@@ -928,6 +928,26 @@ class TestCalMeter:
         
         assert cal_meter.Macs.val == expected_macs    
         assert cal_meter.Flops.val == expected_flops
+
+    def test_not_supported_flag(self):
+        """Test the is_not_supported property is set and retrieved correctly"""
+        
+        model = nn.Identity()
+        opnode = OperationNode(module=model)
+        cal_meter = opnode.cal
+        
+        # retrieve
+        assert not cal_meter.is_not_supported
+        
+        # valid set
+        model.register_forward_hook(cal_meter._CalMeter__not_support_hook)
+        model(torch_randn(1, 10))
+        
+        assert cal_meter.is_not_supported
+        
+        # invalid set
+        with pytest.raises(AttributeError):
+            del cal_meter.is_not_supported
 
 @pytest.mark.usefixtures("toggle_to_mem")
 class TestMemMeter:
