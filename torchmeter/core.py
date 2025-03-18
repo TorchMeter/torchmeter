@@ -86,7 +86,7 @@ class Meter:
     
     def __setattr__(self, name: str, value: Any) -> None:
         
-        cls_attrs:Dict[str, bool] = self.__is_cls_attr_settable()
+        cls_attrs:Dict[str, bool] = self.__get_clsattr_with_settable_flag()
         notchange_cls_attrs = [k for k,v in cls_attrs.items() if not v]
         
         if name in notchange_cls_attrs:
@@ -105,7 +105,7 @@ class Meter:
     
     def __delattr__(self, name:str) -> None:
         
-        cls_attrs:Dict[str, bool] = self.__is_cls_attr_settable()
+        cls_attrs:Dict[str, bool] = self.__get_clsattr_with_settable_flag()
         
         if name in cls_attrs:
             raise AttributeError(f"`{name}` could never be deleted.")
@@ -135,6 +135,17 @@ class Meter:
         self.model.to(self.__device)
         if not self._is_ipt_empty():
             self._ipt2device()
+
+    @property
+    def tree_fold_repeat(self):
+        return __cfg__.tree_fold_repeat
+    
+    @tree_fold_repeat.setter
+    def tree_fold_repeat(self, new_val:bool) -> None:
+        if not isinstance(new_val, bool):
+            raise TypeError("The `tree_fold_repeat` property can only be rewritten with a boolean, " + \
+                            f"but got `{type(new_val).__name__}`.")
+        __cfg__.tree_fold_repeat = new_val
 
     @property
     def tree_levels_args(self) -> FlagNameSpace:
@@ -223,11 +234,12 @@ class Meter:
     def mem(self) -> MemMeter:
         if not self.__measure_mem:
             if self._is_ipt_empty():
-                raise RuntimeError("Input unknown! You should perform at least one feed-forward inference before measuring the memory cost!") 
+                raise RuntimeError("Input unknown! You should perform at least one feed-forward inference " + \
+                                   "before measuring the memory cost!") 
 
             hook_ls = [node.mem.measure() for node in self.optree.all_nodes]
 
-            # feed forwad
+            # feed forward
             self._ipt2device()
             self.model(*self.ipt['args'], **self.ipt['kwargs']) 
 
@@ -343,6 +355,7 @@ class Meter:
         
         ## warning field, only works when stat is "cal" or "mem"
         if show_warning and stat_name not in ("param", "ittp"):
+            # cache for __has_nocall_nodes
             if self.__has_nocall_nodes is None:
                 from operator import attrgetter
                 
@@ -353,6 +366,7 @@ class Meter:
                 except RuntimeError:
                     self.__has_nocall_nodes = True  
             
+            # cache for __has_not_support_nodes
             if stat_name == "cal" and self.__has_not_support_nodes is None:
                 self.__has_not_support_nodes = any(n.cal.is_not_supported 
                                                    for n in self.optree.all_nodes)
@@ -404,7 +418,7 @@ class Meter:
         stats_data_dict:Dict[str, DataFrame] = self.table_renderer.stats_data
         
         if stat_name not in stats_data_dict:
-            raise KeyError(f"Statistics `{stat_name}` in {tuple(stats_data_dict.keys())}.")
+            raise KeyError(f"Statistics `{stat_name}` not in {tuple(stats_data_dict.keys())}.")
         
         stat_data:DataFrame = stats_data_dict[stat_name]
         
@@ -569,8 +583,18 @@ class Meter:
         return f"Meter(model={self.optree}, device={self.device})"
 
     @classmethod
-    def __is_cls_attr_settable(cls) -> Dict[str, bool]:
-        """Return: cls_attr_name: can be set"""
+    def __get_clsattr_with_settable_flag(cls) -> Dict[str, bool]:
+        """Determines which class attributes have setter methods defined.
+
+        This method iterates over all properties of the class and checks if a setter method
+        is defined for each property. It returns a dictionary mapping attribute names to a
+        boolean indicating whether the attribute is settable.
+
+        Returns:
+            Dict[str, bool]: A dictionary where keys are attribute names and values indicate
+            whether the attribute has a setter method (True if settable, False otherwise).
+        """
+        
         return {k:v.fset is not None for k,v in cls.__dict__.items() 
                 if isinstance(v, property)}
         
