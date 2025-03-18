@@ -384,7 +384,7 @@ class TreeRenderer:
         if invalid_keys:
             raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.tree.Tree`, " + \
                            "refer to https://rich.readthedocs.io/en/latest/tree.html for valid args.")
-        self.default_level_args.__dict__.update(custom_args)
+        self.default_level_args.update(custom_args)
         
         self.default_level_args.mark_change()
 
@@ -473,7 +473,7 @@ class TreeRenderer:
         if invalid_keys:
             raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.panel.Panel`, " + \
                            "refer to https://rich.readthedocs.io/en/latest/panel.html for valid args.")
-        self.repeat_block_args.__dict__.update(custom_args)
+        self.repeat_block_args.update(custom_args)
         
         self.repeat_block_args.mark_change()
 
@@ -774,7 +774,7 @@ class TabularRenderer:
         if invalid_keys:
             raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.table.Table`, " + \
                            "refer to https://rich.readthedocs.io/en/latest/tables.html for valid args.")
-        self.tb_args.__dict__.update(custom_args)
+        self.tb_args.update(custom_args)
         
         self.tb_args.mark_change()
         
@@ -790,7 +790,7 @@ class TabularRenderer:
         if invalid_keys:
             raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.table.Column`, " + \
                            "refer to https://rich.readthedocs.io/en/latest/columns.html for valid args.")
-        self.col_args.__dict__.update(custom_args)
+        self.col_args.update(custom_args)
         
         self.col_args.mark_change()
 

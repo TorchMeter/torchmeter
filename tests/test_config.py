@@ -33,7 +33,14 @@ def invalid_cfg_path(tmpdir):
 @pytest.fixture()
 def custom_cfg_path(tmpdir):
     temp_cfg_path = tmpdir.join("custom_cfg.yaml")
+    
+    fake_interval = 0.34
+    fake_content = f"render_interval: {fake_interval}"
+    with open(temp_cfg_path, "w") as f:
+        f.write(fake_content)
+        
     yield temp_cfg_path.strpath
+    
     if tmpdir.exists():
         tmpdir.remove(rec=1)
 
@@ -709,6 +716,60 @@ class TestFlagNameSpace:
         data_dict["key1"] = "value2"
         assert flagns.key1 == "value1"
 
+    def test_update(self):
+        """Test the logic of update method"""
+        
+        flagns = FlagNameSpace(key1="value1", key2=123)
+                
+        # invalid input type
+        with pytest.raises(TypeError):
+            flagns.update(123)
+        
+        # verify flag toggle
+        assert flagns.is_change() is False
+        
+        # add new key
+        ## with dict
+        assert "key3" not in flagns.__dict__
+        flagns.update({"key3": 456})
+        assert flagns.key3 == 456
+        assert "key2" in flagns.__dict__
+        assert flagns.is_change()
+        
+        ## with FlagNameSpace
+        assert "key4" not in flagns.__dict__
+        flagns.update(FlagNameSpace(key4=789))
+        assert flagns.key4 == 789
+        assert "key3" in flagns.__dict__
+        
+        # update existing key
+        ## with dict
+        assert flagns.key1 != "000"
+        flagns.update({"key1": "000"})
+        assert flagns.key1 == "000"
+        assert "key4" in flagns.__dict__
+        
+        ## with FlagNameSpace
+        assert flagns.key2 != "123"
+        flagns.update(FlagNameSpace(key2="123"))
+        assert flagns.key2 == "123"
+        assert "key3" in flagns.__dict__
+            
+        # dict to FlagNameSpace    
+        flagns.update({"key5": {"subkey1": 901}})
+        assert isinstance(flagns.key5, FlagNameSpace)
+        assert flagns.key5.data_dict == {"subkey1": 901}
+        
+        # verify origin structure keeping
+        with pytest.raises(RuntimeError):
+            flagns.update({"key5": 901})
+            
+        # verify replace option
+        flagns.mark_unchange()
+        flagns.update({"key5": 901}, replace=True)
+        assert flagns.data_dict == {"key5": 901}
+        assert flagns.is_change()
+
     def test_is_change(self):
         flagns = FlagNameSpace(key1='1', 
                                key2=[2,[3, 3]],
@@ -841,16 +902,11 @@ class TestGetConfig:
             get_config(invalid_cfg_path)
 
     def test_get_custom_file(self, custom_cfg_path):
-        fake_interval = 0.34
-        fake_content = f"render_interval: {fake_interval}"
-        with open(custom_cfg_path, "w") as f:
-            f.write(fake_content)
-
         with pytest.warns(UserWarning) as w:
             config = get_config(custom_cfg_path)
             assert isinstance(config, Config)
             assert config.config_file == custom_cfg_path
-            assert config.render_interval == fake_interval
+            assert config.render_interval == 0.34
         assert len(w) == len(DEFAULT_FIELDS) - 1
 
 @pytest.mark.vital
@@ -859,7 +915,8 @@ class TestConfig:
         cfg = Config()
         cfg.config_file = None
         
-    def test_init(self):
+    def test_init(self, custom_cfg_path):
+        # init with no config file
         config = Config()
         assert config.config_file is None
         
@@ -867,6 +924,12 @@ class TestConfig:
         default_ns = dict_to_namespace(default_settings_dict)
         for field in DEFAULT_FIELDS:
             assert getattr(config, field) == getattr(default_ns, field)
+        
+        # init with config file
+        with pytest.warns(UserWarning):
+            config = Config(custom_cfg_path)
+            assert config.config_file == custom_cfg_path
+            assert config.render_interval == 0.34
         
     def test_ban_delete_or_new_field(self):
         config = Config()
@@ -893,6 +956,71 @@ class TestConfig:
 
         # custom config file specified is tested in TestGetConfig::test_get_custom_file
 
+    def test_setattr(self):
+        """Test the logic of setattr"""
+        
+        config = Config()
+        
+        # set attribute that is not in the DEFAULT_FIELDS
+        with pytest.raises(AttributeError):
+            config.invalid_attr = 1
+        
+        # set attribute whose value is not a FlagNameSpace
+        assert config.render_interval != 0.6
+        config.render_interval = 0.6
+        assert config.render_interval == 0.6
+        
+        assert config.tree_fold_repeat is True
+        config.tree_fold_repeat = False
+        assert config.tree_fold_repeat is False
+        
+        # set attribute whose value is a FlagNameSpace
+        # verify the action is actually a update
+        ## with dict
+        assert config.tree_repeat_block_args.title_align != "left"
+        config.tree_repeat_block_args = {"title_align": "left"}
+        assert config.tree_repeat_block_args.title_align == "left"
+        
+        assert config.tree_levels_args.default.guide_style != "red"
+        config.tree_levels_args = {"default": {"guide_style": "red"}}
+        assert config.tree_levels_args.default.guide_style == "red"
+        assert "label" in config.tree_levels_args.default.__dict__
+        
+        assert "new_field" not in config.table_column_args.__dict__
+        config.table_column_args = {"new_field": 1}
+        assert "new_field" in config.table_column_args.__dict__
+        assert config.table_column_args.new_field == 1
+        
+        with pytest.raises(TypeError): 
+            # typerror trigger in `FlagNameSpace.update`,
+            # cause the value of `table_display_args` is a FlagNameSpace instance
+            config.table_display_args = 1
+        
+        config.combine = {"new_field": {"sub_field1": 1, "sub_field2": 2}}
+        assert "new_field" in config.combine.__dict__
+        assert isinstance(config.combine.new_field, FlagNameSpace)
+        assert config.combine.new_field.data_dict == {"sub_field1": 1, "sub_field2": 2}
+
+        ## with another FlagNameSpace
+        assert config.tree_repeat_block_args.title_align != "right"
+        config.tree_repeat_block_args = FlagNameSpace(title_align="right")
+        assert config.tree_repeat_block_args.title_align == "right"
+        
+        assert config.tree_levels_args.default.guide_style != "blue"
+        config.tree_levels_args = FlagNameSpace(default={"guide_style": "blue"})
+        assert config.tree_levels_args.default.guide_style == "blue"
+        assert "label" in config.tree_levels_args.default.__dict__
+        
+        assert "new_field2" not in config.table_column_args.__dict__
+        config.table_column_args = FlagNameSpace(new_field2=2)
+        assert "new_field2" in config.table_column_args.__dict__
+        assert config.table_column_args.new_field2 == 2
+        
+        config.combine = FlagNameSpace(new_field3={"sub_field1": 1, "sub_field2": 2})
+        assert "new_field3" in config.combine.__dict__
+        assert isinstance(config.combine.new_field, FlagNameSpace)
+        assert config.combine.new_field3.data_dict == {"sub_field1": 1, "sub_field2": 2}
+
     def test_delattr(self):
         config = Config()
         for field in DEFAULT_FIELDS + ["config_file"]:
@@ -905,8 +1033,11 @@ class TestConfig:
         
         config.render_interval = 0.45
         config.restore()
-        
         assert config.render_interval == default_settings['render_interval']
+        
+        config.tree_levels_args = {"2": {"label": "1"}}
+        config.restore()
+        assert "2" not in config.tree_levels_args.__dict__
 
     def test_check_integrity(self, custom_cfg_path):
         config = Config()
@@ -962,7 +1093,7 @@ class TestConfig:
             "│   - 8 | <int>\n"
             "│   - 9 | <int>\n"
             "└─  )\n\n"
-            "• field E: dict{\n"
+            "• field E: namespace{\n"
             "│   subfield A = None | <NoneType>\n"
             "│   subfield B = True | <bool>\n"
             "│   subfield C = test | <str>\n"
@@ -991,10 +1122,23 @@ class TestConfig:
         
             assert str(cfg).strip() == expected
 
-    def test_singleton(self):
+    def test_singleton(self, custom_cfg_path):
+        # verify same instance
         config1 = Config()
         config2 = Config()
         assert id(config1) == id(config2)
         
+        # verify synchronization of changes
         config2.render_interval = 0.45
         assert config1.render_interval == 0.45
+        
+        # verify change is kept
+        config3 = Config()
+        assert config3.render_interval == 0.45
+        
+        # verify reload when a new config_path is specified
+        with pytest.warns(UserWarning):
+            config4 = Config(custom_cfg_path)
+        assert id(config1) == id(config4)
+        assert config4.render_interval == 0.34
+        
