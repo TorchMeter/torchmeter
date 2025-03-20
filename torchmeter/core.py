@@ -543,7 +543,23 @@ class Meter:
         return not self._ipt['args'] and not self._ipt['kwargs']
         
     def _ipt2device(self) -> None:
-        if self._is_ipt_empty():
+        """Moves all input tensors to the specified device.
+
+        This method checks if the input tensors are already on the specified device. 
+        If not, it moves them to the device set in the Meter instance.
+
+        Raises:
+            RuntimeError: If input data is needed but not provided (i.e., `self._ipt` is empty).
+
+        Notes:
+            - The method only processes tensors in the input.
+            - Non-tensor inputs remain unchanged.
+        """
+
+        from inspect import signature
+        forward_args = signature(self.model.forward).parameters
+
+        if len(forward_args) and self._is_ipt_empty():
             raise RuntimeError("No input data provided.")
 
         devices = set(arg.device for arg in self._ipt['args'] if isinstance(arg, Tensor))

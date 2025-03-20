@@ -39,6 +39,8 @@ class ExampleModel(nn.Module):
 class EmptyModel(nn.Module):
     def __init__(self):
         super(EmptyModel, self).__init__()
+    def forward(self):
+        pass
 
 class RepeatModel(nn.Module):
     def __init__(self, repeat_nodes=1):
@@ -82,6 +84,7 @@ class TestMeter:
         cpu_model(torch_randn(1, 10))
         assert hasattr(cpu_model, "ipt")
         assert hasattr(cpu_model, "device")
+        assert hasattr(cpu_model, "tree_fold_repeat")
         assert hasattr(cpu_model, "tree_levels_args")
         assert hasattr(cpu_model, "tree_repeat_block_args")
         assert hasattr(cpu_model, "table_display_args")
@@ -315,7 +318,11 @@ class TestMeter:
         metered_model = Meter(ExampleModel())
         to_method = torch_randn(1).to
         
-        # empty ipt
+        # empty ipt (no need)
+        empty_metered_model = Meter(EmptyModel(), device="cpu")
+        empty_metered_model._ipt2device()
+
+        # empty ipt(needed)
         with pytest.raises(RuntimeError):
             metered_model._ipt2device()
             
@@ -391,6 +398,25 @@ class TestMeter:
                         
             assert res == "Meter(model=model_info, device=device_info)"
     
+    def test_tree_fold_repeat(self):
+        """Test whether the `tree_fold_repeat` property is set and retrieved correctly."""
+        
+        metered_model = Meter(ExampleModel())
+        
+        assert hasattr(metered_model, "tree_fold_repeat")
+        
+        # retrieve
+        assert metered_model.tree_fold_repeat == __cfg__.tree_fold_repeat
+        
+        # valid set
+        metered_model.tree_fold_repeat = False
+        assert metered_model.tree_fold_repeat is False
+        assert __cfg__.tree_fold_repeat is False
+        
+        # invalid set
+        with pytest.raises(TypeError):
+            metered_model.tree_fold_repeat = 1
+
     @pytest.mark.parametrize(
         argnames=("attr_name", "upper_bound"),
         argvalues=[
