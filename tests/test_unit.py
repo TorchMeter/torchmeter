@@ -54,11 +54,11 @@ def test_time_unit():
 def test_speed_unit():
     is_unitsys_valid(SpeedUnit)
     
-    assert SpeedUnit.TSamPS.value == 1e12
-    assert SpeedUnit.GSamPS.value == 1e9
-    assert SpeedUnit.MSamPS.value == 1e6
-    assert SpeedUnit.KSamPS.value == 1e3
-    assert SpeedUnit.SamPS.value == 1e0
+    assert SpeedUnit.TIPS.value == 1e12
+    assert SpeedUnit.GIPS.value == 1e9
+    assert SpeedUnit.MIPS.value == 1e6
+    assert SpeedUnit.KIPS.value == 1e3
+    assert SpeedUnit.IPS.value == 1e0
     
     assert len(list(SpeedUnit)) == 5
 
