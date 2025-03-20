@@ -912,7 +912,7 @@ class TabularRenderer:
                  custom_cols:Dict[str, str]={},
                  keep_custom_name:bool=False,
                  newcol_name:str='',
-                 newcol_func:Callable[[Dict[str, Any]], Any]=lambda col_dict: col_dict,
+                 newcol_func:Callable[[Dict[str, Any]], Any]=lambda col_dict: None,
                  newcol_type:Optional[PolarsDataType]=None,
                  newcol_idx:int=-1,
                  keep_new_col:bool=False,
@@ -928,10 +928,10 @@ class TabularRenderer:
             raise ValueError(f"`{stat_name}` not in the supported statistics {self.opnode.statistics}.")
         if not isinstance(newcol_idx, int):
             raise TypeError(f"`newcol_idx` must be an integer, but got `{type(newcol_idx).__name__}`.")
-        if not isinstance(pick_cols, (tuple, list)):
-            raise TypeError(f"`pick_cols` must be a list or tuple, but got `{type(pick_cols).__name__}`.")
-        if not isinstance(exclude_cols, (tuple, list)):
-            raise TypeError(f"`exclude_cols` must be a list or tuple, but got `{type(exclude_cols).__name__}`.")
+        if not isinstance(pick_cols, (tuple, list, set)):
+            raise TypeError(f"`pick_cols` must be a list, tuple or set, but got `{type(pick_cols).__name__}`.")
+        if not isinstance(exclude_cols, (tuple, list, set)):
+            raise TypeError(f"`exclude_cols` must be a list, tuple or set, but got `{type(exclude_cols).__name__}`.")
         if not isinstance(custom_cols, dict):
             raise TypeError(f"`custom_cols` must be a dict, but got `{type(custom_cols).__name__}`.")
         
@@ -1026,7 +1026,7 @@ class TabularRenderer:
     def __new_col(self, 
                   df:DataFrame,
                   col_name:str, 
-                  col_func:Callable[[Dict], Any],
+                  col_func:Callable[[Dict[str, Any]], Any],
                   return_type=None,
                   col_idx:int = -1) -> DataFrame:
 
@@ -1035,6 +1035,9 @@ class TabularRenderer:
         if not isinstance(col_name, str):
             raise TypeError(f"`col_name` must be a string, but got `{type(col_name).__name__}`.")
 
+        if col_name in df.columns:
+            raise ValueError(f"Column name `{col_name}` already exists in the table.")
+        
         if col_idx < 0:
             col_idx = len(df.columns) + col_idx + 1 if abs(col_idx) <= len(df.columns) else 0
             

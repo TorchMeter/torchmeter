@@ -1466,6 +1466,22 @@ class TestTabularRenderer:
                     col_name=1,
                     col_func=lambda x: "test")
         
+        # duplicated column name
+        with pytest.raises(ValueError):
+            new_col(df=example_df,
+                    col_name="self_obj",
+                    col_func=lambda x: "test")
+        
+        # invalid new col index type
+        with pytest.raises(TypeError):
+            simple_tabular_renderer(stat_name="cal", newcol_idx=1.5) 
+            
+        # invalid column function type
+        with pytest.raises(TypeError):
+            new_col(df=example_df,
+                    col_name="new_col",
+                    col_func="test")
+        
         # verify function is applied correctly
         new_df = new_col(df=example_df,
                          col_name="new_col",
@@ -1530,10 +1546,6 @@ class TestTabularRenderer:
         # invalid stat name
         with pytest.raises(ValueError):
             simple_tabular_renderer(stat_name="invalid stat")
-        
-        # invalid new col index type
-        with pytest.raises(TypeError):
-            simple_tabular_renderer(stat_name="cal", newcol_idx=1.5) 
         
         # invalid pick_col type
         with pytest.raises(TypeError):
