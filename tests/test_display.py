@@ -1481,21 +1481,57 @@ class TestTabularRenderer:
             new_col(df=example_df,
                     col_name="new_col",
                     col_func="test")
+                
+        # invalid column function argument num
+        ## lack
+        with pytest.raises(TypeError):
+            new_col(df=example_df,
+                    col_name="new_col",
+                    col_func=lambda :...)
+        
+        ## exceed
+        with pytest.raises(TypeError):
+            new_col(df=example_df,
+                    col_name="new_col",
+                    col_func=lambda x, y:...)
+        
+        # invalid column function return
+        ## invalid return type
+        with pytest.raises(TypeError):
+            new_col(df=example_df,
+                    col_name="new_col",
+                    col_func=lambda x: 1)
+        
+        ## invalid return len
+        with pytest.raises(RuntimeError):
+            new_col(df=example_df,
+                    col_name="new_col",
+                    col_func=lambda x: [1])
         
         # verify function is applied correctly
         new_df = new_col(df=example_df,
                          col_name="new_col",
-                         col_func=lambda x: "test",
+                         col_func=lambda x: ["test"]*len(x),
                          col_idx=0)
         assert new_df.shape == (3, 6)
         assert new_df.columns[0] == "new_col"
         assert new_df["new_col"].to_list() == ["test"]*3
         
+        # verify funtion operation will not influence the original dataframe
+        new_df = new_col(df=example_df,
+                         col_name="origin_numeric",
+                         col_func=lambda df: df.drop_in_place(name="numeric"),
+                         col_idx=0)
+        assert new_df.shape == (3, 6)
+        assert example_df.shape == (3, 5)
+        assert example_df.columns == ["numeric", "text", "list_col", "nomal_obj", "self_obj"]
+        assert new_df["origin_numeric"].to_list() == example_df["numeric"].to_list()
+
         # verify col_idx
         ## non-negative and in range
         new_df = new_col(df=example_df,
                          col_name="new_col",
-                         col_func=lambda x: "test",
+                         col_func=lambda x: ["test"]*len(x),
                          col_idx=1)
         assert new_df.shape == (3, 6)
         assert new_df.columns[1] == "new_col"
@@ -1503,7 +1539,7 @@ class TestTabularRenderer:
         ## non-negative and out of range (add last)
         new_df = new_col(df=example_df,
                          col_name="new_col",
-                         col_func=lambda x: "test",
+                         col_func=lambda x: ["test"]*len(x),
                          col_idx=8) 
         assert new_df.shape == (3, 6)
         assert new_df.columns[5] == "new_col"
@@ -1511,7 +1547,7 @@ class TestTabularRenderer:
         ## negative and in range
         new_df = new_col(df=example_df,
                          col_name="new_col",
-                         col_func=lambda x: "test",
+                         col_func=lambda x: ["test"]*len(x),
                          col_idx=-1)
         assert new_df.shape == (3, 6)
         assert new_df.columns[-1] == "new_col"
@@ -1519,7 +1555,7 @@ class TestTabularRenderer:
         ## negative and out of range (add first)
         new_df = new_col(df=example_df,
                          col_name="new_col",
-                         col_func=lambda x: "test",
+                         col_func=lambda x: ["test"]*len(x),
                          col_idx=-9)
         assert new_df.shape == (3, 6)
         assert new_df.columns[0] == "new_col"
@@ -1527,7 +1563,7 @@ class TestTabularRenderer:
         ## verify return_type is correctly applied
         new_df = new_col(df=example_df,
                          col_name="new_col",
-                         col_func=lambda x: 1,
+                         col_func=lambda x: [1]*len(x),
                          return_type=float)
         assert new_df["new_col"].dtype == Float64
     
@@ -1737,7 +1773,7 @@ class TestTabularRenderer:
         # not to keep
         _, data = universal_tabular_renderer(stat_name="param",
                                              newcol_name="test",
-                                             newcol_func=lambda x: "test",
+                                             newcol_func=lambda x: ["test"]*len(x),
                                              keep_new_col=False)
         assert "test" in data.columns
         assert "test" not in universal_tabular_renderer.stats_data["param"].columns
@@ -1745,7 +1781,7 @@ class TestTabularRenderer:
         # keep
         _, data = universal_tabular_renderer(stat_name="param",
                                              newcol_name="test",
-                                             newcol_func=lambda x: "test",
+                                             newcol_func=lambda x: ["test"]*len(x),
                                              keep_new_col=True)
         assert "test" in data.columns
         assert "test" in universal_tabular_renderer.stats_data["param"].columns

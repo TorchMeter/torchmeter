@@ -12,7 +12,7 @@ from rich import print
 from rich.tree import Tree
 from rich.panel import Panel
 from rich.table import Table, Column
-from polars import DataFrame
+from polars import DataFrame, Series
 
 from torchmeter.utils import dfs_task, resolve_savepath
 from torchmeter.config import get_config, dict_to_namespace, FlagNameSpace
@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from rich.segment import Segment
     from rich.console import Console, RenderableType
     from polars._typing import PolarsDataType
+    from polars.series.series import ArrayLike
 
     from torchmeter.engine import OperationNode
     
@@ -912,7 +913,7 @@ class TabularRenderer:
                  custom_cols:Dict[str, str]={},
                  keep_custom_name:bool=False,
                  newcol_name:str='',
-                 newcol_func:Callable[[Dict[str, Any]], Any]=lambda col_dict: None,
+                 newcol_func:Callable[[DataFrame], ArrayLike]=lambda df: [None]*len(df),
                  newcol_type:Optional[PolarsDataType]=None,
                  newcol_idx:int=-1,
                  keep_new_col:bool=False,
@@ -1026,27 +1027,47 @@ class TabularRenderer:
     def __new_col(self, 
                   df:DataFrame,
                   col_name:str, 
-                  col_func:Callable[[Dict[str, Any]], Any],
+                  col_func:Callable[[DataFrame], ArrayLike],
                   return_type=None,
                   col_idx:int = -1) -> DataFrame:
 
-        from polars import Series
+        from inspect import signature
 
+        # validate col_name
         if not isinstance(col_name, str):
             raise TypeError(f"`col_name` must be a string, but got `{type(col_name).__name__}`.")
 
         if col_name in df.columns:
             raise ValueError(f"Column name `{col_name}` already exists in the table.")
         
+        # validate col_func
+        if not callable(col_func):
+            raise TypeError(f"`col_func` must be a callable object, but got `{type(col_func).__name__}`.")
+        else:
+            col_func_args_num = len(signature(col_func).parameters)
+            if col_func_args_num != 1:
+                raise TypeError("`col_func` must take exactly only one argument to receive " + \
+                                f"the backend dataframe, but got {col_func_args_num} instead.")
+            else:
+                func_ret = col_func(df.clone())
+                try:
+                    col_data = Series(values=func_ret, dtype=return_type)
+                except TypeError:
+                    raise TypeError("`col_func` must return an array-like object, " + \
+                                    f"but got `{type(func_ret).__name__}`.")
+                
+                if len(col_data) != len(df):
+                    raise RuntimeError(f"The result length of `col_func` is {len(col_data)}, " + \
+                                       f"not matchs the backend dataframe's length {len(df)}.")
+        
+        # get new column position
         if col_idx < 0:
             col_idx = len(df.columns) + col_idx + 1 if abs(col_idx) <= len(df.columns) else 0
             
         final_cols = df.columns[:]
         final_cols.insert(col_idx, col_name)
-
-        new_col_data = list(map(col_func, df.iter_rows(named=True)))
-
+        
+        # create new column
         return df.with_columns(
-            Series(new_col_data, dtype=return_type)
-            .alias(col_name)
+            col_data.alias(col_name)
         ).select(final_cols)
