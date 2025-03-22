@@ -1,3 +1,6 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import os
 from time import perf_counter
 from inspect import signature
@@ -7,6 +10,12 @@ from typing import Union, Optional, Callable, Iterable
 
 from rich.text import Text
 from rich.status import Status
+
+if TYPE_CHECKING:
+    from typing import Any, List, Tuple
+    from typing import Union, Optional, Callable, Iterable
+
+    from polars import PolarsDataType
 
 __all__ = ["dfs_task", "data_repr", "Timer"]
 
@@ -228,6 +237,57 @@ def data_repr(val:Any) -> str:
 
     else:
         return item_repr(val_type, val)
+
+def match_polars_type(ipt:Any, *, 
+                      recheck:bool=False,
+                      pre_res:Optional[PolarsDataType]=None)-> PolarsDataType:
+        
+    import numpy as np
+    import polars as pl
+    from polars.datatypes._parse import parse_into_dtype
+    from polars.series.series import _resolve_temporal_dtype
+
+    if not recheck and pre_res is not None:
+        return pre_res
+
+    try:
+        pl_type = parse_into_dtype(type(ipt))
+        if isinstance(ipt, (list, tuple)):
+            # TODO: inner type awareness (following type priority) 
+            inner_type = match_polars_type(ipt[0])
+            return pl_type(inner_type) # type: ignore
+            
+        return pl_type
+    
+    except TypeError:
+        if isinstance(ipt, dict):
+            fields = {k:match_polars_type(v) for k,v in ipt.items()}
+            return pl.Struct(fields=fields)
+        
+        elif isinstance(ipt, (np.datetime64, np.timedelta64)):
+            pl_type = _resolve_temporal_dtype(None, np.dtype(ipt)) # type: ignore 
+            return pl_type or pl.Object
+        
+        elif isinstance(ipt, (np.integer, np.floating)):
+            return {
+                np.int8: pl.Int8,
+                np.int16: pl.Int16,
+                np.int32: pl.Int32,
+                np.int64: pl.Int64,
+                np.uint8: pl.UInt8,
+                np.uint16: pl.UInt16,
+                np.uint32: pl.UInt32,
+                np.uint64: pl.UInt64,
+                np.float32: pl.Float32,
+                np.float64: pl.Float64
+            }[type(ipt)]
+            
+        elif isinstance(ipt, np.ndarray):
+            return pl.Series(ipt).dtype
+        
+        else:
+            # class instance
+            return pl.Object
 
 class Timer(Status):
     def __init__(self, task_desc:str, 
