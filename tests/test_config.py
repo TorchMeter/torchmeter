@@ -873,6 +873,10 @@ class TestFlagNameSpace:
 
 @pytest.mark.vital
 class TestGetConfig:
+    def teardown_method(self, method):
+        cfg = get_config()
+        cfg.config_file = None
+        
     def test_get_default(self):
         with patch.dict(os.environ, {}, clear=True):  
             config = get_config()
