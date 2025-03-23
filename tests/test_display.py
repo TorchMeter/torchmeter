@@ -13,10 +13,11 @@ from rich.panel import Panel
 from rich.columns import Columns
 from rich.segment import Segment
 from rich.console import Console, Group
-from polars import DataFrame, Float64
+from polars import DataFrame, Series
 
 from torchmeter.config import FlagNameSpace
 from torchmeter.engine import OperationNode, OperationTree
+from torchmeter._stat_numeric import UpperLinkData, MetricsData, CountUnit
 from torchmeter.display import (
     __cfg__, 
     dfs_task, render_perline, apply_setting,
@@ -143,24 +144,20 @@ def universal_tabular_renderer():
 @pytest.fixture
 def example_df():
     """
-    ┌─────────┬──────┬───────────┬───────────┬────────────┐
-    │ numeric ┆ text ┆ list_col  ┆ nomal_obj ┆ self_obj   │
-    │ ---     ┆ ---  ┆ ---       ┆ ---       ┆ ---        │
-    │ i64     ┆ str  ┆ list[i64] ┆ object    ┆ object     │
-    ╞═════════╪══════╪═══════════╪═══════════╪════════════╡
-    │ 1       ┆ a    ┆ [1, 2]    ┆ example   ┆ NoneStrObj │
-    │ 2       ┆ null ┆ [3]       ┆ dataframe ┆ null       │
-    │ null    ┆ c    ┆ null      ┆ null      ┆ NoneStrObj │
-    └─────────┴──────┴───────────┴───────────┴────────────┘
+    ┌─────────┬──────┬───────────┬───────────┬─────────────┐
+    │ numeric ┆ text ┆ list_col  ┆ nomal_obj ┆ self_obj    │
+    │ ---     ┆ ---  ┆ ---       ┆ ---       ┆ ---         │
+    │ i64     ┆ str  ┆ list[i64] ┆ object    ┆ object      │
+    ╞═════════╪══════╪═══════════╪═══════════╪═════════════╡
+    │ 1       ┆ a    ┆ [1, 2]    ┆ example   ┆ 100 K       │
+    │ 2       ┆ null ┆ [3]       ┆ dataframe ┆ null        │
+    │ null    ┆ c    ┆ null      ┆ null      ┆ 0.00 ± 0.00 │
+    └─────────┴──────┴───────────┴───────────┴─────────────┘
     """
-    class NoneStrObj:
-        none_str = "test none_str"
-        raw_data = 11
+    
+    from polars import Object as pl_obj
 
-        def __repr__(self):
-            return self.__class__.__name__
-
-    return DataFrame({
+    df = DataFrame({
         "numeric": [1, 2, None],
         "text": ["a", None, "c"],
         "list_col": [[1,2], [3], None],
@@ -168,13 +165,21 @@ def example_df():
             Text("example"), 
             Text("dataframe"), 
             None
-        ],
-        "self_obj":[
-            NoneStrObj(),
+        ]})
+    
+    self_obj_col = Series(
+        name="self_obj",
+        values=[
+            UpperLinkData(1e5, unit_sys=CountUnit, none_str="test none_str"),
             None,
-            NoneStrObj()
-        ]
-    })
+            MetricsData()
+        ],
+        dtype = pl_obj
+    )
+
+    df.insert_column(len(df.columns), self_obj_col)
+    
+    return df
 
 @pytest.fixture
 def export_dir(tmpdir):
@@ -1326,17 +1331,21 @@ class TestTabularRenderer:
         noraml_res = simple_tabular_renderer.df2tb(example_df, show_raw=False)
         raw_res = simple_tabular_renderer.df2tb(example_df, show_raw=True)
         
-        # obj that has no raw data, no change
+        # verify not raw display
+        assert self.tbval_getter(0, 0, noraml_res) == "1" 
+        assert self.tbval_getter(0, 1, noraml_res) == "a"
+        assert self.tbval_getter(1, 2, noraml_res) == "[3]"
+        assert self.tbval_getter(1, 3, noraml_res) == "dataframe"
+        assert self.tbval_getter(0, 4, noraml_res) == "100 K"
+        assert self.tbval_getter(2, 4, noraml_res) == "0.00 ± 0.00"
+
+        # verify raw display
         assert self.tbval_getter(0, 0, raw_res) == "1" 
         assert self.tbval_getter(0, 1, raw_res) == "a"
         assert self.tbval_getter(1, 2, raw_res) == "[3]"
         assert self.tbval_getter(1, 3, raw_res) == "dataframe"
-
-        # obj that has raw data, show raw data
-        assert self.tbval_getter(0, 4, raw_res) == "11"
-
-        # normal repr is replaced by raw data correctly
-        assert self.tbval_getter(0, 4, noraml_res) != self.tbval_getter(0, 4, raw_res)
+        assert self.tbval_getter(0, 4, raw_res) == "100000.0"
+        assert self.tbval_getter(2, 4, raw_res) == "0.0"
     
     def test_clear(self, simple_tabular_renderer, example_df, monkeypatch):
         """Test the stat dataframe clearing logic"""
@@ -1448,7 +1457,7 @@ class TestTabularRenderer:
         assert normal_data["list_col"][1] == "[3]"
         
         # object data is converted to str
-        assert normal_data["self_obj"][0] == "NoneStrObj"
+        assert normal_data["self_obj"][0] == "100 K"
         
         os.remove(expected_normal_file)
         os.remove(expected_raw_file)
@@ -1829,8 +1838,10 @@ class TestTabularRenderer:
     def test_edge_cases(self, simple_tabular_renderer):
         """Test the edge cases in rendering"""
         
+        from polars import Float64 as pl_float64
+
         # rebder empty dataframe
-        empty_df = DataFrame(schema={"col1": Float64})
+        empty_df = DataFrame(schema={"col1": pl_float64})
         res = simple_tabular_renderer.df2tb(empty_df)
         
         assert res.row_count == 0

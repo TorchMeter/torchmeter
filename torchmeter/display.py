@@ -14,11 +14,12 @@ from rich.panel import Panel
 from rich.table import Table, Column
 from polars import DataFrame, Series
 
-from torchmeter.utils import dfs_task, resolve_savepath
+from torchmeter.utils import dfs_task, resolve_savepath, match_polars_type
 from torchmeter.config import get_config, dict_to_namespace, FlagNameSpace
 
 if TYPE_CHECKING:
-    from typing import Any, Callable, Dict, List, Optional, Union, Sequence
+    from typing import Any, Dict, List, Union, Sequence
+    from typing import Callable, Optional, NamedTuple
     
     from rich.segment import Segment
     from rich.console import Console, RenderableType
@@ -923,7 +924,7 @@ class TabularRenderer:
         Note that `pick_cols` work before `custom_col`
         """
 
-        from operator import attrgetter
+        from collections import defaultdict
 
         if stat_name not in self.opnode.statistics:
             raise ValueError(f"`{stat_name}` not in the supported statistics {self.opnode.statistics}.")
@@ -939,8 +940,9 @@ class TabularRenderer:
         data:DataFrame = self.__stats_data[stat_name]
         valid_fields = data.columns or getattr(self.opnode, stat_name).tb_fields
     
-        def __fill_cell(subject:OperationNode, 
-                        pre_res=None):
+        def __fill_cell(subject:OperationNode, pre_res=None):
+            nonlocal val_collector, nocall_nodes, col_sample_data
+
             if subject.node_id == '0':
                 return
 
@@ -949,29 +951,41 @@ class TabularRenderer:
             node_stat = getattr(subject, stat_name)
             
             try:
-                stat_infos = node_stat.detail_val
-                if stat_infos:
-                    for rec in stat_infos: # rec: NamedTuple
-                        vals = val_getter(rec)
-                        val_collector.append(vals)
+                stat_infos:List[NamedTuple] = node_stat.detail_val
+                for info_nametuple in stat_infos:
+                    info_dict = info_nametuple._asdict()
+                    val_collector = {k:val_collector[k] + [v] 
+                                     for k,v in info_dict.items()}
+                    
+                    if None in col_sample_data.values():
+                        col_sample_data = {k:col_sample_data[k] or v 
+                                           for k,v in info_dict.items()}
             except RuntimeError:
                 nocall_nodes.append(f"({subject.node_id}){subject.name}")
 
         # only when the table is empty, then explore the data using dfs
-        if data.is_empty():            
-            val_collector:List[Any] = []
-            nocall_nodes:List[str] = []
+        if data.is_empty():  
+            nocall_nodes:List[str] = []          
+            val_collector:Dict[str, List[Any]] = defaultdict(list)        
+            col_sample_data:Dict[str, Any] = {col_name:None for col_name in valid_fields}
+
             dfs_task(dfs_subject=self.opnode,
                      adj_func=lambda x: x.childs.values(),
                      task_func=__fill_cell,
                      visited=[])
             
             if not val_collector:
-                raise RuntimeError(f"No {stat_name} data collected, the reasons are three-folds:\n" + \
-                                   "1. No module is called, make sure that your model's `forward` method is not empty.\n" + \
-                                   "2. The whole model is empty and has no sublayers.\n" + \
-                                   "3. You use a single layer as a model, consider putting it in a class and try again.\n")
-            data = DataFrame(data=val_collector, schema=valid_fields, orient='row')
+                raise RuntimeError(
+                    f"No {stat_name} data collected, the reasons are three-folds:\n" + \
+                    "1. No module is called, make sure that your model's `forward` method is not empty.\n" + \
+                    "2. The whole model is empty and has no sublayers.\n" + \
+                    "3. You use a single layer as a model, consider putting it in a class and try again.\n")
+        
+            val_collector = {col_name: Series(name=col_name, values=col_val, 
+                                              dtype=match_polars_type(col_sample_data[col_name]))
+                             for col_name, col_val in val_collector.items()}
+            
+            data = DataFrame(data=val_collector)
             self.__stats_data[stat_name] = data
             
             if nocall_nodes:
