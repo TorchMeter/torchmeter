@@ -6,6 +6,7 @@ import torch.nn as nn
 from rich import get_console
 from rich.text import Text
 from rich.layout import Layout
+from torch import float16, float32
 from torch import equal as torch_equal
 from torch import randn as torch_randn
 from torch.utils.hooks import RemovableHandle
@@ -114,13 +115,31 @@ class TestMeter:
         assert output.shape == (1, 10)
         assert output.device.type == "cpu"
         assert cpu_model.ipt["args"][0] is input
+        assert not len(cpu_model.ipt["kwargs"])
         
         ## call with keyword argument
-        cpu_model = Meter(model, device="cpu")
-        output = cpu_model(ipt=input)
-        assert output.shape == (1, 10)
-        assert output.device.type == "cpu"
+        output2 = cpu_model(ipt=input)
+        assert output2.shape == (1, 10)
+        assert output2.device.type == "cpu"
         assert cpu_model.ipt["kwargs"]["ipt"] is input
+        assert not len(cpu_model.ipt["args"])
+        
+        ## new input reset statistics measured flags
+        cpu_model._Meter__measure_param = True
+        cpu_model._Meter__measure_cal = True
+        cpu_model._Meter__measure_mem = True
+        cpu_model(torch_randn(2, 10)) # different input triggers reset
+        assert not cpu_model._Meter__measure_param 
+        assert not cpu_model._Meter__measure_cal 
+        assert not cpu_model._Meter__measure_mem
+        
+        cpu_model._Meter__measure_param = True
+        cpu_model._Meter__measure_cal = True
+        cpu_model._Meter__measure_mem = True
+        cpu_model(torch_randn(2, 10)) # same input not triggers reset
+        assert cpu_model._Meter__measure_param 
+        assert cpu_model._Meter__measure_cal 
+        assert cpu_model._Meter__measure_mem
         
         if is_cuda():
             # gpu_model
@@ -130,13 +149,14 @@ class TestMeter:
             assert output.shape == (1, 10)
             assert output.device.type == "cuda"
             assert torch_equal(gpu_model.ipt["args"][0], input.to("cuda:0"))
+            assert not len(gpu_model.ipt["kwargs"])
             
             ## call with keyword argument
-            gpu_model = Meter(model, device="cuda:0")
             output = gpu_model(ipt=input)
             assert output.shape == (1, 10)
             assert output.device.type == "cuda"
             assert torch_equal(gpu_model.ipt["kwargs"]['ipt'], input.to("cuda:0"))
+            assert not len(gpu_model.ipt["args"])
     
     def test_attr_operation(self):
         """Test the logic of overwritten __get(del)attr__ method"""
@@ -379,7 +399,83 @@ class TestMeter:
             assert mock_to.call_count == 2
             assert metered_model.ipt["args"][0].device.type == "cpu"
             assert metered_model.ipt["kwargs"]["A"].device.type == "cpu"
+    
+    @pytest.mark.parametrize(
+        argnames=["origin", "new", "expected"], 
+        argvalues=[
+            # empty
+            ({"args":tuple(), "kwargs":{}}, 
+             {"args":(1,), "kwargs":{}}, True),
             
+            # different number of anonymous args
+            ({"args":(1,)}, {"args":(1,2)}, True),
+            
+            # same number but different inner value
+            ## different type in same position
+            ({"args":(1,2)}, {"args":(1.,2)}, True),
+            
+            ## different shape of tensor in same position
+            ({"args":(torch_randn(1, 10), )}, {"args":(torch_randn(1, 20), )}, True),
+            
+            ## different dtype of tensor in same position
+            ({"args":(torch_randn(1, 10, dtype=float16), )}, 
+             {"args":(torch_randn(1, 10, dtype=float32), )}, True),
+            
+            ## different value in same position
+            ({"args":(1, 2)}, {"args":(2, 2)}, True),
+            
+            ## all same input without tensor data
+            ({"args":(1, 2), "kwargs":{}}, 
+             {"args":(1, 2),"kwargs":{}}, False),
+            
+            ## all same input with tensor data of same shape and same dtype
+            ({"args":(torch_randn(1, 10, dtype=float32), ), "kwargs":{}},
+             {"args":(torch_randn(1, 10, dtype=float32), ), "kwargs":{}}, False),
+            
+            # different number of keyword args
+            ({"args":tuple(), "kwargs":{"a":1, "b":2}}, 
+             {"args":tuple(), "kwargs":{"a":1}}, True),
+            
+            # same number but different keys
+            ({"args":tuple(), "kwargs":{"a":1, "b":2}}, 
+             {"args":tuple(), "kwargs":{"a":1, "c":2}}, True),
+            
+            # same number but different values
+            ## different value type of same key
+            ({"args":tuple(), "kwargs":{"a":1}}, 
+             {"args":tuple(), "kwargs":{"a":1.}}, True),
+            
+            ## different shape of tensor in value of same key
+            ({"args":tuple(), "kwargs":{"a":torch_randn(1, 10)}}, 
+             {"args":tuple(), "kwargs":{"a":torch_randn(1, 20)}}, True),
+            
+            ## different dtype of tensor in value of same key
+            ({"args":tuple(), "kwargs":{"a":torch_randn(1, 10, dtype=float16)}},
+             {"args":tuple(), "kwargs":{"a":torch_randn(1, 10, dtype=float32)}}, True),
+            
+            ## different value of same key
+            ({"args":tuple(), "kwargs":{"a":1}}, 
+             {"args":tuple(), "kwargs":{"a":2}}, True),
+            
+            ## all same input without tensor data
+            ({"args":tuple(), "kwargs":{"b":2, "c":3}}, 
+             {"args":tuple(), "kwargs":{"b":2, "c":3}}, False),
+            
+            ## all same input with tensor data of same shape and same dtype
+            ({"args":tuple(), "kwargs":{"d":torch_randn(1, 10, dtype=float32)}},
+             {"args":tuple(), "kwargs":{"d":torch_randn(1, 10, dtype=float32)}}, False)            
+            
+        ]
+    )
+    def test_is_ipt_changed(self, origin, new, expected, monkeypatch):
+        """Test the logic of __ipt_is_changed method"""
+        
+        metered_model = Meter(ExampleModel())
+        target_method = metered_model._Meter__is_ipt_changed
+            
+        monkeypatch.setattr(metered_model, "_ipt", origin)
+        assert target_method(new) is expected           
+    
     def test_repr(self):
         """Test correct representation of Meter object"""
         

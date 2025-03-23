@@ -67,7 +67,13 @@ class Meter:
         self.__has_not_support_nodes:Optional[bool] = None
 
     def __call__(self, *args, **kwargs) -> Any:
-        self._ipt = {'args': args, 'kwargs': kwargs}
+        new_ipt:IPT_TYPE = {"args": args, "kwargs": kwargs}
+        if self.__is_ipt_changed(new_ipt):
+            self.__measure_param = False
+            self.__measure_cal = False
+            self.__measure_mem = False
+            
+        self._ipt = new_ipt
         self._ipt2device()
         self.model.to(self.device)
         return self.model(*self._ipt['args'], **self._ipt['kwargs'])
@@ -594,6 +600,44 @@ class Meter:
                 "e.g. `Meter(your_model, device='cuda:0')`.")
                           
             return "cpu"
+        
+    def __is_ipt_changed(self, new_ipt:IPT_TYPE) -> bool:
+        if self._is_ipt_empty():
+            return True
+        
+        is_changed = False
+        
+        if len(self._ipt["args"]) == len(new_ipt["args"]):
+            for origin, new in zip(self._ipt["args"], new_ipt["args"]): 
+                if type(origin) is not type(new):
+                    is_changed = True
+                elif isinstance(origin, Tensor):
+                    is_changed = origin.shape != new.shape or origin.dtype != new.dtype
+                else:
+                    is_changed = origin != new   
+                
+                if is_changed:
+                    return True
+        else:
+            return True
+
+        if set(self._ipt["kwargs"].keys()) == set(new_ipt["kwargs"].keys()):
+            for k, origin in self._ipt["kwargs"].items():
+                new = new_ipt["kwargs"][k]
+                
+                if type(origin) is not type(new):
+                    is_changed = True
+                elif isinstance(origin, Tensor):
+                    is_changed = origin.shape != new.shape or origin.dtype != new.dtype
+                else:
+                    is_changed = origin != new   
+                
+                if is_changed:
+                    return True
+        else:
+            return True
+        
+        return False
         
     def __repr__(self) -> str:
         return f"Meter(model={self.optree}, device={self.device})"
