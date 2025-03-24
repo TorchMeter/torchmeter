@@ -51,6 +51,7 @@ class OperationNode:
         self.display_root:Tree # set in `OperationTree.__build()`
         self._render_when_repeat:bool = False # whether to render when enable `fold_repeat`, set in `OperationTree.__build()`
         self._is_folded = False # whether the node is folded in a repeat block, set in `OperationTree.__build()`
+        self.module_repr = str(self.type) if not self.is_leaf else str(self.operation)
 
         # statistic info (all read-only)
         self.__param = ParamsMeter(opnode=self)
@@ -75,8 +76,7 @@ class OperationNode:
         return self.__ittp
     
     def __repr__(self) -> str:
-        op_str = str(self.type) if not self.is_leaf else str(self.operation)            
-        return f"{self.node_id} {self.name}: {op_str}"
+        return f"{self.node_id} {self.name}: {self.module_repr}"
     
 class OperationTree:
 

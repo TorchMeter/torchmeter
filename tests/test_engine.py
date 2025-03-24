@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from unittest.mock import patch
 
 import pytest
 import torch.nn as nn
@@ -66,6 +67,15 @@ class TestOPN:
         assert node._repeat_body == []
         assert node._render_when_repeat is False
         assert node._is_folded is False
+
+    def test_module_repr(self, linear_model, sequential_model):
+        """Test the module_repr attribute"""
+
+        node = OperationNode(module=linear_model)
+        assert node.module_repr == str(linear_model)
+
+        node = OperationNode(module=sequential_model)
+        assert node.module_repr == str(sequential_model.__class__.__name__)
 
     def test_default_name(self, linear_model):
         """Test the default name is the type name when no name is provided"""
@@ -373,6 +383,16 @@ class TestOPT:
         assert root.childs['2'].childs['2.1'].type == "ReLU"
         assert root.childs['2'].childs['2.2'].name == "1"
         assert root.childs['2'].childs['2.2'].type == "Tanh"
+
+    def test_repr(self, nested_model):
+        """Test __repr__ logic"""
+
+        tree = OperationTree(nested_model)
+        root = tree.root
+
+        with patch.object(root, "__repr__", wraps=root.__repr__) as mock_opn_repr:
+            str(tree)
+            mock_opn_repr.assert_called_once()
 
 @pytest.mark.vital
 def test_invalid_init():
