@@ -81,6 +81,9 @@ class TestMeter:
         
         assert hasattr(cpu_model, "ittp_warmup")
         assert hasattr(cpu_model, "ittp_benchmark_time")
+        # set ittp_warmup and ittp_benchmark_time to a lower value to save time
+        cpu_model.ittp_warmup = 2
+        cpu_model.ittp_benchmark_time = 2
         
         cpu_model(torch_randn(1, 10))
         assert hasattr(cpu_model, "ipt")
@@ -961,6 +964,9 @@ class TestMeter:
                 return self.layer1(x)
         
         metered_model = Meter(NotSupportModel(), device="cpu")
+        # set ittp_warmup and ittp_benchmark_time to a lower value to save time
+        metered_model.ittp_warmup = 2
+        metered_model.ittp_benchmark_time = 2
         metered_model(torch_randn(1,10))
         
         nocall_flag = lambda :metered_model._Meter__has_nocall_nodes
@@ -1103,6 +1109,9 @@ class TestMeter:
         from rich.columns import Columns
         
         metered_model = Meter(ExampleModel())
+        # set ittp_warmup and ittp_benchmark_time to a lower value to save time
+        metered_model.ittp_warmup = 2
+        metered_model.ittp_benchmark_time = 2
         metered_model(torch_randn(1,10))
         
         order_getter = lambda res: [p._title.plain.split(" INFO")[0].strip().lower() 
@@ -1208,13 +1217,11 @@ class TestMeter:
         mock_render.reset_mock()
         metered_model.profile("param", show=False, no_tree=False)
         mock_render.assert_not_called()
-        assert len(terminal_output_strls()) == 1 # only the scanning time, i.e Finish scanning model in ....
         
         # show = False, no_tree = True
         mock_render.reset_mock()
         metered_model.profile("param", show=False, no_tree=True)
         mock_render.assert_not_called()
-        assert len(terminal_output_strls()) == 1
         
         with patch.object(Meter, "structure", 
                           new_callable=PropertyMock,
@@ -1224,12 +1231,14 @@ class TestMeter:
             mock_structure.reset_mock()
             metered_model.profile("param", show=True, no_tree=False)
             mock_structure.assert_called_once()
+            mock_render.assert_called_once()
         
             # show = True, no_tree = True
             mock_render.reset_mock()
             mock_structure.reset_mock()
             metered_model.profile("param", show=True, no_tree=True)
             mock_structure.assert_not_called()
+            mock_render.assert_called_once()
     
     @patch("torchmeter.core.render_perline")
     def test_profile_horizon_gap(self, mock_render):

@@ -498,6 +498,8 @@ class TestRenderPerline:
             mock_sleep.call_count == render_lines_num
 
 class TestTreeRenderer:
+    def teardown_method(self, method):
+        __cfg__.restore()
         
     def test_valid_init(self, simple_tree_renderer):
         """Test valid initialization"""

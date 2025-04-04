@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 import pytest
 import numpy as np
 import polars as pl
+from rich.text import Text
 from torch import rand as torch_rand
 from numpy.random import rand as np_rand
 
@@ -576,8 +577,9 @@ class TestTimer:
         mock_status["exit"].assert_called_once()
         
         captured = capsys.readouterr()
-        assert f"Finish {task} in" in captured.out
-        assert "seconds" in captured.out
+        plain_text = Text.from_ansi(captured.out).plain
+        assert f"Finish {task} in" in plain_text
+        assert "seconds" in plain_text
 
     # boundary condition test
     def test_short_time(self, capsys):

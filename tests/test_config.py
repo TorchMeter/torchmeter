@@ -874,7 +874,7 @@ class TestFlagNameSpace:
 @pytest.mark.vital
 class TestGetConfig:
     def teardown_method(self, method):
-        cfg = get_config()
+        cfg = Config()
         cfg.config_file = None
         
     def test_get_default(self):
@@ -915,9 +915,9 @@ class TestGetConfig:
 
 @pytest.mark.vital
 class TestConfig:
-    def setup_method(self, method):
+    def teardown_method(self, method):
         cfg = Config()
-        cfg.config_file = None
+        cfg.restore()
         
     def test_init(self, custom_cfg_path):
         # init with no config file

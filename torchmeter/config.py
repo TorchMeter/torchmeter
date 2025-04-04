@@ -174,7 +174,7 @@ def dict_to_namespace(d: Dict[str, Any]) -> FlagNameSpace:
     
     for k, v in d.items():
         # overwrite the value of unsafe key to get the unrepresent value
-        if k in UNSAFE_KV:
+        if k in UNSAFE_KV and isinstance(v, str):
             v = getattr(UNSAFE_KV[k], v).value
 
         if isinstance(v, dict):

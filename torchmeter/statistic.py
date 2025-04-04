@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from typing import Optional, Tuple, NamedTuple, Sequence
 
     from tqdm import tqdm
+    from torch.cuda import Event
     from torch import device as tc_device
     from torch.utils.hooks import RemovableHandle
 
@@ -755,15 +756,15 @@ class IttpMeter(Statistics):
         module._forward_hooks.clear()
         module.eval()
 
-        
-        start_event = cuda_event(enable_timing=True)
-        end_event = cuda_event(enable_timing=True)
-        cpu_timer = perf_counter
-        gpu_start_timer = start_event.record
-        gpu_end_timer = end_event.record
-
-        if device.type != 'cpu':
-            cuda_sync()  # WAIT FOR GPU SYNC  
+        if device.type == 'cpu':
+            cpu_timer = perf_counter
+        elif device.type == 'cuda':
+            start_event:Event = cuda_event(enable_timing=True)
+            end_event:Event = cuda_event(enable_timing=True)
+            gpu_start_timer = start_event.record
+            gpu_end_timer = end_event.record
+            cuda_sync()  # WAIT FOR GPU SYNC 
+         
         with no_grad():
             for _ in range(repeat):
                 start_time = cpu_timer() if device.type == 'cpu' else gpu_start_timer()
