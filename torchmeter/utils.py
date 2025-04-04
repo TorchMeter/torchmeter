@@ -5,8 +5,6 @@ import os
 from time import perf_counter
 from inspect import signature
 from functools import partial
-from typing import Any, List, Tuple
-from typing import Union, Optional, Callable, Iterable
 
 from rich.text import Text
 from rich.status import Status
@@ -40,18 +38,6 @@ def resolve_savepath(origin_path:str,
     return save_dir, save_file
 
 def hasargs(func:Callable, *required_args:str) -> None:
-    """
-    Check if the function `func` has all the required arguments.
-
-    Args:
-    ---
-        - `func` (Callable): The function to be checked.
-        - `required_args` (Tuple[str]): The names of required arguments.
-
-    Returns:
-    ---
-        None
-    """
     if not required_args:
         return 
         
@@ -67,73 +53,6 @@ def dfs_task(dfs_subject:Any,
              visited_signal_func:Callable[[Any], Any]=lambda x:id(x),
              *,
              visited:Optional[List]=None) -> Any: 
-    """
-    Perform Depth-First Search (DFS) traversal on `dfs_subject`, 
-    and complete the specified task at the same time.
-
-    The traversal is implemented by recursion.
-    
-    Args:
-    ---
-        - `dfs_subject` (Any): The subject to be traversed.\n\n
-        
-        - `adj_func` (Callable[[Any], Iterable]): Function to obtain an iterator for child objects of "dfs_subject".
-                                                  The function should have one parameter, which is the object to be traversed.
-                                                  And the function should return an iterator of child objects.
-                                                  
-        - `task_func` (Callable[[Any], Any]): Function to perform the task. 
-                                              The function should have two specific parameters, one is `subject` used to receive the currently traversed object,
-                                              and the other is `pre_res` used to receive the result of the previous level task.
-                                              Finally, the function should return the result of the currently traversal task.
-                                              
-        - `visited_signal_func` (Callable[[Any], Any]): Function to obtain the signal used to identify whether this object is visited.
-                                                        The function should have one parameter, which is the object to be traversed.
-                                                        And the function should return a signal in any format.
-                                                        Defaults to use the traversal object itself.
-                                                        
-        - `visited` (List, optional): A list to store the visited signals, it's used to avoid visiting a same object repeatly.
-                                      Defaults to [].
-    
-    Returns:
-    ---
-        Any: The result of the first-level task. Given that each level's task result will be passed to next level,
-             therefore you can use a container (such as list) to collect the result of each level's task,
-             in this case, although the function returns the result of the first level's task, it has all levels' results in it.
-    
-    Example:
-    ---
-        ```python
-        class BinaryTree:
-            def __init__(self, value, left=None, right=None):
-                self.value = value
-                self.left = left
-                self.right = right
-        
-        root = BinaryTree(1)
-        l_child = BinaryTree(2)
-        ll_child = BinaryTree(3)
-        root.left = l_child
-        l_child.left = ll_child
-        
-        def print_node(subject, pre_res=[]):
-            print(subject.value)
-            return pre_res + [subject.value]
-
-        print('Print the left subtree:')
-        dfs_res = dfs_task(dfs_subject=root, 
-                        adj_func=lambda x:[x.left] if x.left else [],  # stop traversal when there is no left child
-                        task_func=print_node, 
-                        visited_signal_func=id, # use the addr as visited_signal
-                        visited=[])
-        # >>> 1
-        # >>> 2
-        # >>> 3
-        
-        print(dfs_res)
-        # >>> [1, 2, 3]
-        ```
-    """
-    
     hasargs(task_func, 'subject', 'pre_res')
 
     visited_signal = visited_signal_func(dfs_subject)

@@ -151,31 +151,6 @@ def apply_setting(obj:Any,
     return obj
 
 def render_perline(renderable: RenderableType) -> None:
-    """
-    Output a renderable object line by line. \n
-    Each line allows for the setting of a prefix and a suffix, i.e. `line_prefix` and `line_suffix`. \n
-    A separator `row_separator` can be set between lines. \n
-    At the same time, an interval of `time_sep` seconds is allowed between the output of each line.
-
-    Args:
-    ---
-        - `renderable` (Union[RenderableType, List[List[Segment]]]): The renderable object to be displayed. Accepts a nested lists of Segments as well.
-        
-        - `line_prefix` (str, optional): The prefix to be displayed before each line. Accept rich style customization. 
-                                         Defaults to ''.
-        
-        - `line_suffix` (str, optional): The suffix to be displayed after each line. Accept rich style customization. 
-                                         Defaults to ''.
-        - `row_separator` (str, optional): The separator pattern to be displayed between each line. The pattern will be repeat for the full display width.
-                                         Accept rich style customization. Defaults to ''.
-        
-        - `console` (rich.console.Console, optional): The console object to be used for rendering. If it is not specified, 
-                                                      the global console object will be used. Defaults to None.
-        
-    Returns:
-    ---
-        None
-    """
     
     from time import sleep
     from rich import get_console
@@ -200,114 +175,6 @@ def render_perline(renderable: RenderableType) -> None:
             sleep(time_sep)
 
 class TreeRenderer:
-    """Render a `OperationNode` object as a tree.
-    
-    A renderer responsible for rendering a `OperationNode` object as a tree without polluting the original `OperationNode` object.
-
-    Features:
-        - Rich display: Implemented based on rich, supporting rich text output.
-
-        - Easy-to-understand visualization: auto-fold the repeat block when the `fold_repeat` is set in `render()` method.
-
-        - Highly customizable: Allows custom rendering for even each level of the tree. You can specify your own display settings by 
-                               passing a dictionary or a list of dictionaries as `level_args` when you call the object.
-
-    Tips for customization: 
-        - customize the display settings for each level: pass a dictionary or a list of dictionaries as `level_args` when you call the object.
-            - If you pass a dictionary, it should follow the format: `{'0': {level_0_setting}, '1': {level_1_setting}, ...}`. In this case, 
-            the key should be a non-negative int or 'default' or 'all', which means that the settings in value will be used at the target level, 
-            the undefined level and all levels from now on.
-
-            - If you pass a list of dictionaries, each dictionary should contain a key `level` to indicate the working level. You should follow 
-            the format like `[{'level':'0', **level_0_setting}, {'level':'1', **level_1_setting}, ...]`, the `level` serves the same function as 
-            the key set in the dict.
-
-            - As for level settting, it firstly should be attributes of a `rich.tree.Tree` object, mostly used are `label` for the display content of the node,
-            `guide_style` for the style of the guide line, `style` for the style of the node, etc. See more at https://rich.readthedocs.io/en/latest/tree.html.
-            Note that You can access the attributes of the operation node by using `<·>` in the value. For example, if you want to print the node id, 
-            you can set `'label':'<node_id>'`. Typically, the content in the placeholder `<·>` will be replaced by the corresponding attribute of the operation node.
-            However, if you want a more dedicated post-process, you can overwrite the `resolve_attr` method of the renderer instance. The method accept the attribute value
-            as input and should return a string as output.
-
-        - customize the display settings for repeat block: pass a dictionary as `repeat_block_args` when you call the object.
-            - The keys of the dict can be arguments of `rich.panel.Panel` object;
-            - In addition, you can set a `repeat_footer` key to pass in a string or a function with an `attr_dict` argument to customize the footer of the repeat block.
-              If you use a string, then you can use `<·>` in the string to access the attributes of the operation node. If you use a function, then your function should have an argument
-              known as `attr_dict` through which you can access the attributes of the operation node. Finally, you should promise that your function return a string that may contain placeholder or not.
-              By the way, if you want to access the loop algebra, you can use `<loop_algebra>` in the string or function.
-                               
-    
-    Attributes:
-    ---
-        - `node` (OperationNode): the node to be rendered as a tree.
-
-        - `loop_algebras` (str): The loop algebra sequence whose character will be used to generate the unique node id. 
-                                 If it is not set, it will used `xyijkabcdefghlmnopqrstuvwz` instead. Defaults to ''.
-
-        - `render_unfold_tree` (rich.tree.Tree): A `rich.tree.Tree` object without folding the repeat nodes. 
-                                                 That is to say, this is the original tree structure.
-
-        - `render_fold_tree` (rich.tree.Tree): A `rich.tree.Tree` object with repeat nodes folded as repeat blocks. This is an efficient 
-                                               and easy-to-understand way to display.
-
-        - `default_level_args` (Dict[str, Any]): A dictionary containing the default display settings for each level of the tree. 
-                                                 The keys of the dict are arguments of `rich.tree.Tree` class. This attribute might be 
-                                                 changed by `render()` method if `level_args` is passed in and there is a key `default` or `all` in the passed in setting. 
-
-        - `tree_levels_args` (Dict[str, Any]): A dictionary containing the display settings for each level of the tree. 
-                                              The key is the level number, and the value is a dictionary containing the display settings of corresponding level.
-                                              This attribute might be changed by `render()` method if `level_args` is passed in.
-
-        - `repeat_block_args` (Dict[str, Any]): A dictionary containing the display settings for the repeat block. This attribute takes effect only when `fold_repeat` is set to True
-                                                in `render()` method. Note that the keys can be arguments of `rich.panel.Panel` object, or `repeat_footer` to customize the footer format 
-                                                of the repeat block.
-    
-    Methods:  
-    ---
-        - `__call__`: Render the OperationNode object and its childs as a tree.      
-        - `resolve_attr`: Function to process the attribute value resolved by regex. You should inherit and override this method 
-                          to customize the processing pipeline of the attribute value.    
-
-    Examples:  
-    ---
-        ```python
-        from torchvision.models import resnet18
-        from torchmeter.engine import OperationTree
-        from torchmeter.display import TreeRenderer
-
-        model = resnet18()
-        optree = OperationTree(model)
-
-        root_display = {
-            'level': 0,
-            'label': '[b red]<name>[/]',
-            'guide_style':'red',
-        }
-
-        level_1_display = {
-            'level': 1,
-            'label':'[gray35]<node_id> [b green]<name>[/]',
-            'guide_style':'green'
-        }
-
-        level_2_display = {
-            'level': 2,
-            'guide_style':'blue'
-        }
-
-        repeat_block_args = {
-            'title': '[i]Repeat [[b u]<repeat_time>[/b u]] Times[/]',
-            'title_align': 'center',
-            'highlight': True,
-            'repeat_footer': lambda attr_dict: f"First value of <loop_algebra> is {attr_dict['node_id'].split('.')[-1]}"
-        }
-
-        renderer = TreeRenderer()
-        renderer(optree.root, 
-                 level_args=[root_display, level_1_display, level_2_display],
-                 repeat_block_args=repeat_block_args)
-        ```                                         
-    """
     
     loop_algebras:str = "xyijkabcdefghlmnopqrstuvwz" + "XYIJKABCDEFGHLMNOPQRSTUVWZ"
     
@@ -364,18 +231,6 @@ class TreeRenderer:
 
     @default_level_args.setter  # type: ignore
     def default_level_args(self, custom_args:Dict[str, Any]) -> None:
-        """
-        Update the default display settings of the rendered tree with the pass-in dict.
-        Note that the keys of the dict should be valid args of `rich.tree.Tree` class.
-
-        Args:
-        ---
-            - `custom_args` (Dict[str, str]): A dict of new display settings. The keys should be valid args of `rich.tree.Tree` class.
-
-        Raises:
-        ---
-            - `TypeError`: if the new value is not a dict.
-        """
         if not isinstance(custom_args, dict):
             raise TypeError(f"You can only overwrite `{self.__class__.__name__}.default_level_args` with a dict, " + \
                             f"but got `{type(custom_args).__name__}`.")
@@ -384,30 +239,15 @@ class TreeRenderer:
         passin_keys = set(custom_args.keys())
         invalid_keys = passin_keys - valid_setting_keys
         if invalid_keys:
-            raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.tree.Tree`, " + \
-                           "refer to https://rich.readthedocs.io/en/latest/tree.html for valid args.")
+            raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.tree.Tree`, refer to " + \
+                           "https://rich.readthedocs.io/en/latest/reference/tree.html#rich.tree.Tree " + \
+                           "for valid args.")
         self.default_level_args.update(custom_args)
         
         self.default_level_args.mark_change()
 
     @tree_levels_args.setter    # type: ignore
     def tree_levels_args(self, custom_args:Dict[Any, Dict[str, Any]]) -> None:
-        """
-        Update the display settings of all levels in the rendered tree with the pass-in list of dict.
-        Note that all dicts should have a key `level` to indicate the level of the corresponding display settings.
-        To ensure correctly displayed, all key-values pairs in the dict will be valid.
-
-        Args:
-        ---
-            - `custom_args` (Union[List[Dict[str, Any]], Dict[Any, Dict[str, Any]]]): 
-                A list of dict or a dict.
-                If a list of dict, each dict should contain a key `level` to indicate the level of the corresponding display settings.
-                If a dict, the key should be the level of the corresponding display settings.
-
-        Raises:
-        ---
-            `TypeError`: if the new value is not a dict or a list of dict.
-        """
         if not isinstance(custom_args, dict):
             raise TypeError(f"You can only overwrite `{self.__class__.__name__}.tree_levels_args` with a dict, " + \
                             f"but got `{type(custom_args).__name__}`.")
@@ -418,16 +258,17 @@ class TreeRenderer:
             # assure level is a non-negative integer, 'default' or 'all'
             level = level.lower()
             if not level.isnumeric() and level not in ('default', 'all'):
-                warnings.warn(message=f"The `level` key should be numeric, `default` or `all`, but got `{level}`.\n" + \
-                                      "This setting will be ignored.\n",
+                warnings.warn(message="The `level` key should be numeric, `default` or `all`, " + \
+                                      f"but got `{level}`.This setting will be ignored.",
                               category=UserWarning)
                 continue
                 
             passin_keys = set(level_args_dict.keys())
             invalid_keys = passin_keys - valid_setting_keys
             if invalid_keys:
-                raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.tree.Tree`, " + \
-                               "refer to https://rich.readthedocs.io/en/latest/tree.html for valid args.")
+                raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.tree.Tree`, refer to " + \
+                               "https://rich.readthedocs.io/en/latest/reference/tree.html#rich.tree.Tree " + \
+                               "for valid args.")
 
             if level == 'default':
                 self.default_level_args = level_args_dict # type: ignore
@@ -439,27 +280,12 @@ class TreeRenderer:
                 list(map(lambda level:delattr(self.tree_levels_args, level), levels))   # type: ignore
                 break
             else:
-                if hasattr(self.tree_levels_args, level):
-                    getattr(self.tree_levels_args, level).__dict__.update(level_args_dict)
-                else:
-                    setattr(self.tree_levels_args, level, dict_to_namespace(level_args_dict)) # type: ignore
+                self.tree_levels_args.update({level:level_args_dict})
                        
         self.tree_levels_args.mark_change()
 
     @repeat_block_args.setter   # type: ignore
     def repeat_block_args(self, custom_args:Dict[str, Any]) -> None:
-        """
-        Update the display settings of the repeat block with the pass-in dict.
-        Note that the keys of the dict should be valid args of `rich.panel.Panel` class.
-
-        Args:
-        ---
-            - `custom_args` (Dict[str, Any]): A dict of new display settings. The keys should be valid args of `rich.panel.Panel` class.
-
-        Raises:
-        ---
-            - `TypeError`: if the new value is not a dict.
-        """
         if not isinstance(custom_args, dict):
             raise TypeError(f"You can only overwrite `{self.__class__.__name__}.repeat_block_args` with a dict, " + \
                             f"but got `{type(custom_args).__name__}`.")
@@ -473,8 +299,9 @@ class TreeRenderer:
         passin_keys = set(custom_args.keys())
         invalid_keys = passin_keys - valid_setting_keys
         if invalid_keys:
-            raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.panel.Panel`, " + \
-                           "refer to https://rich.readthedocs.io/en/latest/panel.html for valid args.")
+            raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.panel.Panel`, refer to " + \
+                           "https://rich.readthedocs.io/en/latest/reference/panel.html#rich.panel.Panel " + \
+                           "for valid args.")
         self.repeat_block_args.update(custom_args)
         
         self.repeat_block_args.mark_change()
@@ -523,28 +350,6 @@ class TreeRenderer:
         return str(attr_val)
     
     def __call__(self) -> Tree:
-        """Render the `OperationNode` object and its childs as a tree without polluting the original `OperationNode` object.
-        
-        see docs of the class(i.e. `torchmeter.display.TreeRenderer`) for details.
-
-        Args:
-        ---
-            - `fold_repeat` (bool, optional): whether to fold the repeat nodes. Defaults to True.
-            
-            - `level_args` (Union[List[Dict[str, Any]], Dict[Any, Dict[str, Any]]], optional): a dict or a list of dicts, whose item controls 
-                                                                    the render settings of specific tree level through key(if it's a dict) or key 'level'(if it's a list). 
-                                                                    Defaults to {}, which means using the default setting for each level.
-            
-            - `repeat_block_args` (Dict[str, Any], optional): a dict of display settings for the repeat block. Defaults to {}.
-
-        Returns:
-        ---
-            rich.tree.Tree: the rendered tree.
-        
-        Example:
-        ---
-            see docs of the class(i.e. `torchmeter.display.TreeRenderer`) for details.
-        """
         
         from rich.rule import Rule
         from rich.console import Group
@@ -706,18 +511,16 @@ class TreeRenderer:
                           attr_owner:"OperationNode", # noqa # type: ignore
                           **kwargs) -> str: 
         """
-        Disolve all placeholders in form of `<·>` in `text`.\n
-        If you do not want the content in `<·>` to be resolved, you can use `\\<` or `\\>` to escape it.\n
-        For example, `<name>` will be replaced by the value of `attr_owner.name`, while `\\<name\\>` will not be resolved.
+        Disolve all placeholders in form of `<·>` in `text`. If you do not want the content in `<·>` to 
+        be resolved, you can use `\\<` or `\\>` to escape it. For example, `<name>` will be replaced by 
+        the value of `attr_owner.name`, while `\\<name\\>` will not be resolved.
 
         Args:
-        ---
-            - `text` (str): A string that may contain placeholder in the form of `<·>`.
-            - `attr_owner` (OperationNode): The object who owns the attributes to be resolved.
-            - `kwargs` (dict): Offering additional attributes.
+            text (str): A string that may contain placeholder in the form of `<·>`.
+            attr_owner (OperationNode): The object who owns the attributes to be resolved.
+            kwargs (dict): Offering additional attributes.
 
         Returns:
-        ---
             str: Text with all placeholders resolved.
         """
         attr_dict = copy(attr_owner.__dict__)
@@ -774,8 +577,9 @@ class TabularRenderer:
         passin_keys = set(custom_args.keys())
         invalid_keys = passin_keys - valid_setting_keys
         if invalid_keys:
-            raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.table.Table`, " + \
-                           "refer to https://rich.readthedocs.io/en/latest/tables.html for valid args.")
+            raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.table.Table`, refer to " + \
+                           "https://rich.readthedocs.io/en/latest/reference/table.html#rich.table.Table " + \
+                           "for valid args.")
         self.tb_args.update(custom_args)
         
         self.tb_args.mark_change()
@@ -790,8 +594,9 @@ class TabularRenderer:
         passin_keys = set(custom_args.keys())
         invalid_keys = passin_keys - valid_setting_keys
         if invalid_keys:
-            raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.table.Column`, " + \
-                           "refer to https://rich.readthedocs.io/en/latest/columns.html for valid args.")
+            raise KeyError(f"Keys {invalid_keys} is/are not accepted by `rich.table.Column`, refer to " + \
+                           "https://rich.readthedocs.io/en/latest/reference/table.html#rich.table.Column " + \
+                           "for valid args.")
         self.col_args.update(custom_args)
         
         self.col_args.mark_change()
@@ -941,12 +746,10 @@ class TabularRenderer:
         valid_fields = data.columns or getattr(self.opnode, stat_name).tb_fields
     
         def __fill_cell(subject:OperationNode, pre_res=None):
-            nonlocal val_collector, nocall_nodes, col_sample_data
+            nonlocal val_collector, nocall_nodes, col_sample_data # type: ignore
 
             if subject.node_id == '0':
                 return
-
-            val_getter = attrgetter(*valid_fields)
 
             node_stat = getattr(subject, stat_name)
             
@@ -981,11 +784,11 @@ class TabularRenderer:
                     "2. The whole model is empty and has no sublayers.\n" + \
                     "3. You use a single layer as a model, consider putting it in a class and try again.\n")
         
-            val_collector = {col_name: Series(name=col_name, values=col_val, 
-                                              dtype=match_polars_type(col_sample_data[col_name]))
-                             for col_name, col_val in val_collector.items()}
+            col_data:Dict[str, Series] = {col_name: Series(name=col_name, values=col_val, 
+                                                           dtype=match_polars_type(col_sample_data[col_name]))
+                                          for col_name, col_val in val_collector.items()}
             
-            data = DataFrame(data=val_collector)
+            data = DataFrame(data=col_data)
             self.__stats_data[stat_name] = data
             
             if nocall_nodes:

@@ -103,27 +103,21 @@ class OperationTree:
                     -> Tuple[OPNODE_LIST, Optional[Tree]]:
         """
         Private method.
-        
-        This function will explore the model structure, unfold all multi-layers modules, and organize them into a tree structure.
-        
-        Finally, it will build a display tree and a operation tree in one DFS recursion, simutaneously.
-        
-        With the built display tree, the terminal display of the model structure can be achieved.
-        
+        This function will explore the model structure, unfold all multi-layers modules, and organize them 
+        into a tree structure. Finally, it will build a display tree and a operation tree in one DFS recursion, 
+        simutaneously. With the built display tree, the terminal display of the model structure can be achieved.
         With the built operation tree, the model statistic can be easily and quickly accessed.
 
         Args:
-        ---
-        This function serves as the `task_func` in `torchmeter.utils.dfs_task`, 
-        therefore having the following two arguments:
-        
-            - `subject` (OperationNode): the node to be traversed in the operation tree.
-            
-            - `pre_res` (Tuple[List["OperationNode"], Optional[Tree]]): the container of all nodes and the father node of the display tree 
+            subject (OperationNode): the node to be traversed in the operation tree.
+            pre_res (Tuple[Optional[OPNODE_LIST], Optional[Tree]]): the container of all nodes and the father node
+                                                                   of the display tree 
         
         Returns:
-        ---
-            Tuple[List["OperationNode"], Optional[Tree]]: the current traversed node of the operation tree and display tree
+            Tuple[Optional[OPNODE_LIST], Optional[Tree]]: the current traversed node of the operation tree and 
+                                                          display tree
+
+        Note: This function serves as the `task_func` in `torchmeter.utils.dfs_task`
         """
         
         all_nodes, *display_parent = pre_res
