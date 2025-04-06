@@ -1,0 +1,40 @@
+# TorchMeter, MIT license
+# Author: Ahzyuan
+# Repo: https://github.com/Ahzyuan/torchmeter
+
+# This workflow is borrowed from polars and modified
+# polars official one: https://github.com/pola-rs/polars/blob/main/.github/workflows/pr-labeler.yml
+# thanks to @pola-rs's great job
+
+# This workflow is triggered when a PR is opened or edited. Core functions:
+# 1. Automatic PR Title Validation - Ensure PR titles follow Contribution Guidelines
+# 2. Intelligent Label Assignment - Auto-tag PRs based on title (feat, fix, docs, etc)
+# 3. Release Integration - Sync labels with release-drafter for changelog generation
+
+name: 🤖 PR Auto-Labeler ⛳
+
+on:
+  pull_request_target:
+    types: 
+      - opened
+      - edited
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  labeler:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR Title
+        uses: thehanimo/pr-title-checker@v1.4.2
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Label PR
+        uses: release-drafter/release-drafter@v6
+        with:
+          disable-releaser: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

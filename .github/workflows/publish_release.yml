@@ -1,136 +1,285 @@
+# TorchMeter, MIT license
+# Author: Ahzyuan
+# Repo: https://github.com/Ahzyuan/torchmeter
+
+# This workflow is triggered when a new tag matching the semantic versioning pattern 'v*.*.*' (e.g., v1.2.3) is pushed.
+#
+# Trigger Conditions:
+# - Exclusive activation by semantic version tag pushes (`vA.B.C` format, can be only performed by maintainer)
+# - Automated verification of tag-master branch consistency
+#
+# Core Pipeline:
+# 1. Tag Validation - Ensures tags originate from master branch commit
+# 2. Package Building - Generates universal wheels and sdist packages
+# 3. Staged Publishing:
+#    - TestPyPI: Initial validation deployment
+#    - PyPI Official: Production-grade package release
+# 4. Release Automation: 
+#    - GitHub Release creation with auto-generated changelog
+#    - Success notification with deployment links to maintainer
+# 5. Safety Mechanisms:
+#    - Automatic tag cleanup on failure
+#    - Maintainer alerting via email for failed attempts
+#    - Metadata verification pre-publication
+# 
+# Secrets:
+# - NOTIFY_EMAIL: email address to send notification to
+
 name: 📤 Publish and Release 🗳
 
 on:
   push:
     tags:
-      - "v*.*.*" 
+      - 'v*.*.*'
 
 env:
-  FORCE_COLOR: 1 
+  FORCE_COLOR: 1
 
 jobs:
-    Build-distribution-packages:  
-        name: 📦 Build distribution   
-        runs-on: ubuntu-latest       
+  Check-Tag:
+    name: 🏷 Validate Tag
+    runs-on: ubuntu-latest
 
-        steps: 
-        - name: Fetch repository    
-          uses: actions/checkout@v4 
-        
-        - name: Install Python       
-          uses: actions/setup-python@v5 
-          with:
-              python-version: "3.x" 
-        
-        - name: Install packages used for building  
-          run: |   
-              python3 -m pip install setuptools build wheel isort ruff --user
-              python3 -m pip install twine check-manifest --user
-        
-        - name: Build distribution packages  
-          run: python3 -m build -v -n .
-        
-        - name: Execute validation script    
-          run: |
-            chmod +x ./check_meta.sh
-            bash ./check_meta.sh
+    if: github.repository == 'TorchMeter/torchmeter'
 
-        - name: Store the building results   
-          uses: actions/upload-artifact@v4
-          with:
-            name: build-results
-            path: dist/
-            if-no-files-found: error
+    steps:
+      - name: Fetch Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    Publish-PyPI: 
-        name: 📤 Publish to PyPI
-        runs-on: ubuntu-latest
-        
-        needs: Build-distribution-packages 
-      
-        environment:
-          name: pypi
-          url: https://pypi.org/p/torchmeter  
+      - name: Check Tag is on Master
+        run: |          
+          TAG_COMMIT=$(git rev-parse ${{ github.ref_name }}^{commit})
           
-        permissions:
-          id-token: write  
+          if ! git merge-base --is-ancestor $TAG_COMMIT origin/master; then
+            echo "❌ Error: Tag ${{ github.ref_name }} is not on master branch!" >&2
+            exit 1
+          else
+            echo "✅ Tag ${{ github.ref_name }} points to master branch correctly."
+          fi
       
-        steps: 
-        - name: Download all the dists
-          uses: actions/download-artifact@v4
-          with:
-            name: build-results 
-            path: dist/
-        
-        - name: Upload to PyPI
-          uses: pypa/gh-action-pypi-publish@release/v1
-          with: 
-            skip-existing: true
+  Build-Distribution-Packages:
+    name: 📦 Build Distributions
+    runs-on: ubuntu-latest
 
-    Publish-TestPyPI: 
-      name: 📤 Publish to TestPyPI
-      runs-on: ubuntu-latest
+    needs: Check-Tag
 
-      needs: Build-distribution-packages 
-  
-      environment:
-        name: testpypi
-        url: https://test.pypi.org/p/torchmeter 
-  
-      permissions:
-        id-token: write 
-  
-      steps:
-      - name: Download all the dists
+    steps:
+      - name: Fetch Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '>=3.8'
+
+      - name: Install Dependencies
+        run: |
+            python3 -m pip install --upgrade pip
+            python3 -m pip install setuptools build wheel isort ruff --user
+            python3 -m pip install twine check-manifest --user
+
+      - name: Build Distributions
+        run: python3 -m build -v -n .
+
+      - name: Check Meta Data
+        run: |
+          chmod +x misc/check_meta.sh
+          bash misc/check_meta.sh
+
+      - name: Upload Built Distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-results
+          path: dist/
+          overwrite: true
+          retention-days: 7
+          if-no-files-found: error
+
+  Publish-TestPyPI:
+    name: 📤 Publish to TestPyPI
+    runs-on: ubuntu-latest
+
+    needs: Build-Distribution-Packages
+    if: github.repository == 'TorchMeter/torchmeter'
+
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/torchmeter
+
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download Distributions
         uses: actions/download-artifact@v4
         with:
-          name: build-results 
+          name: build-results
           path: dist/
 
       - name: Upload to TestPyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           repository-url: https://test.pypi.org/legacy/
+          verbose: true
+          print-hash: true
           skip-existing: true
 
-    Github-Release: 
-        name: 🗳 Create a Release
-        runs-on: ubuntu-latest
+  Publish-PyPI:
+    name: 📤 Publish to PyPI
+    runs-on: ubuntu-latest
 
-        needs: Build-distribution-packages
+    needs: Publish-TestPyPI
+    if: github.repository == 'TorchMeter/torchmeter'
 
-        permissions:
-          contents: write 
+    environment:
+      name: pypi
+      url: https://pypi.org/p/torchmeter
+
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download Distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: build-results
+          path: dist/
+
+      - name: Upload to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          verbose: true
+          print-hash: true
+          skip-existing: false
+
+  Publish-Release: 
+    name: 🗳 Create a Release
+    runs-on: ubuntu-latest
+
+    needs: Publish-PyPI
+    if: github.repository == 'TorchMeter/torchmeter'
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Fetch Code
+        uses: actions/checkout@v4
+        
+      - name: Download Distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: build-results
+          path: dist/
+
+      - name: Draft GitHub Release
+        uses: release-drafter/release-drafter@v6
+        id: github-release
+        with:
+          name: TorchMeter ${{ github.ref_name }}
+          tag: ${{ github.ref_name }}
+          version: ${{ github.ref_name }}
+          disable-autolabeler: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload dist to GitHub Release
+        run: gh release upload $TAG $FILES --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          FILES: dist/*
+
+      - name: Email Notification
+        uses: cinotify/github-action@v1.6.0
+        with:
+          to: ${{ secrets.NOTIFY_EMAIL }}
+          subject: '🎊 TorchMeter ${{ github.ref_name }} Blasts Off to PyPI & GitHub!'
+          type: 'text/html'
+          body: |
+            <div style="font-family: monospace; color: #2f363d;">
+              🥳 <strong style="color: #2ea043;">Congratulation! Version ${{ github.ref_name }} Launched</strong> 🥳
+              <hr style="border: 0; border-top: 1px solid #e1e4e8;">
+              
+              <strong>Release Details</strong><br>
+              ▸ 🕗 Time: ${{ github.event.head_commit.timestamp }}<br>
+              ▸ 🏷️ Version: <code>${{ github.ref_name }}</code><br>
+              ▸ 🎁 <a href="https://pypi.org/project/torchmeter/${{ github.ref_name }}/">PyPI Package</a><br>
+              ▸ 📦 <a href="${{ steps.github-release.outputs.html_url }}">Github Release</a>
+
+              <hr style="border: 0; border-top: 1px dashed #e1e4e8;">
+              
+              <strong>Quick Links</strong><br>
+              ▸ 🚀 <a href="https://github.com/${{ github.repository }}">Repository Home</a><br>
+              ▸ ⚙️ <a href="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}">Workflow Run</a>
+
+              <hr style="border: 0; border-top: 1px solid #e1e4e8;">
+            </div>
   
-        steps:              
-        - name: Fetch repository
-          uses: actions/checkout@v4
-          
-        - name: Generate Changelog 
-          run: |
-            awk -v RS="---" 'NR==1{gsub(/\n+$/, ""); print}' CHANGELOG.md > ${{ github.workspace }}-RELEASE.txt 
-            cat ${{ github.workspace }}-RELEASE.txt
-        
-        - name: Download all the dists
-          uses: actions/download-artifact@v4
-          with:
-            name: build-results
-            path: dist/
-        
-        - name: Create GitHub Release
-          env:
-            GITHUB_TOKEN: ${{ github.token }}
-          run: >-  
-            gh release create
-            '${{ github.ref_name }}'
-            --repo '${{ github.repository }}'
-            --notes "$(cat ${{ github.workspace }}-RELEASE.txt)"
+  Cleanup-Tag:
+    name: 🧹 Cleanup Tag on Failure
+    runs-on: ubuntu-latest
 
-        - name: Upload artifact to GitHub Release
-          env:
-            GITHUB_TOKEN: ${{ github.token }}
-          run: >-
-            gh release upload
-            '${{ github.ref_name }}' dist/**
-            --repo '${{ github.repository }}'
+    permissions:
+      contents: write
+      pull-requests: write
+      
+    needs: 
+      - Check-Tag
+      - Build-Distribution-Packages
+      - Publish-TestPyPI
+      - Publish-PyPI
+      - Publish-Release
+    if: |
+      github.repository == 'TorchMeter/torchmeter' && 
+      failure() && 
+      needs.Check-Tag.result == 'success'
+
+    steps:
+      - name: Fetch Code
+        uses: actions/checkout@v4
+
+      - name: Delete Tag on Failure
+        uses: prompt/actions-delete-tag@v1
+      
+      - name: Email Notification
+        uses: cinotify/github-action@v1.6.0
+        with:
+          to: ${{ secrets.NOTIFY_EMAIL }}
+          subject: 'TorchMeter: Tag ${{ github.ref_name }} deleted'
+          type: 'text/html'
+          body: |
+            <div style="font-family: monospace; color: #2f363d;">
+
+              🔴 <strong>Publish <code>${{ github.ref_name }}</code> Failed</strong>
+
+              <hr style="border: 0; border-top: 1px solid #e1e4e8;">
+
+              ▸ Repo: <a href="https://github.com/${{github.repository}}">${{github.repository}}</a><br>
+              ▸ Tag: <code>${{ github.ref_name }}</code><br>
+              ▸ Time: ${{ github.event.head_commit.timestamp }}<br>
+              ▸ Run: <a href="https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}">#${{github.run_id}}</a><br>
+              
+              <hr style="border: 0; border-top: 1px solid #e1e4e8;">
+
+              🛠️ Investigate errors, apply fixes and retry with:<br>
+
+              <hr style="border: 0; border-top: 1px dashed #e1e4e8;">
+              
+              <pre><code class="language-bash">
+              # Remove existing tag locally
+              git tag -d ${{ github.ref_name }}
+
+              # Recreate tag on current commit
+              git tag ${{ github.ref_name }}
+
+              # Push to trigger workflow
+              git push origin ${{ github.ref_name }}
+              </code></pre>
+
+              <hr style="border: 0; border-top: 1px solid #e1e4e8;">
+            </div>
           

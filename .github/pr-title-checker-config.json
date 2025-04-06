@@ -1,0 +1,15 @@
+{
+    "LABEL": {
+        "name": "PR-title-needs-formatting",
+        "color": "CE0000"
+    },
+    "CHECKS": {
+        "regexp": "^(depr|perf|feat|fix|doc|test|ci|chore|maintain|refactor|revert)(\\(.*\\))?\\!?\\s?\\: [A-Z].*[^\\.\\!\\?,… ]$",
+        "ignoreLabels": ["skip-changelog"]
+    },
+    "MESSAGES": {
+        "success": "🎉 PR title format is valid. Thank you!",
+        "failure": "❌ PR title format is invalid! Please update according to the contributing guidelines",
+        "notice": ""
+    }
+}

@@ -1,0 +1,198 @@
+# TorchMeter, MIT license
+# Author: Ahzyuan
+# Repo: https://github.com/Ahzyuan/torchmeter
+
+# This workflow ensures code quality and cross-platform compatibility. 
+#
+# Trigger Conditions:
+# - PR events (open/review-ready) with changes to:
+#   - Source code (/torchmeter)
+#   - Test cases (/tests)
+#   - Configuration files
+# - Manual trigger via GitHub UI
+#
+# Core functions:
+# 1. Automated Linting & Formatting via Ruff
+# 2. Multi-Environment Testing - Validate code across OS/Python versions
+# 3. Coverage Tracking - Generate test coverage report comments of different platforms
+# 4. CI/CD Integration - Block PR merges with failed checks
+
+name: ✅ Compatibility Test ❌
+
+on:
+  pull_request: 
+    types:
+      - opened
+      - ready_for_review
+    paths:
+      - 'tests/**'
+      - 'torchmeter/**'
+      - 'default_cfg.yml'
+      - 'requirements.txt'
+  workflow_dispatch:
+
+env:
+  FORCE_COLOR: 1 
+
+permissions:
+  contents: write
+  checks: write
+  pull-requests: write
+
+jobs:
+  Lint-Format:
+    name: 🕵️‍♂️ Lint and Format 📝
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Fetch Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+
+      - name: Install Dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install ruff>=0.6.0
+          ruff version
+
+      - name: Lint Code with Ruff
+        shell: bash
+        run: |
+          set +e
+          ruff check \
+            --preview \
+            --target-version=py38 \
+            --output-format=grouped \
+            --output-file=ruff_lint_output.log 
+          exit_code=$?
+          set -e
+          
+          if [[ $exit_code -eq 0 ]]; then
+            echo -e "\n✅ Linting passed! Code quality check successful! 🎉"
+          else
+            echo -e "\n❌ Linting failed! Some code does not meet the linting rules!" >&2
+            echo -e "💡 Detailed Report: artifacts/ruff-lint-output" >&2
+            exit 1
+          fi
+      
+      - name: Upload Lint Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruff-lint-output
+          path: ruff_lint_output.log
+          overwrite: true
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Format Code with Ruff
+        shell: bash
+        run: |
+          set -o pipefail
+          set +e
+          ruff format \
+            --diff \
+            --preview \
+            --target-version=py38 > ruff_format_diff.log 
+          exit_code=$?
+          # ruff format --preview --target-version=py38
+          set -e
+
+          if [[ $exit_code -eq 0 ]]; then
+            echo -e "\n✅ Formatting passed! All code is well-formated! 🎉"
+          else
+            echo -e "\n❌ Formatting failed! Some code does not meet the format requirements!" >&2
+            echo -e "💡 Detailed Report: artifacts/ruff-format-diff" >&2
+            exit 1
+          fi
+                
+      - name: Upload Format Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ruff-format-diff
+          path: ruff_format_diff.log
+          overwrite: true
+          retention-days: 7
+          if-no-files-found: error
+        
+  Compatibility-Test:
+    name: ⚙️ Compatibility Test 🧪
+
+    needs: [Lint-Format]
+    
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
+    
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Set Additional Env Variables
+        shell: bash
+        run: |
+          OS=$(echo "${{ matrix.os }}" | cut -d '-' -f1 | tr 'A-Z' 'a-z')
+          echo "SHORT_OS=$OS" >> $GITHUB_ENV
+
+      - name: Fetch Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+          cache-dependency-path: |
+            setup.cfg
+            requirements.txt
+
+      - name: Install Dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -e ".[test]"
+
+      - name: Run Tests
+        shell: bash
+        run: |
+          set -o pipefail
+          
+          pytest -q \
+          --cov-report "xml:coverage-${{ env.SHORT_OS }}-${{ matrix.python-version }}.xml" \
+          --junitxml=test-report-${{ env.SHORT_OS }}-${{ matrix.python-version }}.xml \
+          | tee pytest-output-${{ env.SHORT_OS }}-${{ matrix.python-version }}.log
+
+      - name: Upload Pytest Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-output-${{ env.SHORT_OS }}-${{ matrix.python-version }}
+          path: pytest-output-${{ env.SHORT_OS }}-${{ matrix.python-version }}.log
+          overwrite: true
+          retention-days: 7
+          if-no-files-found: error
+      
+      - name: Pytest Coverage Comment
+        if: >-
+          matrix.python-version == '3.8' && 
+          github.event_name != 'workflow_dispatch'
+        uses: MishaKav/pytest-coverage-comment@v1
+        with:
+          title: Coverage Details on ${{ env.SHORT_OS }} under Python ${{ matrix.python-version }}
+          badge-title: Coverage
+          hide-badge: false
+          hide-report: false
+          create-new-comment: false
+          hide-comment: false
+          report-only-changed-files: false
+          remove-link-from-badge: false
+          unique-id-for-comment: ${{ matrix.os }}
+          junitxml-title: Summary (on `${{ env.SHORT_OS }}` under `Python ${{ matrix.python-version }}`)
+          junitxml-path: test-report-${{ env.SHORT_OS }}-${{ matrix.python-version }}.xml
+          pytest-xml-coverage-path: coverage-${{ env.SHORT_OS }}-${{ matrix.python-version }}.xml
