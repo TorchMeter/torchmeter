@@ -483,9 +483,9 @@ class TestMatchPolarsType:
             (set(), pl.Object),
             
             # ndarray
-            (np.array([1, 2, 3]), pl.Int64),          # 1D int
-            (np.array([1.1, 2.2]), pl.Float64),       # 1D float
-            (np.array([[1, 2], [3, 4]]), pl.Array(pl.Int64, 2)),  # 2D
+            (np.array([1, 2, 3], dtype=np.int64), pl.Int64),          # 1D int
+            (np.array([1.1, 2.2], dtype=np.float64), pl.Float64),       # 1D float
+            (np.array([[1, 2], [3, 4]], dtype=np.int64), pl.Array(pl.Int64, 2)),  # 2D
             (np.array([1, "a"], dtype=object), pl.Object), # structed ndarray
             
             # class instance

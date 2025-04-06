@@ -1,3 +1,4 @@
+import sys
 import warnings
 from collections import namedtuple
 from unittest.mock import MagicMock, PropertyMock, patch
@@ -914,8 +915,8 @@ class TestMemMeter:
             (1, 32),  
             (1., 24), # python default size for float
 
-            ("1", 49 + 1),
-            ("-"*50, 49 + 50),
+            ("1", 1 + (49 if sys.version_info < (3, 12) else 41)),
+            ("-"*50, 50 + (49 if sys.version_info < (3, 12) else 41)),
 
             (None, 16), # python default size for None
 
@@ -970,7 +971,7 @@ class TestMemMeter:
         argnames=("opts", "expected_opt_cost"),
         argvalues=[
             ((1, 1.), 32 + 24), 
-            ((1, "1"), 32 + 50),
+            ((1, "1"), 32 + 1 + (49 if sys.version_info < (3, 12) else 41)),
             ((1, None), 32 + 16),  
             ((1, ()), 32 + 40),
             ((1, (1,2,3)), 32 + 40*4),
@@ -978,9 +979,9 @@ class TestMemMeter:
             ((1, {1,2,3}), 32 + 216 + 32*3),
             ((1, {"a":1, "b":2}), 32 + asizeof({"a":1, "b":2})),
 
-            (("1", "2."), 50 + 51),
-            (("1", 2.), 50 + 24),
-            (("1", None), 50 + 16),
+            (("1", "2."), 3 + 2*(49 if sys.version_info < (3, 12) else 41)),
+            (("1", 2.), 1 + 24 + (49 if sys.version_info < (3, 12) else 41)),
+            (("1", None), 1 + 16 + (49 if sys.version_info < (3, 12) else 41)),
 
             ((None, None), 16 + 16),
             ((None, 2.), 16 + 24),

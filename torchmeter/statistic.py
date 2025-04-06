@@ -624,6 +624,8 @@ class MemMeter(Statistics):
                 elif isinstance(opt, np.ndarray):
                     opt_cost += opt.nbytes
                 elif isinstance(opt, str):
+                    # Note: string storage is optimized after python 3.12, so the value changes with the version, 
+                    # but it is not significantly changed, which does not affect the macro measurement results.
                     opt_cost += opt.__sizeof__()
                 else:
                     opt_cost += asizeof(opt)
