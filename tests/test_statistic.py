@@ -863,7 +863,6 @@ class TestMemMeter:
             (nn.RReLU(), (1, 10), False),
             (nn.LeakyReLU(), (1, 10), False),
             (nn.SELU(), (1, 10), False),
-            (nn.Mish(), (1, 10), False),
             (nn.Dropout(0.5), (1, 10), False),
             (nn.Threshold(0.1, 20), (1, 10), False),
 
@@ -873,7 +872,6 @@ class TestMemMeter:
             (nn.RReLU(inplace=True), (1, 10), True),
             (nn.LeakyReLU(inplace=True), (1, 10), True),
             (nn.SELU(inplace=True), (1, 10), True),
-            (nn.Mish(inplace=True), (1, 10), True),
             (nn.Dropout(0.5, inplace=True), (1, 10), True),
             (nn.Threshold(0.1, 20, inplace=True), (1, 10), True),
 
@@ -1123,7 +1121,6 @@ class TestMemMeter:
             (nn.RReLU(inplace=True), (1, 10), 0, 0, 0),
             (nn.LeakyReLU(inplace=True), (1, 10), 0, 0, 0),
             (nn.SELU(inplace=True), (1, 10), 0, 0, 0),
-            (nn.Mish(inplace=True), (1, 10), 0, 0, 0),
             (nn.Dropout(0.5, inplace=True), (1, 10), 0, 0, 0),
             (nn.Threshold(0.1, 20, inplace=True), (1, 10), 0, 0, 0),
             

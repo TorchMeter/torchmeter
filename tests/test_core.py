@@ -967,7 +967,7 @@ class TestMeter:
         # set ittp_warmup and ittp_benchmark_time to a lower value to save time
         metered_model.ittp_warmup = 2
         metered_model.ittp_benchmark_time = 2
-        metered_model(torch_randn(1,10))
+        metered_model(torch_randn(1,10,5))
         
         nocall_flag = lambda :metered_model._Meter__has_nocall_nodes
         notsupport_flag = lambda :metered_model._Meter__has_not_support_nodes
