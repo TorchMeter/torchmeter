@@ -87,7 +87,7 @@ class Meter:
             - Dynamic input/output detection (number, type, shape, ...)
         
         3. Memory Diagnostics 
-            - Input/output tensor memory mapping
+            - Input/output tensor memory awareness
             - Hierarchical memory consumption analysis
         
         4. Performance Benchmarking
