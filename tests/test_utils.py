@@ -1,14 +1,25 @@
 import os
+from decimal import Decimal
+from datetime import datetime, date
 from unittest.mock import Mock, patch
 
 import pytest
+import numpy as np
+import polars as pl
+from rich.text import Text
 from torch import rand as torch_rand
 from numpy.random import rand as np_rand
+
+from torchmeter._stat_numeric import (
+    UpperLinkData,
+    MetricsData
+)
 
 from torchmeter.utils import (
     resolve_savepath,
     hasargs,
     indent_str, data_repr,
+    match_polars_type,
     Status, Timer
 )
 
@@ -430,6 +441,113 @@ class TestDataRepr:
         assert data_repr(mock_obj) == "[b green]obj[/] [dim]<unittest.mock.Mock>[/]"
 
 @pytest.mark.vital
+class TestMatchPolarsType:
+    
+    is_same_type = lambda _, val, pl_type: match_polars_type(val).is_(pl_type)
+
+    @pytest.mark.parametrize(
+        argnames=("input_value", "expected_type"), 
+        argvalues=[
+            # basic types
+            (42, pl.Int64),
+            (3.14, pl.Float64),
+            ("text", pl.Utf8),
+            (True, pl.Boolean),
+            (np.int8(5), pl.Int8),
+            (np.int16(5), pl.Int16),
+            (np.int32(5), pl.Int32),
+            (np.int64(5), pl.Int64),
+            (np.uint8(5), pl.UInt8),
+            (np.uint16(5), pl.UInt16),
+            (np.uint32(5), pl.UInt32),
+            (np.uint64(5), pl.UInt64),
+            (np.float32(1.2), pl.Float32),
+            (np.float64(1.2), pl.Float64),
+            
+            # decimal 
+            (Decimal("1.2"), pl.Decimal),
+            
+            # time related types
+            (date.today(), pl.Date),
+            (datetime.now(), pl.Datetime("us")),
+            (np.datetime64("2023-01-01"), pl.Date),
+            (np.datetime64("2023-01-01T12"), pl.Object),
+            (np.timedelta64(1, "us"), pl.Duration("us")),
+            (np.timedelta64(1, "D"), pl.Object),
+            
+            # container types
+            ([1, 2, 3], pl.List(pl.Int64)),
+            ((1., 2., 3.), pl.List(pl.Float64)),
+            ((1, 2., 3.), pl.List(pl.Int64)),
+            ({"A": 1, "B": "b"}, pl.Struct({"A": pl.Int64, "B": pl.Utf8})),
+            (set(), pl.Object),
+            
+            # ndarray
+            (np.array([1, 2, 3], dtype=np.int64), pl.Int64),          # 1D int
+            (np.array([1.1, 2.2], dtype=np.float64), pl.Float64),       # 1D float
+            (np.array([[1, 2], [3, 4]], dtype=np.int64), pl.Array(pl.Int64, 2)),  # 2D
+            (np.array([1, "a"], dtype=object), pl.Object), # structed ndarray
+            
+            # class instance
+            (Timer(task_desc="test"), pl.Object),
+            (Status(status="test"), pl.Object),
+            (UpperLinkData(2), pl.Object),
+            (MetricsData(), pl.Object)
+        ]
+    )
+    def test_type_inference(self, input_value, expected_type):
+        """Test basic functionality"""
+        
+        assert self.is_same_type(input_value, expected_type) 
+
+    @pytest.mark.parametrize(
+        argnames="pre_res_value", 
+        argvalues=[
+            pl.Int64,
+            pl.Float64,
+            pl.Date,
+            pl.Object,
+            pl.List(pl.Float64),
+            pl.Array(pl.Float64, 2)
+        ]
+    )
+    def test_pre_res_option(self, pre_res_value):
+        """Test the logic of pre_res option(early return)"""
+        
+        result = match_polars_type(
+            "return pre_res no matter what this is", 
+            recheck=False,
+            pre_res=pre_res_value
+        )
+        assert result.is_(pre_res_value)
+
+    def test_recheck_option(self):
+        """Test the logic of recheck option(force recheck the type)"""
+
+        result = match_polars_type(
+            42, 
+            recheck=True, 
+            pre_res=pl.Utf8
+        )
+        
+        assert result.is_(pl.Int64)
+
+    def test_edge_cases(self):
+        """Test the edge use of the function"""
+        
+        # structured array
+        structured_array = np.array(
+            [('Rex', 9, 81.0), ('Fido', 3, 27.0)],
+            dtype=[('name', 'U10'), ('age', 'i4'), ('weight', 'f4')]
+        )
+        assert self.is_same_type(structured_array, pl.Object)
+
+        # nested container
+        nested_ls = [[1, 2], (3., 4.)]
+        
+        assert self.is_same_type(nested_ls, pl.List(pl.List(pl.Int64)))
+
+@pytest.mark.vital
 class TestTimer:
     # basic function test
     @pytest.mark.parametrize(
@@ -459,8 +577,9 @@ class TestTimer:
         mock_status["exit"].assert_called_once()
         
         captured = capsys.readouterr()
-        assert f"Finish {task} in" in captured.out
-        assert "seconds" in captured.out
+        plain_text = Text.from_ansi(captured.out).plain
+        assert f"Finish {task} in" in plain_text
+        assert "seconds" in plain_text
 
     # boundary condition test
     def test_short_time(self, capsys):

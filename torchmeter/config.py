@@ -168,13 +168,13 @@ def dict_to_namespace(d: Dict[str, Any]) -> FlagNameSpace:
     Recursively converts a dictionary to a FlagNameSpace object.
     """
     if not isinstance(d, dict):
-        raise TypeError(f"Input must be a dictionary, but got {type(d)}")
+        raise TypeError(f"Input must be a dictionary, but got `{type(d).__name__}`")
     
     ns = FlagNameSpace()
     
     for k, v in d.items():
         # overwrite the value of unsafe key to get the unrepresent value
-        if k in UNSAFE_KV:
+        if k in UNSAFE_KV and isinstance(v, str):
             v = getattr(UNSAFE_KV[k], v).value
 
         if isinstance(v, dict):
@@ -199,7 +199,7 @@ def namespace_to_dict(ns, safe_resolve=False) -> Dict[str, CFG_CONTENT_TYPE]:
     Recursively converts a FlagNameSpace object to a dictionary.
     """
     if not isinstance(ns, SimpleNamespace):
-        raise TypeError(f"Input must be an instance of SimpleNamespace, but got {type(ns)}")
+        raise TypeError(f"Input must be an instance of SimpleNamespace, but got `{type(ns).__name__}`")
 
     d:Dict[str, CFG_CONTENT_TYPE] = {}
     for k, v in ns.data_dict.items():
@@ -224,10 +224,9 @@ def namespace_to_dict(ns, safe_resolve=False) -> Dict[str, CFG_CONTENT_TYPE]:
             
     return d
 
-def get_config(config_file:Optional[str]=None) -> Config:
-    cfg_file = os.environ.get('TORCHMETER_CONFIG', config_file)
-    cfg = Config() # always exist an instance cause display.py and core.py depend on it
-    cfg.config_file = cfg_file
+def get_config(config_path:Optional[str]=None) -> Config:
+    cfg_path = os.environ.get('TORCHMETER_CONFIG', config_path)
+    cfg = Config(config_path=cfg_path) # always exist an instance cause display.py and core.py depend on it
     return cfg
 
 class CallbackList(list):
@@ -309,6 +308,48 @@ class FlagNameSpace(SimpleNamespace):
         del full_dict[self.__flag_key]
         return full_dict
     
+    def update(self, other:Union[dict, FlagNameSpace], *, replace:bool=False) -> None:
+        """`other` should keep a same hierarchy structure with `self`"""
+        
+        if not isinstance(other, (dict, FlagNameSpace)):
+            raise TypeError(f"Instance of `{self.__class__.__name__}` can only be updated with a dict or " + \
+                            f"another instance of `{self.__class__.__name__}`, but got `{type(other).__name__}`.")
+        
+        if isinstance(other, dict):
+            other = dict_to_namespace(other)
+        
+        if replace:
+            replace_data = other.data_dict
+            self.__dict__.update(replace_data)
+            
+            del_keys = set(self.data_dict.keys()) - set(replace_data.keys())
+            list(map(lambda k: delattr(self, k), del_keys))
+            
+            self.mark_change()
+            return 
+        
+        for k, v in other.data_dict.items():            
+            
+            if k not in self.__dict__:
+                if isinstance(v, dict):
+                    v = dict_to_namespace(v)
+                setattr(self, k, v)
+                continue
+            
+            # if the value is a dict or a FlagNameSpace, 
+            # update the orgin namespace (origin must be a FlagNameSpace)
+            origin_val_type = type(self.__dict__[k]).__name__
+            new_val_type = type(v).__name__
+            if origin_val_type == "FlagNameSpace":
+                if new_val_type not in ["dict", "FlagNameSpace"]:
+                    raise RuntimeError(f"Operation aborted: the origin value of `{k}` is of type " + \
+                                       "`FlagNameSpace` which has a inner structure, " + \
+                                       f"set to `{new_val_type}` will destroy it.")
+                else:
+                    self.__dict__[k].update(v)
+            else:
+                setattr(self, k, v)
+    
     def is_change(self) -> bool:
         res = getattr(self, self.__flag_key) or \
               any(args.is_change() for args in self.__dict__.values() 
@@ -330,11 +371,14 @@ class ConfigMeta(type):
     __instances = None
     __thread_lock = Lock()
 
-    def __call__(cls) -> Config:
+    def __call__(cls, config_path:Optional[str]=None) -> Config:
         with cls.__thread_lock:
             if cls.__instances is None:
-                instance = super().__call__()
+                instance = super().__call__(config_path)
                 cls.__instances = instance
+            else:
+                if cls.__instances.config_file != config_path:
+                    cls.__instances.config_file = config_path
         return cls.__instances
 
 class Config(metaclass=ConfigMeta):
@@ -351,10 +395,13 @@ class Config(metaclass=ConfigMeta):
 
     __slots__ = DEFAULT_FIELDS + ['__cfg_file']
     
-    def __init__(self) -> None:
+    def __init__(self, config_path:Optional[str]=None) -> None:
         """Load default settings by default"""
-        self.__cfg_file:Optional[str] = None
-        self.__load()
+        # init __cfg_file
+        self.__cfg_file = None
+        
+        # set __cfg_file, load config file and check its integrity
+        self.config_file = config_path
             
     @property
     def config_file(self) -> Optional[str]:
@@ -364,14 +411,14 @@ class Config(metaclass=ConfigMeta):
     def config_file(self, file_path:Optional[str]=None) -> None:
         if file_path is not None and not isinstance(file_path, str):
             raise TypeError("You must pass in a string or None to change config or use the default config, " + \
-                            f"but got {type(file_path)}.")
+                            f"but got `{type(file_path).__name__}`.")
                 
         if file_path:
             file_path = os.path.abspath(file_path)
             if not os.path.isfile(file_path):
                 raise FileNotFoundError(f"Config file {file_path} does not exist.")
             if not file_path.endswith('.yaml'):
-                raise ValueError(f"Config file must be a yaml file, but got {file_path}")
+                raise ValueError(f"Config file must be a yaml file, but got `{file_path}`")
         
         self.__cfg_file = file_path
         self.__load()
@@ -385,10 +432,13 @@ class Config(metaclass=ConfigMeta):
                 raw_data = yaml.safe_load(f)
         
         ns:FlagNameSpace = dict_to_namespace(raw_data)
-        for field in ns.__dict__.keys():
-            if field.startswith('__FLAG'):
-                continue
-            setattr(self, field, getattr(ns, field))          
+        for k,v in ns.data_dict.items():
+            is_reload = hasattr(self, k)
+              
+            if is_reload and isinstance(v, FlagNameSpace):
+                getattr(self, k).update(v, replace=True)
+            else:
+                setattr(self, k, v)       
 
     def restore(self) -> None:
         self.__load()
@@ -432,6 +482,19 @@ class Config(metaclass=ConfigMeta):
                            indent=2, sort_keys=False,
                            encoding='utf-8', allow_unicode=True)        
 
+    def __setattr__(self, name: str, value: Any) -> None:
+        # the attribute is already exist
+        try:
+            origin_val = getattr(self, name)
+            # to avoid break the format
+            if isinstance(origin_val, (dict, FlagNameSpace)):
+                origin_val.update(value)
+            else:
+                super().__setattr__(name, value)
+        # the first time to set the attribute
+        except AttributeError:
+            super().__setattr__(name, value)
+
     def __delattr__(self, name: str) -> None:
         # every attribute of Config object is important and should be there
         raise RuntimeError("You cannot delete attributes from Config object.")
@@ -443,7 +506,7 @@ class Config(metaclass=ConfigMeta):
             val_repr = []         
             
             if isinstance(val, dict):
-                val_repr.append("dict{")
+                val_repr.append("namespace{")
                 val_repr.extend([f"{k} = {simple_data_repr(v)}" for k,v in val.items()])
                 # val_repr[-1] += "}"
                 val_repr.append("}")

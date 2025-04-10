@@ -39,11 +39,11 @@ class TimeUnit(Enum):
 
 @unique
 class SpeedUnit(Enum):
-    TSamPS = 1e12
-    GSamPS = 1e9
-    MSamPS = 1e6
-    KSamPS = 1e3
-    SamPS = 1e0
+    TIPS = 1e12
+    GIPS = 1e9
+    MIPS = 1e6
+    KIPS = 1e3
+    IPS = 1e0
 
 def auto_unit(val:Union[int, FLOAT], unit_system=CountUnit) -> str:
     for unit in list(unit_system):

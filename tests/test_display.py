@@ -13,10 +13,11 @@ from rich.panel import Panel
 from rich.columns import Columns
 from rich.segment import Segment
 from rich.console import Console, Group
-from polars import DataFrame, Float64
+from polars import DataFrame, Series
 
 from torchmeter.config import FlagNameSpace
 from torchmeter.engine import OperationNode, OperationTree
+from torchmeter._stat_numeric import UpperLinkData, MetricsData, CountUnit
 from torchmeter.display import (
     __cfg__, 
     dfs_task, render_perline, apply_setting,
@@ -143,24 +144,20 @@ def universal_tabular_renderer():
 @pytest.fixture
 def example_df():
     """
-    ┌─────────┬──────┬───────────┬───────────┬────────────┐
-    │ numeric ┆ text ┆ list_col  ┆ nomal_obj ┆ self_obj   │
-    │ ---     ┆ ---  ┆ ---       ┆ ---       ┆ ---        │
-    │ i64     ┆ str  ┆ list[i64] ┆ object    ┆ object     │
-    ╞═════════╪══════╪═══════════╪═══════════╪════════════╡
-    │ 1       ┆ a    ┆ [1, 2]    ┆ example   ┆ NoneStrObj │
-    │ 2       ┆ null ┆ [3]       ┆ dataframe ┆ null       │
-    │ null    ┆ c    ┆ null      ┆ null      ┆ NoneStrObj │
-    └─────────┴──────┴───────────┴───────────┴────────────┘
+    ┌─────────┬──────┬───────────┬───────────┬─────────────┐
+    │ numeric ┆ text ┆ list_col  ┆ nomal_obj ┆ self_obj    │
+    │ ---     ┆ ---  ┆ ---       ┆ ---       ┆ ---         │
+    │ i64     ┆ str  ┆ list[i64] ┆ object    ┆ object      │
+    ╞═════════╪══════╪═══════════╪═══════════╪═════════════╡
+    │ 1       ┆ a    ┆ [1, 2]    ┆ example   ┆ 100 K       │
+    │ 2       ┆ null ┆ [3]       ┆ dataframe ┆ null        │
+    │ null    ┆ c    ┆ null      ┆ null      ┆ 0.00 ± 0.00 │
+    └─────────┴──────┴───────────┴───────────┴─────────────┘
     """
-    class NoneStrObj:
-        none_str = "test none_str"
-        raw_data = 11
+    
+    from polars import Object as pl_obj
 
-        def __repr__(self):
-            return self.__class__.__name__
-
-    return DataFrame({
+    df = DataFrame({
         "numeric": [1, 2, None],
         "text": ["a", None, "c"],
         "list_col": [[1,2], [3], None],
@@ -168,13 +165,21 @@ def example_df():
             Text("example"), 
             Text("dataframe"), 
             None
-        ],
-        "self_obj":[
-            NoneStrObj(),
+        ]})
+    
+    self_obj_col = Series(
+        name="self_obj",
+        values=[
+            UpperLinkData(1e5, unit_sys=CountUnit, none_str="test none_str"),
             None,
-            NoneStrObj()
-        ]
-    })
+            MetricsData()
+        ],
+        dtype = pl_obj
+    )
+
+    df.insert_column(len(df.columns), self_obj_col)
+    
+    return df
 
 @pytest.fixture
 def export_dir(tmpdir):
@@ -493,6 +498,9 @@ class TestRenderPerline:
             mock_sleep.call_count == render_lines_num
 
 class TestTreeRenderer:
+    def teardown_method(self, method):
+        __cfg__.restore()
+        
     def test_valid_init(self, simple_tree_renderer):
         """Test valid initialization"""
         assert isinstance(simple_tree_renderer.opnode, OperationNode)
@@ -1001,15 +1009,15 @@ class TestTreeRenderer:
 
         monkeypatch.setattr("torchmeter.display.__cfg__.tree_fold_repeat", True)
 
-        # skip control by `render_when_repeat`
+        # skip control by `_render_when_repeat`
         oproot = repeat_tree_renderer.opnode
-        monkeypatch.setattr(oproot, "render_when_repeat", False)
-        monkeypatch.setattr(oproot.childs["1"], "render_when_repeat", False)
-        monkeypatch.setattr(oproot.childs["2"], "render_when_repeat", False)
-        monkeypatch.setattr(oproot.childs["2"].childs["2.1"], "render_when_repeat", False)
-        monkeypatch.setattr(oproot.childs["2"].childs["2.2"], "render_when_repeat", False)
-        monkeypatch.setattr(oproot.childs["2"].childs["2.3"], "render_when_repeat", False)
-        monkeypatch.setattr(oproot.childs["2"].childs["2.4"], "render_when_repeat", False)
+        monkeypatch.setattr(oproot, "_render_when_repeat", False)
+        monkeypatch.setattr(oproot.childs["1"], "_render_when_repeat", False)
+        monkeypatch.setattr(oproot.childs["2"], "_render_when_repeat", False)
+        monkeypatch.setattr(oproot.childs["2"].childs["2.1"], "_render_when_repeat", False)
+        monkeypatch.setattr(oproot.childs["2"].childs["2.2"], "_render_when_repeat", False)
+        monkeypatch.setattr(oproot.childs["2"].childs["2.3"], "_render_when_repeat", False)
+        monkeypatch.setattr(oproot.childs["2"].childs["2.4"], "_render_when_repeat", False)
 
         res = repeat_tree_renderer()
 
@@ -1019,15 +1027,15 @@ class TestTreeRenderer:
         assert res.children[1].label == "1"
         assert all(c.label == "2" for c in res.children[1].children)
 
-        # skip control by `is_folded`
+        # skip control by `_is_folded`
         monkeypatch.undo()
-        oproot.is_folded = True
-        oproot.childs["1"].is_folded = True
-        oproot.childs["2"].is_folded = True
-        oproot.childs["2"].childs["2.1"].is_folded = True
-        oproot.childs["2"].childs["2.2"].is_folded = True
-        oproot.childs["2"].childs["2.3"].is_folded = True
-        oproot.childs["2"].childs["2.4"].is_folded = True
+        oproot._is_folded = True
+        oproot.childs["1"]._is_folded = True
+        oproot.childs["2"]._is_folded = True
+        oproot.childs["2"].childs["2.1"]._is_folded = True
+        oproot.childs["2"].childs["2.2"]._is_folded = True
+        oproot.childs["2"].childs["2.3"]._is_folded = True
+        oproot.childs["2"].childs["2.4"]._is_folded = True
 
         ## display tree is not change
         assert res.label == "0"
@@ -1043,18 +1051,18 @@ class TestTreeRenderer:
         repeat_tree_renderer.tree_levels_args = {"2": {"label": "<type>"}}
 
         res = repeat_tree_renderer()
-        repeat_body = res.children[1].children[0].label.renderable
+        repeat_body_tree = res.children[1].children[0].label.renderable
         
         # repeat body tree structure
-        assert isinstance(repeat_body, Tree) 
-        assert repeat_body.hide_root is True
+        assert isinstance(repeat_body_tree, Tree) 
+        assert repeat_body_tree.hide_root is True
 
-        assert len(repeat_body.children) == 2
-        assert all(isinstance(c, Tree) for c in repeat_body.children)
+        assert len(repeat_body_tree.children) == 2
+        assert all(isinstance(c, Tree) for c in repeat_body_tree.children)
         
         # repeat body tree content
-        assert "Linear" in repeat_body.children[0].label
-        assert "ReLU" in repeat_body.children[1].label
+        assert "Linear" in repeat_body_tree.children[0].label
+        assert "ReLU" in repeat_body_tree.children[1].label
 
     def test_repeat_block_rendering(self, repeat_tree_renderer, monkeypatch):
         """Test whether the repeat block(panel) can be rendered correctly"""
@@ -1074,8 +1082,8 @@ class TestTreeRenderer:
         assert isinstance(repeat_panel.renderable, Group)
         assert len(repeat_panel.renderable.renderables) == 3
 
-        repeat_body, divider, footer = repeat_panel.renderable.renderables
-        assert isinstance(repeat_body, Tree)
+        repeat_body_tree, divider, footer = repeat_panel.renderable.renderables
+        assert isinstance(repeat_body_tree, Tree)
         assert isinstance(divider, Rule)
         assert isinstance(footer, str)
         assert "Footer" in footer
@@ -1323,17 +1331,21 @@ class TestTabularRenderer:
         noraml_res = simple_tabular_renderer.df2tb(example_df, show_raw=False)
         raw_res = simple_tabular_renderer.df2tb(example_df, show_raw=True)
         
-        # obj that has no raw data, no change
+        # verify not raw display
+        assert self.tbval_getter(0, 0, noraml_res) == "1" 
+        assert self.tbval_getter(0, 1, noraml_res) == "a"
+        assert self.tbval_getter(1, 2, noraml_res) == "[3]"
+        assert self.tbval_getter(1, 3, noraml_res) == "dataframe"
+        assert self.tbval_getter(0, 4, noraml_res) == "100 K"
+        assert self.tbval_getter(2, 4, noraml_res) == "0.00 ± 0.00"
+
+        # verify raw display
         assert self.tbval_getter(0, 0, raw_res) == "1" 
         assert self.tbval_getter(0, 1, raw_res) == "a"
         assert self.tbval_getter(1, 2, raw_res) == "[3]"
         assert self.tbval_getter(1, 3, raw_res) == "dataframe"
-
-        # obj that has raw data, show raw data
-        assert self.tbval_getter(0, 4, raw_res) == "11"
-
-        # normal repr is replaced by raw data correctly
-        assert self.tbval_getter(0, 4, noraml_res) != self.tbval_getter(0, 4, raw_res)
+        assert self.tbval_getter(0, 4, raw_res) == "100000.0"
+        assert self.tbval_getter(2, 4, raw_res) == "0.0"
     
     def test_clear(self, simple_tabular_renderer, example_df, monkeypatch):
         """Test the stat dataframe clearing logic"""
@@ -1445,7 +1457,7 @@ class TestTabularRenderer:
         assert normal_data["list_col"][1] == "[3]"
         
         # object data is converted to str
-        assert normal_data["self_obj"][0] == "NoneStrObj"
+        assert normal_data["self_obj"][0] == "100 K"
         
         os.remove(expected_normal_file)
         os.remove(expected_raw_file)
@@ -1463,20 +1475,72 @@ class TestTabularRenderer:
                     col_name=1,
                     col_func=lambda x: "test")
         
+        # duplicated column name
+        with pytest.raises(ValueError):
+            new_col(df=example_df,
+                    col_name="self_obj",
+                    col_func=lambda x: "test")
+        
+        # invalid new col index type
+        with pytest.raises(TypeError):
+            simple_tabular_renderer(stat_name="cal", newcol_idx=1.5) 
+            
+        # invalid column function type
+        with pytest.raises(TypeError):
+            new_col(df=example_df,
+                    col_name="new_col",
+                    col_func="test")
+                
+        # invalid column function argument num
+        ## lack
+        with pytest.raises(TypeError):
+            new_col(df=example_df,
+                    col_name="new_col",
+                    col_func=lambda :...)
+        
+        ## exceed
+        with pytest.raises(TypeError):
+            new_col(df=example_df,
+                    col_name="new_col",
+                    col_func=lambda x, y:...)
+        
+        # invalid column function return
+        ## invalid return type
+        with pytest.raises(TypeError):
+            new_col(df=example_df,
+                    col_name="new_col",
+                    col_func=lambda x: 1)
+        
+        ## invalid return len
+        with pytest.raises(RuntimeError):
+            new_col(df=example_df,
+                    col_name="new_col",
+                    col_func=lambda x: [1])
+        
         # verify function is applied correctly
         new_df = new_col(df=example_df,
                          col_name="new_col",
-                         col_func=lambda x: "test",
+                         col_func=lambda x: ["test"]*len(x),
                          col_idx=0)
         assert new_df.shape == (3, 6)
         assert new_df.columns[0] == "new_col"
         assert new_df["new_col"].to_list() == ["test"]*3
         
+        # verify funtion operation will not influence the original dataframe
+        new_df = new_col(df=example_df,
+                         col_name="origin_numeric",
+                         col_func=lambda df: df.drop_in_place(name="numeric"),
+                         col_idx=0)
+        assert new_df.shape == (3, 6)
+        assert example_df.shape == (3, 5)
+        assert example_df.columns == ["numeric", "text", "list_col", "nomal_obj", "self_obj"]
+        assert new_df["origin_numeric"].to_list() == example_df["numeric"].to_list()
+
         # verify col_idx
         ## non-negative and in range
         new_df = new_col(df=example_df,
                          col_name="new_col",
-                         col_func=lambda x: "test",
+                         col_func=lambda x: ["test"]*len(x),
                          col_idx=1)
         assert new_df.shape == (3, 6)
         assert new_df.columns[1] == "new_col"
@@ -1484,7 +1548,7 @@ class TestTabularRenderer:
         ## non-negative and out of range (add last)
         new_df = new_col(df=example_df,
                          col_name="new_col",
-                         col_func=lambda x: "test",
+                         col_func=lambda x: ["test"]*len(x),
                          col_idx=8) 
         assert new_df.shape == (3, 6)
         assert new_df.columns[5] == "new_col"
@@ -1492,7 +1556,7 @@ class TestTabularRenderer:
         ## negative and in range
         new_df = new_col(df=example_df,
                          col_name="new_col",
-                         col_func=lambda x: "test",
+                         col_func=lambda x: ["test"]*len(x),
                          col_idx=-1)
         assert new_df.shape == (3, 6)
         assert new_df.columns[-1] == "new_col"
@@ -1500,7 +1564,7 @@ class TestTabularRenderer:
         ## negative and out of range (add first)
         new_df = new_col(df=example_df,
                          col_name="new_col",
-                         col_func=lambda x: "test",
+                         col_func=lambda x: ["test"]*len(x),
                          col_idx=-9)
         assert new_df.shape == (3, 6)
         assert new_df.columns[0] == "new_col"
@@ -1508,7 +1572,7 @@ class TestTabularRenderer:
         ## verify return_type is correctly applied
         new_df = new_col(df=example_df,
                          col_name="new_col",
-                         col_func=lambda x: 1,
+                         col_func=lambda x: [1]*len(x),
                          return_type=float)
         assert new_df["new_col"].dtype == Float64
     
@@ -1527,10 +1591,6 @@ class TestTabularRenderer:
         # invalid stat name
         with pytest.raises(ValueError):
             simple_tabular_renderer(stat_name="invalid stat")
-        
-        # invalid new col index type
-        with pytest.raises(TypeError):
-            simple_tabular_renderer(stat_name="cal", newcol_idx=1.5) 
         
         # invalid pick_col type
         with pytest.raises(TypeError):
@@ -1722,7 +1782,7 @@ class TestTabularRenderer:
         # not to keep
         _, data = universal_tabular_renderer(stat_name="param",
                                              newcol_name="test",
-                                             newcol_func=lambda x: "test",
+                                             newcol_func=lambda x: ["test"]*len(x),
                                              keep_new_col=False)
         assert "test" in data.columns
         assert "test" not in universal_tabular_renderer.stats_data["param"].columns
@@ -1730,7 +1790,7 @@ class TestTabularRenderer:
         # keep
         _, data = universal_tabular_renderer(stat_name="param",
                                              newcol_name="test",
-                                             newcol_func=lambda x: "test",
+                                             newcol_func=lambda x: ["test"]*len(x),
                                              keep_new_col=True)
         assert "test" in data.columns
         assert "test" in universal_tabular_renderer.stats_data["param"].columns
@@ -1778,8 +1838,10 @@ class TestTabularRenderer:
     def test_edge_cases(self, simple_tabular_renderer):
         """Test the edge cases in rendering"""
         
+        from polars import Float64 as pl_float64
+
         # rebder empty dataframe
-        empty_df = DataFrame(schema={"col1": Float64})
+        empty_df = DataFrame(schema={"col1": pl_float64})
         res = simple_tabular_renderer.df2tb(empty_df)
         
         assert res.row_count == 0

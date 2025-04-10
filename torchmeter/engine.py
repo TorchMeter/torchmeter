@@ -25,12 +25,11 @@ class OperationNode:
                  module:nn.Module,
                  name:Optional[str]=None,
                  node_id:str='0',
-                 parent:Optional[OperationNode]=None,
-                 render_when_repeat:bool=False):
+                 parent:Optional[OperationNode]=None):
 
         if not isinstance(module, nn.Module):
             raise TypeError(f"You must use an `nn.Module` instance to instantiate `{self.__class__.__name__}`, " + \
-                            f"but got {type(module).__name__}.")
+                            f"but got `{type(module).__name__}`.")
         
         # basic info
         self.operation = module
@@ -46,12 +45,13 @@ class OperationNode:
         # repeat info
         self.repeat_winsz:int = 1 # size of repeat block
         self.repeat_time:int = 1
-        self.repeat_body:List[Tuple[str, str]] = [] # the ids and names of the nodes in the same repeat block
+        self._repeat_body:List[Tuple[str, str]] = [] # the ids and names of the nodes in the same repeat block
         
         # display info 
         self.display_root:Tree # set in `OperationTree.__build()`
-        self.render_when_repeat:bool = render_when_repeat # whether to render when enable `fold_repeat`, set in `OperationTree.__build()`
-        self.is_folded = False # whether the node is folded in a repeat block, set in `OperationTree.__build()`
+        self._render_when_repeat:bool = False # whether to render when enable `fold_repeat`, set in `OperationTree.__build()`
+        self._is_folded = False # whether the node is folded in a repeat block, set in `OperationTree.__build()`
+        self.module_repr = str(self.type) if not self.is_leaf else str(self.operation)
 
         # statistic info (all read-only)
         self.__param = ParamsMeter(opnode=self)
@@ -76,8 +76,7 @@ class OperationNode:
         return self.__ittp
     
     def __repr__(self) -> str:
-        op_str = str(self.type) if not self.is_leaf else str(self.operation)            
-        return f"{self.node_id} {self.name}: {op_str}"
+        return f"{self.node_id} {self.name}: {self.module_repr}"
     
 class OperationTree:
 
@@ -85,9 +84,10 @@ class OperationTree:
         
         if not isinstance(model, nn.Module):
             raise TypeError(f"You must use an `nn.Module` instance to instantiate `{self.__class__.__name__}`, " + \
-                            f"but got {type(model).__name__}.")
+                            f"but got `{type(model).__name__}`.")
         
-        self.root = OperationNode(module=model, render_when_repeat=True)
+        self.root = OperationNode(module=model)
+        self.root._render_when_repeat = True
         
         with Timer(task_desc="Scanning model"):
             nonroot_nodes, *_ = dfs_task(dfs_subject=self.root, 
@@ -103,27 +103,21 @@ class OperationTree:
                     -> Tuple[OPNODE_LIST, Optional[Tree]]:
         """
         Private method.
-        
-        This function will explore the model structure, unfold all multi-layers modules, and organize them into a tree structure.
-        
-        Finally, it will build a display tree and a operation tree in one DFS recursion, simutaneously.
-        
-        With the built display tree, the terminal display of the model structure can be achieved.
-        
+        This function will explore the model structure, unfold all multi-layers modules, and organize them 
+        into a tree structure. Finally, it will build a display tree and a operation tree in one DFS recursion, 
+        simutaneously. With the built display tree, the terminal display of the model structure can be achieved.
         With the built operation tree, the model statistic can be easily and quickly accessed.
 
         Args:
-        ---
-        This function serves as the `task_func` in `torchmeter.utils.dfs_task`, 
-        therefore having the following two arguments:
-        
-            - `subject` (OperationNode): the node to be traversed in the operation tree.
-            
-            - `pre_res` (Tuple[List["OperationNode"], Optional[Tree]]): the container of all nodes and the father node of the display tree 
+            subject (OperationNode): the node to be traversed in the operation tree.
+            pre_res (Tuple[Optional[OPNODE_LIST], Optional[Tree]]): the container of all nodes and the father node
+                                                                   of the display tree 
         
         Returns:
-        ---
-            Tuple[List["OperationNode"], Optional[Tree]]: the current traversed node of the operation tree and display tree
+            Tuple[Optional[OPNODE_LIST], Optional[Tree]]: the current traversed node of the operation tree and 
+                                                          display tree
+
+        Note: This function serves as the `task_func` in `torchmeter.utils.dfs_task`
         """
         
         all_nodes, *display_parent = pre_res
@@ -167,7 +161,7 @@ class OperationTree:
         slide_start_idx = 0
         while slide_start_idx < len(str_childs):
             now_node = copy_childs[slide_start_idx]
-            now_node.render_when_repeat = True & subject.render_when_repeat
+            now_node._render_when_repeat = True & subject._render_when_repeat
             
             # find the maximum window size `m` that satifies `str_childs[0:m] == str_childs[m:2*m]`
             exist_repeat = False
@@ -201,9 +195,9 @@ class OperationTree:
                 now_node.repeat_time = repeat_time
                 for idx in range(slide_start_idx, slide_start_idx + win_size):
                     inwin_node = copy_childs[idx]
-                    inwin_node.render_when_repeat = True & subject.render_when_repeat
-                    inwin_node.is_folded = True if idx-slide_start_idx else False
-                    now_node.repeat_body.append((inwin_node.node_id, inwin_node.name))
+                    inwin_node._render_when_repeat = True & subject._render_when_repeat
+                    inwin_node._is_folded = True if idx-slide_start_idx else False
+                    now_node._repeat_body.append((inwin_node.node_id, inwin_node.name))
 
                 # skip the modules that is repeated
                 slide_start_idx += win_size * repeat_time

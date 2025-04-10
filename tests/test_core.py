@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import patch, ANY
 from unittest.mock import MagicMock, PropertyMock
 
 import pytest
@@ -6,6 +6,7 @@ import torch.nn as nn
 from rich import get_console
 from rich.text import Text
 from rich.layout import Layout
+from torch import float16, float32
 from torch import equal as torch_equal
 from torch import randn as torch_randn
 from torch.utils.hooks import RemovableHandle
@@ -39,6 +40,8 @@ class ExampleModel(nn.Module):
 class EmptyModel(nn.Module):
     def __init__(self):
         super(EmptyModel, self).__init__()
+    def forward(self):
+        pass
 
 class RepeatModel(nn.Module):
     def __init__(self, repeat_nodes=1):
@@ -73,13 +76,19 @@ class TestMeter:
         assert cpu_model._Meter__measure_param is False
         assert cpu_model._Meter__measure_cal is False
         assert cpu_model._Meter__measure_mem is False
+        assert cpu_model._Meter__has_nocall_nodes is None
+        assert cpu_model._Meter__has_not_support_nodes is None
         
         assert hasattr(cpu_model, "ittp_warmup")
         assert hasattr(cpu_model, "ittp_benchmark_time")
+        # set ittp_warmup and ittp_benchmark_time to a lower value to save time
+        cpu_model.ittp_warmup = 2
+        cpu_model.ittp_benchmark_time = 2
         
         cpu_model(torch_randn(1, 10))
         assert hasattr(cpu_model, "ipt")
         assert hasattr(cpu_model, "device")
+        assert hasattr(cpu_model, "tree_fold_repeat")
         assert hasattr(cpu_model, "tree_levels_args")
         assert hasattr(cpu_model, "tree_repeat_block_args")
         assert hasattr(cpu_model, "table_display_args")
@@ -109,13 +118,31 @@ class TestMeter:
         assert output.shape == (1, 10)
         assert output.device.type == "cpu"
         assert cpu_model.ipt["args"][0] is input
+        assert not len(cpu_model.ipt["kwargs"])
         
         ## call with keyword argument
-        cpu_model = Meter(model, device="cpu")
-        output = cpu_model(ipt=input)
-        assert output.shape == (1, 10)
-        assert output.device.type == "cpu"
+        output2 = cpu_model(ipt=input)
+        assert output2.shape == (1, 10)
+        assert output2.device.type == "cpu"
         assert cpu_model.ipt["kwargs"]["ipt"] is input
+        assert not len(cpu_model.ipt["args"])
+        
+        ## new input reset statistics measured flags
+        cpu_model._Meter__measure_param = True
+        cpu_model._Meter__measure_cal = True
+        cpu_model._Meter__measure_mem = True
+        cpu_model(torch_randn(2, 10)) # different input triggers reset
+        assert not cpu_model._Meter__measure_param 
+        assert not cpu_model._Meter__measure_cal 
+        assert not cpu_model._Meter__measure_mem
+        
+        cpu_model._Meter__measure_param = True
+        cpu_model._Meter__measure_cal = True
+        cpu_model._Meter__measure_mem = True
+        cpu_model(torch_randn(2, 10)) # same input not triggers reset
+        assert cpu_model._Meter__measure_param 
+        assert cpu_model._Meter__measure_cal 
+        assert cpu_model._Meter__measure_mem
         
         if is_cuda():
             # gpu_model
@@ -125,13 +152,14 @@ class TestMeter:
             assert output.shape == (1, 10)
             assert output.device.type == "cuda"
             assert torch_equal(gpu_model.ipt["args"][0], input.to("cuda:0"))
+            assert not len(gpu_model.ipt["kwargs"])
             
             ## call with keyword argument
-            gpu_model = Meter(model, device="cuda:0")
             output = gpu_model(ipt=input)
             assert output.shape == (1, 10)
             assert output.device.type == "cuda"
             assert torch_equal(gpu_model.ipt["kwargs"]['ipt'], input.to("cuda:0"))
+            assert not len(gpu_model.ipt["args"])
     
     def test_attr_operation(self):
         """Test the logic of overwritten __get(del)attr__ method"""
@@ -313,7 +341,11 @@ class TestMeter:
         metered_model = Meter(ExampleModel())
         to_method = torch_randn(1).to
         
-        # empty ipt
+        # empty ipt (no need)
+        empty_metered_model = Meter(EmptyModel(), device="cpu")
+        empty_metered_model._ipt2device()
+
+        # empty ipt(needed)
         with pytest.raises(RuntimeError):
             metered_model._ipt2device()
             
@@ -370,7 +402,83 @@ class TestMeter:
             assert mock_to.call_count == 2
             assert metered_model.ipt["args"][0].device.type == "cpu"
             assert metered_model.ipt["kwargs"]["A"].device.type == "cpu"
+    
+    @pytest.mark.parametrize(
+        argnames=["origin", "new", "expected"], 
+        argvalues=[
+            # empty
+            ({"args":tuple(), "kwargs":{}}, 
+             {"args":(1,), "kwargs":{}}, True),
             
+            # different number of anonymous args
+            ({"args":(1,)}, {"args":(1,2)}, True),
+            
+            # same number but different inner value
+            ## different type in same position
+            ({"args":(1,2)}, {"args":(1.,2)}, True),
+            
+            ## different shape of tensor in same position
+            ({"args":(torch_randn(1, 10), )}, {"args":(torch_randn(1, 20), )}, True),
+            
+            ## different dtype of tensor in same position
+            ({"args":(torch_randn(1, 10, dtype=float16), )}, 
+             {"args":(torch_randn(1, 10, dtype=float32), )}, True),
+            
+            ## different value in same position
+            ({"args":(1, 2)}, {"args":(2, 2)}, True),
+            
+            ## all same input without tensor data
+            ({"args":(1, 2), "kwargs":{}}, 
+             {"args":(1, 2),"kwargs":{}}, False),
+            
+            ## all same input with tensor data of same shape and same dtype
+            ({"args":(torch_randn(1, 10, dtype=float32), ), "kwargs":{}},
+             {"args":(torch_randn(1, 10, dtype=float32), ), "kwargs":{}}, False),
+            
+            # different number of keyword args
+            ({"args":tuple(), "kwargs":{"a":1, "b":2}}, 
+             {"args":tuple(), "kwargs":{"a":1}}, True),
+            
+            # same number but different keys
+            ({"args":tuple(), "kwargs":{"a":1, "b":2}}, 
+             {"args":tuple(), "kwargs":{"a":1, "c":2}}, True),
+            
+            # same number but different values
+            ## different value type of same key
+            ({"args":tuple(), "kwargs":{"a":1}}, 
+             {"args":tuple(), "kwargs":{"a":1.}}, True),
+            
+            ## different shape of tensor in value of same key
+            ({"args":tuple(), "kwargs":{"a":torch_randn(1, 10)}}, 
+             {"args":tuple(), "kwargs":{"a":torch_randn(1, 20)}}, True),
+            
+            ## different dtype of tensor in value of same key
+            ({"args":tuple(), "kwargs":{"a":torch_randn(1, 10, dtype=float16)}},
+             {"args":tuple(), "kwargs":{"a":torch_randn(1, 10, dtype=float32)}}, True),
+            
+            ## different value of same key
+            ({"args":tuple(), "kwargs":{"a":1}}, 
+             {"args":tuple(), "kwargs":{"a":2}}, True),
+            
+            ## all same input without tensor data
+            ({"args":tuple(), "kwargs":{"b":2, "c":3}}, 
+             {"args":tuple(), "kwargs":{"b":2, "c":3}}, False),
+            
+            ## all same input with tensor data of same shape and same dtype
+            ({"args":tuple(), "kwargs":{"d":torch_randn(1, 10, dtype=float32)}},
+             {"args":tuple(), "kwargs":{"d":torch_randn(1, 10, dtype=float32)}}, False)            
+            
+        ]
+    )
+    def test_is_ipt_changed(self, origin, new, expected, monkeypatch):
+        """Test the logic of __ipt_is_changed method"""
+        
+        metered_model = Meter(ExampleModel())
+        target_method = metered_model._Meter__is_ipt_changed
+            
+        monkeypatch.setattr(metered_model, "_ipt", origin)
+        assert target_method(new) is expected           
+    
     def test_repr(self):
         """Test correct representation of Meter object"""
         
@@ -389,6 +497,25 @@ class TestMeter:
                         
             assert res == "Meter(model=model_info, device=device_info)"
     
+    def test_tree_fold_repeat(self):
+        """Test whether the `tree_fold_repeat` property is set and retrieved correctly."""
+        
+        metered_model = Meter(ExampleModel())
+        
+        assert hasattr(metered_model, "tree_fold_repeat")
+        
+        # retrieve
+        assert metered_model.tree_fold_repeat == __cfg__.tree_fold_repeat
+        
+        # valid set
+        metered_model.tree_fold_repeat = False
+        assert metered_model.tree_fold_repeat is False
+        assert __cfg__.tree_fold_repeat is False
+        
+        # invalid set
+        with pytest.raises(TypeError):
+            metered_model.tree_fold_repeat = 1
+
     @pytest.mark.parametrize(
         argnames=("attr_name", "upper_bound"),
         argvalues=[
@@ -791,6 +918,7 @@ class TestMeter:
         
         metered_model = Meter(ExampleModel())
         metered_model(torch_randn(1,10))
+        metered_model._Meter__has_nocall_nodes = False
         
         # verify output type
         # input a stat name
@@ -823,7 +951,157 @@ class TestMeter:
                           new_callable=PropertyMock) as mock_crucial_data:
             direct_res = metered_model.stat_info("mem")
             mock_crucial_data.assert_called_once()
+    
+    def test_stat_info_warning(self, monkeypatch):
+        """Test the logic of generating warning info"""
         
+        class NotSupportModel(nn.Module):
+            def __init__(self):
+                super(NotSupportModel, self).__init__()
+                self.layer0 = nn.Linear(10,5)
+                self.layer1 = nn.AdaptiveAvgPool1d(1)
+            def forward(self, x):
+                return self.layer1(x)
+        
+        metered_model = Meter(NotSupportModel(), device="cpu")
+        # set ittp_warmup and ittp_benchmark_time to a lower value to save time
+        metered_model.ittp_warmup = 2
+        metered_model.ittp_benchmark_time = 2
+        metered_model(torch_randn(1,10,5))
+        
+        nocall_flag = lambda :metered_model._Meter__has_nocall_nodes
+        notsupport_flag = lambda :metered_model._Meter__has_not_support_nodes
+        
+        assert nocall_flag() is None
+        assert notsupport_flag() is None
+        
+        # only take effect when the stat is cal or mem
+        metered_model.stat_info("param", show_warning=True)
+        assert nocall_flag() is None
+        assert notsupport_flag() is None
+        
+        metered_model.stat_info("ittp", show_warning=True)
+        assert nocall_flag() is None
+        assert notsupport_flag() is None
+        
+        metered_model.stat_info("mem", show_warning=True)
+        assert nocall_flag() is True
+        assert notsupport_flag() is None
+        
+        metered_model._Meter__has_nocall_nodes = None
+        metered_model.stat_info("cal", show_warning=True)
+        assert nocall_flag() is True
+        assert notsupport_flag() is True
+        
+        # verify show_warning option
+        metered_model._Meter__has_nocall_nodes = None
+        metered_model._Meter__has_not_support_nodes = None
+        metered_model.stat_info("cal", show_warning=False)
+        assert nocall_flag() is None
+        assert notsupport_flag() is None
+                
+        # verify __has_nocall_nodes flag is properly set &
+        # verify cache of __has_nocall_nodes 
+        with patch.object(MemMeter, "crucial_data",
+                          new_callable=PropertyMock) as mock_crucial_data:
+            ## when there is no nocalled nodes (crucial_data is mocked and will raise error)
+            metered_model.stat_info("mem", show_warning=True)
+            assert mock_crucial_data.call_count == 4 # 1: provide info to info_ls; 3: traverse all 3 nodes
+            assert nocall_flag() is False
+            
+            ## when the second traversal node is no called
+            mock_crucial_data.reset_mock()
+            metered_model._Meter__has_nocall_nodes = None
+            mock_crucial_data.side_effect = [{}, True, RuntimeError]
+            metered_model.stat_info("mem", show_warning=True)
+            assert mock_crucial_data.call_count == 3 # 1: provide info to info_ls; 2: traverse the leading 2 nodes
+            assert nocall_flag() is True
+            
+            # verify cache of __has_nocall_nodes
+            mock_crucial_data.reset_mock()
+            mock_crucial_data.side_effect = [{}]
+            metered_model.stat_info("mem", show_warning=True)
+            mock_crucial_data.assert_called_once() # 1: provide info to info_ls; 0: no need to traverse due to the cache
+
+        # verify __has_not_support_nodes flag is properly set &
+        # verify cache of __has_not_support_nodes
+        with patch.object(OperationNode, "cal", 
+                          new_callable=PropertyMock) as mock_cal:
+            
+            mock_cal_instance = MagicMock(spec=CalMeter)
+            type(mock_cal_instance).name = PropertyMock(return_value="cal")
+            mock_cal.return_value = mock_cal_instance
+            
+            ## when all nodes are supported
+            mock_cal_instance.is_not_supported = False
+            metered_model.stat_info("cal", show_warning=True)
+            assert notsupport_flag() is False
+
+            ## when any node is not supported
+            mock_cal_instance.is_not_supported = True
+            metered_model._Meter__has_not_support_nodes = None
+            metered_model.stat_info("cal", show_warning=True)
+            assert notsupport_flag() is True
+        
+            ## verify cache of __has_not_support_nodes
+            mock_cal.reset_mock()
+            metered_model._Meter__has_not_support_nodes = None
+            metered_model.stat_info("cal", show_warning=True)
+            assert mock_cal.call_count == 2 # 1: provide info to info_ls; 1: check each node.cal.is_not_supported
+            
+            mock_cal.reset_mock()
+            metered_model.stat_info("cal", show_warning=True)
+            assert mock_cal.call_count == 1 # 1: provide info to info_ls
+        
+        # verify warning info is added to info_ls correctly
+        with patch.object(OperationNode, "cal", 
+                          new_callable=PropertyMock) as mock_cal, \
+             patch.object(CalMeter, "crucial_data",
+                          new_callable=PropertyMock) as mock_crucial_data:
+            
+            mock_cal_instance = MagicMock(spec=CalMeter)
+            type(mock_cal_instance).name = PropertyMock(return_value="cal")
+            type(mock_cal_instance).crucial_data = mock_crucial_data
+            mock_cal.return_value = mock_cal_instance
+            
+            ## when there is no warning info, i.e. no nocalled nodes and not-supported nodes
+            mock_crucial_data.side_effect=[dict()]
+            mock_cal_instance.is_not_supported = False
+            metered_model._Meter__has_nocall_nodes = None
+            metered_model._Meter__has_not_support_nodes = None
+            res = metered_model.stat_info("cal", show_warning=True).plain
+            assert "Warning" not in res
+            
+            ## when there are only nocall nodes, but all nodes are supported
+            mock_crucial_data.side_effect=[dict(), RuntimeError]
+            mock_cal_instance.is_not_supported = False
+            metered_model._Meter__has_nocall_nodes = None
+            metered_model._Meter__has_not_support_nodes = None
+            res = metered_model.stat_info("cal", show_warning=True).plain
+            assert "Warning" in res
+            assert "not called" in res
+            assert "don't support" not in res
+            
+            ## when there are only not-supported nodes, but all nodes are called
+            mock_crucial_data.side_effect=[dict()]*10
+            mock_cal_instance.is_not_supported = True
+            metered_model._Meter__has_nocall_nodes = None
+            metered_model._Meter__has_not_support_nodes = None
+            res = metered_model.stat_info("cal", show_warning=True).plain
+            assert "Warning" in res
+            assert "not called" not in res
+            assert "don't support" in res
+            
+            ## when nocall nodes and not-supported nodes exist in the same time
+            mock_crucial_data.side_effect=[dict(), RuntimeError]
+            mock_cal_instance.is_not_supported = True
+            metered_model._Meter__has_nocall_nodes = None
+            metered_model._Meter__has_not_support_nodes = None
+            res = metered_model.stat_info("cal", show_warning=True).plain
+            assert "Warning" in res
+            assert "not called" in res
+            assert "don't support" in res
+         
     def test_overview(self):
         """Test the logic of overview method"""
         
@@ -831,6 +1109,9 @@ class TestMeter:
         from rich.columns import Columns
         
         metered_model = Meter(ExampleModel())
+        # set ittp_warmup and ittp_benchmark_time to a lower value to save time
+        metered_model.ittp_warmup = 2
+        metered_model.ittp_benchmark_time = 2
         metered_model(torch_randn(1,10))
         
         order_getter = lambda res: [p._title.plain.split(" INFO")[0].strip().lower() 
@@ -855,11 +1136,27 @@ class TestMeter:
             metered_model.overview("invalid_stat")
         
         # verify content
-        ## if model info always exists, see the second second ablove
-        
-        ## each item is a panel of stat_info
-        res = metered_model.overview("mem", "cal")
-        assert all(isinstance(p, Panel) for p in res.renderables)
+        with patch.object(metered_model, "stat_info",
+                          wraps=metered_model.stat_info) as mock_stat_info:
+            ## whether model info always exists, see the second section above
+            
+            ## each item is a panel of stat_info
+            res = metered_model.overview("mem", "cal")
+            assert all(isinstance(p, Panel) for p in res.renderables)
+            assert mock_stat_info.call_count == 2
+            mock_stat_info.assert_any_call("mem", show_warning=True)
+            mock_stat_info.assert_any_call("cal", show_warning=True)
+            
+            ## default setting is True
+            metered_model.overview("param", "cal")
+            call_args_ls = mock_stat_info.call_args_list
+            assert all(call_args.kwargs["show_warning"] for call_args in call_args_ls)
+            
+            ## custom setting
+            mock_stat_info.reset_mock()
+            metered_model.overview("param", "cal", show_warning=False)
+            call_args_ls = mock_stat_info.call_args_list
+            assert all(not call_args.kwargs["show_warning"] for call_args in call_args_ls)
     
     def test_table_cols(self):
         """Test the logic of table_cols method"""
@@ -920,13 +1217,11 @@ class TestMeter:
         mock_render.reset_mock()
         metered_model.profile("param", show=False, no_tree=False)
         mock_render.assert_not_called()
-        assert len(terminal_output_strls()) == 1 # only the scanning time, i.e Finish scanning model in ....
         
         # show = False, no_tree = True
         mock_render.reset_mock()
         metered_model.profile("param", show=False, no_tree=True)
         mock_render.assert_not_called()
-        assert len(terminal_output_strls()) == 1
         
         with patch.object(Meter, "structure", 
                           new_callable=PropertyMock,
@@ -936,12 +1231,14 @@ class TestMeter:
             mock_structure.reset_mock()
             metered_model.profile("param", show=True, no_tree=False)
             mock_structure.assert_called_once()
+            mock_render.assert_called_once()
         
             # show = True, no_tree = True
             mock_render.reset_mock()
             mock_structure.reset_mock()
             metered_model.profile("param", show=True, no_tree=True)
             mock_structure.assert_not_called()
+            mock_render.assert_called_once()
     
     @patch("torchmeter.core.render_perline")
     def test_profile_horizon_gap(self, mock_render):
@@ -991,7 +1288,9 @@ class TestMeter:
         
         # verify main content generation
         with patch.object(Layout, "__init__", autospec=True, 
-                          side_effect=layout_init_wrapper) as mock_init_layout:
+                          side_effect=layout_init_wrapper) as mock_init_layout,\
+             patch.object(metered_model, "stat_info",
+                          wraps=metered_model.stat_info) as mock_stat_info:
             ## no tree, main content is a Table
             metered_model.profile("param", show=True, no_tree=True)
             main_content = renderable_getter(mock_init_layout.call_args_list[-2])
@@ -1017,6 +1316,7 @@ class TestMeter:
             assert isinstance(footer, Columns)
             assert len(footer.renderables) == 2
             assert all(isinstance(ctt, Text) for ctt in footer.renderables)
+            mock_stat_info.assert_called_with(stat_or_statname=ANY, show_warning=False)
             
             assert isinstance(footer.title, Rule)
         

@@ -1,12 +1,19 @@
+from __future__ import annotations
+from typing import TYPE_CHECKING
+
 import os
 from time import perf_counter
 from inspect import signature
 from functools import partial
-from typing import Any, List, Tuple
-from typing import Union, Optional, Callable, Iterable
 
 from rich.text import Text
 from rich.status import Status
+
+if TYPE_CHECKING:
+    from typing import Any, List, Tuple
+    from typing import Union, Optional, Callable, Iterable
+
+    from polars import PolarsDataType
 
 __all__ = ["dfs_task", "data_repr", "Timer"]
 
@@ -31,18 +38,6 @@ def resolve_savepath(origin_path:str,
     return save_dir, save_file
 
 def hasargs(func:Callable, *required_args:str) -> None:
-    """
-    Check if the function `func` has all the required arguments.
-
-    Args:
-    ---
-        - `func` (Callable): The function to be checked.
-        - `required_args` (Tuple[str]): The names of required arguments.
-
-    Returns:
-    ---
-        None
-    """
     if not required_args:
         return 
         
@@ -58,73 +53,6 @@ def dfs_task(dfs_subject:Any,
              visited_signal_func:Callable[[Any], Any]=lambda x:id(x),
              *,
              visited:Optional[List]=None) -> Any: 
-    """
-    Perform Depth-First Search (DFS) traversal on `dfs_subject`, 
-    and complete the specified task at the same time.
-
-    The traversal is implemented by recursion.
-    
-    Args:
-    ---
-        - `dfs_subject` (Any): The subject to be traversed.\n\n
-        
-        - `adj_func` (Callable[[Any], Iterable]): Function to obtain an iterator for child objects of "dfs_subject".
-                                                  The function should have one parameter, which is the object to be traversed.
-                                                  And the function should return an iterator of child objects.
-                                                  
-        - `task_func` (Callable[[Any], Any]): Function to perform the task. 
-                                              The function should have two specific parameters, one is `subject` used to receive the currently traversed object,
-                                              and the other is `pre_res` used to receive the result of the previous level task.
-                                              Finally, the function should return the result of the currently traversal task.
-                                              
-        - `visited_signal_func` (Callable[[Any], Any]): Function to obtain the signal used to identify whether this object is visited.
-                                                        The function should have one parameter, which is the object to be traversed.
-                                                        And the function should return a signal in any format.
-                                                        Defaults to use the traversal object itself.
-                                                        
-        - `visited` (List, optional): A list to store the visited signals, it's used to avoid visiting a same object repeatly.
-                                      Defaults to [].
-    
-    Returns:
-    ---
-        Any: The result of the first-level task. Given that each level's task result will be passed to next level,
-             therefore you can use a container (such as list) to collect the result of each level's task,
-             in this case, although the function returns the result of the first level's task, it has all levels' results in it.
-    
-    Example:
-    ---
-        ```python
-        class BinaryTree:
-            def __init__(self, value, left=None, right=None):
-                self.value = value
-                self.left = left
-                self.right = right
-        
-        root = BinaryTree(1)
-        l_child = BinaryTree(2)
-        ll_child = BinaryTree(3)
-        root.left = l_child
-        l_child.left = ll_child
-        
-        def print_node(subject, pre_res=[]):
-            print(subject.value)
-            return pre_res + [subject.value]
-
-        print('Print the left subtree:')
-        dfs_res = dfs_task(dfs_subject=root, 
-                        adj_func=lambda x:[x.left] if x.left else [],  # stop traversal when there is no left child
-                        task_func=print_node, 
-                        visited_signal_func=id, # use the addr as visited_signal
-                        visited=[])
-        # >>> 1
-        # >>> 2
-        # >>> 3
-        
-        print(dfs_res)
-        # >>> [1, 2, 3]
-        ```
-    """
-    
     hasargs(task_func, 'subject', 'pre_res')
 
     visited_signal = visited_signal_func(dfs_subject)
@@ -163,15 +91,15 @@ def indent_str(s:Union[str, Iterable[str]],
         for i in s:
             if not isinstance(i,str):
                 raise TypeError("The input should be a string or an iterable object of strings, " + \
-                                f"but got {type(i)} when travering input.")
+                                f"but got `{type(i).__name__}` when travering input.")
             split_lines.extend(i.split("\n"))
             
     else:
         raise TypeError("The input should be a string or a sequence of strings, " + \
-                        f"but got {type(s)}.")
+                        f"but got `{type(s).__name__}`.")
     
     if not isinstance(indent, int):
-        raise TypeError(f"The indent should be an integer, but got {type(indent)}")
+        raise TypeError(f"The indent should be an integer, but got `{type(indent).__name__}`")
     indent = max(indent, 0)
         
     res = []
@@ -228,6 +156,57 @@ def data_repr(val:Any) -> str:
 
     else:
         return item_repr(val_type, val)
+
+def match_polars_type(ipt:Any, *, 
+                      recheck:bool=False,
+                      pre_res:Optional[PolarsDataType]=None)-> PolarsDataType:
+        
+    import numpy as np
+    import polars as pl
+    from polars.datatypes._parse import parse_into_dtype
+    from polars.series.series import _resolve_temporal_dtype
+
+    if not recheck and pre_res is not None:
+        return pre_res
+
+    try:
+        pl_type = parse_into_dtype(type(ipt))
+        if isinstance(ipt, (list, tuple)):
+            # TODO: inner type awareness (following type priority) 
+            inner_type = match_polars_type(ipt[0])
+            return pl_type(inner_type) # type: ignore
+            
+        return pl_type
+    
+    except TypeError:
+        if isinstance(ipt, dict):
+            fields = {k:match_polars_type(v) for k,v in ipt.items()}
+            return pl.Struct(fields=fields)
+        
+        elif isinstance(ipt, (np.datetime64, np.timedelta64)):
+            pl_type = _resolve_temporal_dtype(None, np.dtype(ipt)) # type: ignore 
+            return pl_type or pl.Object
+        
+        elif isinstance(ipt, (np.integer, np.floating)):
+            return {
+                np.int8: pl.Int8,
+                np.int16: pl.Int16,
+                np.int32: pl.Int32,
+                np.int64: pl.Int64,
+                np.uint8: pl.UInt8,
+                np.uint16: pl.UInt16,
+                np.uint32: pl.UInt32,
+                np.uint64: pl.UInt64,
+                np.float32: pl.Float32,
+                np.float64: pl.Float64
+            }[type(ipt)]
+            
+        elif isinstance(ipt, np.ndarray):
+            return pl.Series(ipt).dtype
+        
+        else:
+            # class instance
+            return pl.Object
 
 class Timer(Status):
     def __init__(self, task_desc:str, 

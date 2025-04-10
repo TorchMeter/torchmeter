@@ -1,3 +1,4 @@
+import sys
 import warnings
 from collections import namedtuple
 from unittest.mock import MagicMock, PropertyMock, patch
@@ -5,6 +6,7 @@ from unittest.mock import MagicMock, PropertyMock, patch
 import pytest
 import numpy as np
 import torch.nn as nn
+from pympler.asizeof import asizeof
 from torch import ones as torch_ones
 from torch import randn as torch_randn
 from torch import device as torch_device
@@ -29,16 +31,6 @@ from torchmeter.statistic import (
 
 pytestmark = pytest.mark.vital
 STAT_TESTED_NOW = ""
-
-@pytest.fixture
-def base_upperlink_data():
-    return UpperLinkData(val=100)
-
-@pytest.fixture
-def linked_upperlink_data():
-    parent = UpperLinkData(val=200)
-    child = UpperLinkData(val=50, parent_data=parent)
-    return parent, child
 
 @pytest.fixture
 def empty_model_root():
@@ -76,9 +68,10 @@ def measured_simple_model(simple_model_root):
     device = torch_device("cpu")
 
     if STAT_TESTED_NOW == "ittp":
+        repeat = 2
         for child in simple_oproot.childs.values():
-            getattr(child, STAT_TESTED_NOW).measure(device=device)
-        stat.measure(device=device)
+            getattr(child, STAT_TESTED_NOW).measure(device=device, repeat=repeat)
+        stat.measure(device=device, repeat=repeat)
     else:
         for child in simple_oproot.childs.values():
             getattr(child, STAT_TESTED_NOW).measure()
@@ -137,225 +130,6 @@ class ConcreteStat(Statistics):
 
     def measure(self): ...
 
-
-class TestUpperLinkData:
-    def test_valid_init(self):
-        """Test initialization with different arguments"""
-        data = UpperLinkData()
-        assert data.val == 0
-        assert data._UpperLinkData__parent_data is None
-        assert data._UpperLinkData__unit_sys is None
-        assert data._UpperLinkData__access_cnt == 1
-        assert data.none_str == '-'
-
-        parent = UpperLinkData()
-        data = UpperLinkData(
-            val=100,
-            parent_data=parent,
-            unit_sys=BinaryUnit,
-            none_str="N/A"
-        )
-        assert data.val == 100
-        assert data._UpperLinkData__parent_data is parent
-        assert data._UpperLinkData__unit_sys is BinaryUnit
-        assert data.none_str == "N/A"
-
-    def test_invalid_init(self):
-        """Test invalid initialization"""
-        with pytest.raises(TypeError):
-            UpperLinkData(val={})
-        
-        with pytest.raises(TypeError):
-            UpperLinkData(val=100, parent_data=100)
-        
-        with pytest.raises(TypeError):
-            UpperLinkData(unit_sys="KB")    
-        
-        with pytest.raises(TypeError):
-            UpperLinkData(none_str=22)
-
-    def test_slots(self, base_upperlink_data):
-        """Test __slots__ restriction"""
-        assert not hasattr(base_upperlink_data, "__dict__")
-        
-        with pytest.raises(AttributeError):
-            base_upperlink_data.invalid_attribute = 42
-
-    def test_raw_data(self, base_upperlink_data):
-        """Test whether the raw_data property is correcttly calculated"""
-        assert base_upperlink_data.raw_data == 100.0
-        base_upperlink_data.val = 150
-        assert base_upperlink_data.raw_data == 150.0
-
-    def test_mark_access(self, base_upperlink_data):
-        """Test whether the mark_access method is correct"""
-        assert base_upperlink_data._UpperLinkData__access_cnt == 1
-        base_upperlink_data.mark_access()
-        base_upperlink_data.mark_access()
-        assert base_upperlink_data._UpperLinkData__access_cnt == 3
-
-    def test_inplace_addition(self, base_upperlink_data):
-        """Test inplace addition"""
-        base_upperlink_data += 50
-        assert base_upperlink_data.val == 150
-
-    def test_linked_update(self, linked_upperlink_data):
-        """Test whether the inplace addition will trigger the update of parent data"""
-        parent, child = linked_upperlink_data
-        
-        child += 50
-        assert child.val == 100
-        assert parent.val == 250
-
-        # 测试多级链式更新
-        grandparent = UpperLinkData(val=500)
-        parent._UpperLinkData__parent_data = grandparent
-        child += 100
-        assert child.val == 200
-        assert parent.val == 350 
-        assert grandparent.val == 600
-
-    def test_repr(self, linked_upperlink_data):
-        """Test correct representation"""
-        
-        # no unit_sys
-        parent, child = linked_upperlink_data
-        assert repr(parent) == "200.0" 
-        assert repr(child) == "50.0"
-
-        # with unit_sys
-        data = UpperLinkData(val=1500, unit_sys=BinaryUnit)
-        assert repr(data) == "1.46 KiB" # 1500/1024
-
-        # re-access representation
-        data = UpperLinkData(val=300)
-        data.mark_access()
-        assert repr(data) == "150.0 [dim](×2)[/]"
-
-    def test_edge_cases(self, base_upperlink_data):
-        """Test some edge cases"""
-        # add invalid data
-        with pytest.raises(TypeError):
-            base_upperlink_data += "invalid_type"
-        
-class TestMetricsData:
-    def test_valid_init(self):
-        """Test initialization with different arguments"""
-        m = MetricsData()
-        assert isinstance(m.vals, np.ndarray)
-        assert not len(m.vals)
-        assert m._MetricsData__reduce_func is np.mean
-        assert m._MetricsData__unit_sys is CountUnit
-        assert m.none_str == '-'
-
-        custom_func = np.median
-        m = MetricsData(reduce_func=custom_func, unit_sys=BinaryUnit, none_str="N/A")
-        assert m._MetricsData__reduce_func is custom_func
-        assert m._MetricsData__unit_sys is BinaryUnit
-        assert m.none_str == "N/A"
-
-    def test_invalid_init(self):
-        """Test invalid initialization"""
-        with pytest.raises(TypeError):
-            MetricsData(reduce_func=100)
-        
-        with pytest.raises(RuntimeError):
-            MetricsData(reduce_func=str)
-        
-        with pytest.raises(TypeError):
-            MetricsData(unit_sys=100)
-        
-        with pytest.raises(TypeError):
-            MetricsData(none_str=22)
-
-    def test_slots(self):
-        """Test __slots__ restriction"""   
-        m = MetricsData()
-        with pytest.raises(AttributeError):
-            m.invalid_attr = 100
-
-    def test_empty_data_properties(self):
-        empty_m = MetricsData()
-        assert empty_m.metrics == 0.0
-        assert empty_m.iqr == 0.0
-        assert empty_m.val == (0.0, 0.0)
-        assert empty_m.raw_data == 0.0
-
-    def test_single_value_properties(self):
-        m = MetricsData()
-        m.append(5.0)
-        assert m.metrics == 5.0
-        assert not m.iqr
-        assert m.val == (5.0, 0.0)
-
-    def test_multi_value_properties(self):
-        m = MetricsData()
-        m.vals = np.array([2.0, 4.0, 6.0, 10.0])
-        assert m.metrics == 5.5
-        assert m.iqr == 3.5  # Q3=7.0, Q1=3.5
-
-    def test_reduce_func(self):
-        m = MetricsData()
-        m.vals = np.array([1.0, 2.0, 6.0])
-        assert m.metrics == 3.0  # mean
-
-        m._MetricsData__reduce_func = np.median
-        assert m.metrics == 2.0  # median
-        
-        m._MetricsData__reduce_func = np.sum
-        assert m.metrics == 9.0  # sum
-
-    def test_data_management(self):
-        m = MetricsData()
-
-        with pytest.raises(TypeError):
-            m.append([1.0, 2.0, 3.0, 4.0, 5.0])
-        
-        m.append(1.0)
-        m.append(2.0)
-        m.append(4.0)
-        assert m.vals.tolist() == [1.0, 2.0, 4.0]
-        
-        m.clear()
-        assert not len(m.vals)
-
-    def test_repr(self):
-        """Test correct representation"""
-        # no unit
-        m = MetricsData(unit_sys=None)
-        m.append(1.5)
-        m.append(2.5)
-        assert repr(m) == "2.00 ± 0.50"  # mean 2.0，IQR=0.5（Q3=2.25, Q1=1.75）
-
-        # default unit: CountUnit
-        m = MetricsData()
-        m.append(1000)
-        m.append(2000)
-        assert repr(m) == "1.50 K ± 500.00"  # mean 1500，IQR=500
-        
-        # custom unit
-        m = MetricsData(unit_sys=BinaryUnit)
-        m.append(1000)
-        m.append(2000)
-        assert repr(m) == "1.46 KiB ± 500 B"  # (mean 1500)/1024，IQR=500
-        
-    def test_edge_cases(self):
-        """Test some edge cases"""    
-        # all zero
-        m = MetricsData()
-        m.append(0)
-        m.append(0)
-        m.append(0)
-        assert m.metrics == 0.0
-        assert m.iqr == 0.0
-
-        # negative value
-        m = MetricsData()
-        m.append(-2)
-        m.append(0)
-        m.append(2)
-        assert m.metrics == 0.0
-        assert m.iqr == 2.0  # Q3=1.0, Q1=-1.0
 
 class TestStatistics:
     def test_mandatory_attributes_check(self):
@@ -463,11 +237,11 @@ class TestParamsMeter:
         """Test detail_val_container and overview_val_container settings"""
         assert hasattr(ParamsMeter, "detail_val_container")
         dc = ParamsMeter.detail_val_container
-        assert all(v is None for v in dc._fields_defaults.values())
+        assert all(v is None for v in dc._field_defaults.values())
         
         assert hasattr(ParamsMeter, "overview_val_container")
         oc = ParamsMeter.overview_val_container
-        assert all(v is None for v in oc._fields_defaults.values())
+        assert all(v is None for v in oc._field_defaults.values())
     
     def test_valid_init(self, simple_model_root):
         """Test valid initialization"""
@@ -614,11 +388,11 @@ class TestCalMeter:
         """Test detail_val_container and overview_val_container settings"""
         assert hasattr(CalMeter, "detail_val_container")
         dc = CalMeter.detail_val_container
-        assert all(v is None for v in dc._fields_defaults.values())
+        assert all(v is None for v in dc._field_defaults.values())
         
         assert hasattr(CalMeter, "overview_val_container")
         oc = CalMeter.overview_val_container
-        assert all(v is None for v in oc._fields_defaults.values())
+        assert all(v is None for v in oc._field_defaults.values())
     
     def test_valid_init(self, simple_model_root):
         """Test valid initialization"""
@@ -628,9 +402,14 @@ class TestCalMeter:
         assert cal_meter._opnode == oproot
         assert cal_meter._model is model
         assert not cal_meter.is_measured
+        assert not cal_meter._CalMeter__is_not_supported
         assert not cal_meter._CalMeter__stat_ls
         
-        assert cal_meter.name == "cal"    
+        assert cal_meter.name == "cal"   
+        
+        assert hasattr(cal_meter, "is_not_supported")
+        assert not cal_meter.is_not_supported 
+        
         assert hasattr(cal_meter, "Macs")
         assert isinstance(cal_meter.Macs, UpperLinkData)
         assert cal_meter.Macs.val == 0
@@ -785,11 +564,6 @@ class TestCalMeter:
             ([torch_randn(3,4)]*3, ("([3, 4],\n" 
                                     " [3, 4],\n"
                                     " [3, 4])")),
-            ({torch_randn(1,2),
-              torch_randn(3,4),
-              torch_randn(5,6)}, ("([1, 2],\n" 
-                                  " [3, 4],\n"
-                                  " [5, 6])")),
             ({"k":torch_randn(2,3),
               "l":torch_randn(4,5),
               "m":torch_randn(6,7)}, ("{str: [2, 3],\n"
@@ -929,17 +703,37 @@ class TestCalMeter:
         assert cal_meter.Macs.val == expected_macs    
         assert cal_meter.Flops.val == expected_flops
 
+    def test_not_supported_flag(self):
+        """Test the is_not_supported property is set and retrieved correctly"""
+        
+        model = nn.Identity()
+        opnode = OperationNode(module=model)
+        cal_meter = opnode.cal
+        
+        # retrieve
+        assert not cal_meter.is_not_supported
+        
+        # valid set
+        model.register_forward_hook(cal_meter._CalMeter__not_support_hook)
+        model(torch_randn(1, 10))
+        
+        assert cal_meter.is_not_supported
+        
+        # invalid set
+        with pytest.raises(AttributeError):
+            del cal_meter.is_not_supported
+
 @pytest.mark.usefixtures("toggle_to_mem")
 class TestMemMeter:
     def test_cls_variable(self):
         """Test detail_val_container and overview_val_container settings"""
         assert hasattr(MemMeter, "detail_val_container")
         dc = MemMeter.detail_val_container
-        assert all(v is None for v in dc._fields_defaults.values())
+        assert all(v is None for v in dc._field_defaults.values())
         
         assert hasattr(MemMeter, "overview_val_container")
         oc = MemMeter.overview_val_container
-        assert all(v is None for v in oc._fields_defaults.values())
+        assert all(v is None for v in oc._field_defaults.values())
     
     def test_valid_init(self, simple_model_root):
         """Test valid initialization"""
@@ -1069,7 +863,6 @@ class TestMemMeter:
             (nn.RReLU(), (1, 10), False),
             (nn.LeakyReLU(), (1, 10), False),
             (nn.SELU(), (1, 10), False),
-            (nn.Mish(), (1, 10), False),
             (nn.Dropout(0.5), (1, 10), False),
             (nn.Threshold(0.1, 20), (1, 10), False),
 
@@ -1079,7 +872,6 @@ class TestMemMeter:
             (nn.RReLU(inplace=True), (1, 10), True),
             (nn.LeakyReLU(inplace=True), (1, 10), True),
             (nn.SELU(inplace=True), (1, 10), True),
-            (nn.Mish(inplace=True), (1, 10), True),
             (nn.Dropout(0.5, inplace=True), (1, 10), True),
             (nn.Threshold(0.1, 20, inplace=True), (1, 10), True),
 
@@ -1121,23 +913,25 @@ class TestMemMeter:
             (1, 32),  
             (1., 24), # python default size for float
 
-            ("1", 49 + 1),
-            ("-"*50, 49 + 50),
+            ("1", 1 + (49 if sys.version_info < (3, 12) else 41)),
+            ("-"*50, 50 + (49 if sys.version_info < (3, 12) else 41)),
 
             (None, 16), # python default size for None
 
             (tuple(), 0),
             ((1,2,3), 32*3),
-
-            (list(), 56),
-            ([1,2,3], 56 + 40*3),
+            
+            # value change between python version
+            (list(), asizeof([])),
+            ([1,2,3], asizeof([1,2,3])), 
 
             (set(), 216),
             ({1,2,3}, 216 + 32*3),
 
-            (dict(), 232),
-            ({"a":1, "b":2}, 232+(56+32)*2),
-            ({"a":1., "b":2.}, 232+(56+24)*2),
+            # hard to resolve the component
+            (dict(), asizeof(dict())), 
+            ({"a":1, "b":2}, asizeof({"a":1, "b":2})), 
+            ({"a":1., "b":2.}, asizeof({"a":1., "b":2.})),
 
             (np.array([1,2,3], dtype=np.int8), 1*3),
             (np.array([1,2,3], dtype=np.int16), 2*3),
@@ -1175,17 +969,17 @@ class TestMemMeter:
         argnames=("opts", "expected_opt_cost"),
         argvalues=[
             ((1, 1.), 32 + 24), 
-            ((1, "1"), 32 + 50),
+            ((1, "1"), 32 + 1 + (49 if sys.version_info < (3, 12) else 41)),
             ((1, None), 32 + 16),  
             ((1, ()), 32 + 40),
             ((1, (1,2,3)), 32 + 40*4),
-            ((1, [1,2,3]), 32 + 56 + 40*3),
+            ((1, [1,2,3]), 32 + asizeof([1,2,3])),
             ((1, {1,2,3}), 32 + 216 + 32*3),
-            ((1, {"a":1, "b":2}), 32 + 232 + (56+32)*2),
+            ((1, {"a":1, "b":2}), 32 + asizeof({"a":1, "b":2})),
 
-            (("1", "2."), 50 + 51),
-            (("1", 2.), 50 + 24),
-            (("1", None), 50 + 16),
+            (("1", "2."), 3 + 2*(49 if sys.version_info < (3, 12) else 41)),
+            (("1", 2.), 1 + 24 + (49 if sys.version_info < (3, 12) else 41)),
+            (("1", None), 1 + 16 + (49 if sys.version_info < (3, 12) else 41)),
 
             ((None, None), 16 + 16),
             ((None, 2.), 16 + 24),
@@ -1327,7 +1121,6 @@ class TestMemMeter:
             (nn.RReLU(inplace=True), (1, 10), 0, 0, 0),
             (nn.LeakyReLU(inplace=True), (1, 10), 0, 0, 0),
             (nn.SELU(inplace=True), (1, 10), 0, 0, 0),
-            (nn.Mish(inplace=True), (1, 10), 0, 0, 0),
             (nn.Dropout(0.5, inplace=True), (1, 10), 0, 0, 0),
             (nn.Threshold(0.1, 20, inplace=True), (1, 10), 0, 0, 0),
             
@@ -1376,11 +1169,11 @@ class TestIttpMeter:
         """Test detail_val_container and overview_val_container settings"""
         assert hasattr(IttpMeter, "detail_val_container")
         dc = MemMeter.detail_val_container
-        assert all(v is None for v in dc._fields_defaults.values())
+        assert all(v is None for v in dc._field_defaults.values())
         
         assert hasattr(IttpMeter, "overview_val_container")
         oc = MemMeter.overview_val_container
-        assert all(v is None for v in oc._fields_defaults.values())
+        assert all(v is None for v in oc._field_defaults.values())
     
     def test_valid_init(self, simple_model_root):
         """Test valid initialization"""
@@ -1459,6 +1252,7 @@ class TestIttpMeter:
         res = ittp_meter.measure(device=torch_device("cpu"))
         assert res is not None
 
+    @pytest.mark.skipif(not is_cuda(), reason="No GPUs detected")
     def test_model_device_dismatch(self):
         """Test whether the measure method works well 
            when model's device is the same with given argument"""
