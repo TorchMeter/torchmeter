@@ -1,19 +1,20 @@
 name: Bug Report
 description: File a bug report.
 title: "[🐞 Bug]: "
-labels: ["bug", "triage"]
+labels: ["bug"]
+type: Bug
 
 body:
 
   - type: markdown
     attributes:
       value: |
-        **Thanks for taking the time to fill out this bug report!**
+        > **Thanks for taking the time to fill out this bug report!**
 
   - type: checkboxes
     attributes:
-      label: Is there an existing issue for this?
-      description: Search for existing issues for the bug you encountered.
+      label: Is there an existing issue or a disscusion for this?
+      description: Search for [existing issues](https://github.com/TorchMeter/torchmeter/issues?q=) or [existing discussions](https://github.com/TorchMeter/torchmeter/discussions?discussions_q=) for what you encountered.
       options:
         - label: I have searched, and found nothing match my bug.
           required: true
@@ -25,7 +26,7 @@ body:
       description: |
         What did you do, and what did you encounter?
         It is best to include a screenshot, gif or screen recording of your issue.
-      placeholder: Tell us what you see!
+      placeholder: Tell us what did you do and what you see!
     validations:
       required: true
 
@@ -59,25 +60,33 @@ body:
     id: version
     attributes:
       label: Your package version
-      description: Use `pip show <package-name>` to get the version.
+      description: Use `pip show torchmeter` to get the version.
     validations:
       required: true
   
-  - type: dropdown
+  - type: input
+    id: py-version
+    attributes:
+      label: Your python version
+      description: Use `python -V` to get the version.
+    validations:
+      required: true
+  
+  - type: input
     id: os
     attributes:
-      label: Operating System?
-      multiple: true
-      options:
-        - Windows
-        - Linux
-        - macOS
+      label: Operating System
+      description: Your os, like `windows 10`, `ubuntu 22.04`.
+    validations:
+      required: true
 
   - type: textarea
     id: appendix
     attributes:
       label: Appendix
-      description: Any addition information helping to resolve this issue is welcome.
+      description: |
+        Any addition information helping to resolve this issue is welcome. \
+        You can include code snippets, error traces, screenshots/GIFs, or other relevant materials here.
       value: |
         <details>
         <summary>Details</summary>
