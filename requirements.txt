@@ -1,5 +1,9 @@
 rich
-torch
-torchvision
+tqdm
+torch >= 1.7.0
 xlsxwriter
-polars
+polars >= 1.8.2
+numpy
+pyyaml
+pympler
+typing_extensions
