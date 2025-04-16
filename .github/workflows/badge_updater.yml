@@ -50,7 +50,7 @@ jobs:
         run: |
           perl -0777 -i -pe '
             BEGIN { $coverage = shift }
-            s|<!-- Coverage Badge:Begin -->.*?<!-- Coverage Badge:End -->|<!-- Coverage Badge:Begin -->$coverage<!-- Coverage Badge:End -->|sg
+            s|<!-- Coverage Badge:Begin -->.*?<!-- Coverage Badge:End -->|<!-- Coverage Badge:Begin -->![coverage-badge]($coverage)<!-- Coverage Badge:End -->|sg
           ' "${{ github.event.inputs.coverage_badge_link }}" README.md
 
       - name: Commit & Push Changes
