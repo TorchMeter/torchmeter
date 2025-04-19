@@ -1,6 +1,6 @@
 # TorchMeter, MIT license
 # Author: Ahzyuan
-# Repo: https://github.com/Ahzyuan/torchmeter
+# Repo: https://github.com/TorchMeter/torchmeter
 
 # This workflow is borrowed from polars and modified
 # polars official one: https://github.com/pola-rs/polars/blob/main/.github/workflows/pr-labeler.yml

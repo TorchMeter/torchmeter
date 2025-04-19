@@ -1,6 +1,6 @@
 # TorchMeter, MIT license
 # Author: Ahzyuan
-# Repo: https://github.com/Ahzyuan/torchmeter
+# Repo: https://github.com/TorchMeter/torchmeter
 
 # This workflow is triggered manually with target PR number as input.
 # 
@@ -34,7 +34,7 @@ env:
 
 jobs:
   Coverage-Badge:
-    name: 🪄 Update Coverage Badge
+    name: 🔄 Update Coverage Badge
     runs-on: ubuntu-latest
 
     if: github.repository == 'TorchMeter/torchmeter'

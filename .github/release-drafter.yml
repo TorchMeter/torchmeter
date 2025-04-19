@@ -1,6 +1,6 @@
 # TorchMeter, MIT license
 # Author: Ahzyuan
-# Repo: https://github.com/Ahzyuan/torchmeter
+# Repo: https://github.com/TorchMeter/torchmeter
 
 # This template is borrowed from polars and modified
 # polars official one: https://github.com/pola-rs/polars/blob/main/.github/release-drafter.yml
@@ -17,24 +17,25 @@ version-resolver:
   minor:
     labels:
       - feat
-      - performance
 
   patch:
     labels:
+      - performance
       - deprecation
       - bug-fix
       - refactor
       - maintain
       - revert
+      - build
       - misc
       - tests
       - ci
-      # - docs
+      # - doc
 
   default: patch
 
 # release title
-name-template: 'TorchMeter v$RESOLVED_VERSION'
+name-template: 'torchmeter v$RESOLVED_VERSION'
 
 # the format of tag to be linked by the release
 tag-template: 'v$RESOLVED_VERSION'
@@ -43,7 +44,7 @@ tag-template: 'v$RESOLVED_VERSION'
 ## global limitations
 replacers:
   ## Remove conventional commits from titles
-  - search: '/- (depr|perf|feat|fix|doc|test|ci|chore|maintain|refactor|revert)(\(.*\))?(\!)?(\s)?\: /g'
+  - search: '/- (depr|perf|feat|fix|doc|test|ci|chore|build|refactor|revert)(\([^\s]+\))?(\!)?(\s)?\: /g'
     replace: '- '
 
 ## change list related
@@ -93,6 +94,10 @@ categories:
     collapse-after: 10
     labels: ci
 
+  - title: 📦 Build
+    collapse-after: 10
+    labels: build
+
   - title: 🧰 Maintenance
     collapse-after: 20
     labels: maintain
@@ -117,8 +122,7 @@ categories:
 autolabeler:
   - label: breaking
     title:
-      - '/^(break|breaking)/i'
-      - '/^(depr|perf|feat|fix|doc|test|ci|chore|maintain|refactor|revert)(\(.*\))?\!\s?\: /i' # Example: feat!: ...
+      - '/^(break|breaking|depr|perf|feat|fix|doc|test|ci|chore|build|refactor|revert)(\([^\s]+\))?\!\s?\: /i' # Example: feat!: ...
 
   - label: deprecation
     title:
@@ -148,10 +152,13 @@ autolabeler:
     title:
       - '/^ci/i'
   
+  - label: build
+    title:
+      - '/^build/i'
+
   - label: maintain
     title:
       - '/^chore/i'
-      - '/^maintain/i'
 
   - label: refactor
     title:
@@ -163,7 +170,7 @@ autolabeler:
   
   - label: misc
     title:
-      - '/^(?!break|breaking|depr|perf|feat|fix|doc|test|ci|chore|maintain|refactor|revert).+/i'
+      - '/^(?!break|breaking|depr|perf|feat|fix|doc|test|ci|chore|build|refactor|revert).+/i'
 
 ## layout
 template: |
@@ -171,7 +178,7 @@ template: |
 
   ## 🍻 Acknowledgements
   > 😊 Special thanks to all our contributors!
-  > 👏 Your contributions make `TorchMeter` better for everyone! 
+  > 👏 Your contributions make `torchmeter` better for everyone! 
 
   $CONTRIBUTORS
   

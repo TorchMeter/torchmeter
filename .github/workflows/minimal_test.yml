@@ -1,6 +1,6 @@
 # TorchMeter, MIT license
 # Author: Ahzyuan
-# Repo: https://github.com/Ahzyuan/torchmeter
+# Repo: https://github.com/TorchMeter/torchmeter
 
 # This workflow ensures quick code quality checks and code logic validation.
 #
@@ -20,7 +20,7 @@
 #    - Randomly selects OS and uses Python 3.8 for non-manual runs
 #    - Validates code across OS/Python combinations on manual runs
 
-name: ✅ Minimal Test ❌
+name: ✔ Minimal Test ✘
 
 on:
   pull_request: 
@@ -170,7 +170,7 @@ jobs:
           if-no-files-found: error
         
   Minimal-Test:
-    name: 🪛 Minimal Test 🧪
+    name: 🧩 Minimal Test 🧪
 
     needs: [Pick-OS-Python, Lint-Format]
         
