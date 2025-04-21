@@ -1,5 +1,3 @@
-refers/
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -36,7 +34,11 @@ var/
 pip-log.txt
 pip-delete-this-directory.txt
 
+# Type annotation
+.mypy_cache/
+
 # Unit test / coverage reports
+.pytest_cache/
 htmlcov/
 .tox/
 .coverage
@@ -91,3 +93,8 @@ ENV/
 .ropeproject
 *.npy
 *.pkl
+
+# Other
+.vscode/
+refers/
+*_cache/
