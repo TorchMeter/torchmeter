@@ -11,13 +11,13 @@ To ensure efficient review, please complete the following sections
 <!-- Note: Use `[x]` to check the boxes -->
 
 - [ ] 🔍 I've checked for duplicate PRs ([click to check](https://github.com/TorchMeter/torchmeter/pulls?q=))
-- [ ] 📜 I've followed [contribution guidelines](CONTRIBUTING.md) 
-  - [ ] ✨ I've linted and formatted my code (how?)
-  - [ ] 🔧 I've formatted the PR title appropriately (how?)
+- [ ] 📜 I've followed [contribution guidelines](../CONTRIBUTING.md) 
+  - [ ] ✨ I've linted and formatted my code ([how?](../CONTRIBUTING.md#cb-lint-format-and-test-your-code))
+  - [ ] 🔧 I've formatted the PR title appropriately ([how?](../docs/pr_standard.md#pull-request-title))
   - [ ] 🎯 I've targeted the `master` branch ([how?](../assets/target_master_branch.jpg))
-  - [ ] 👐 I've allowed maintainer edits on my branch ([how?](../assets/allow_maintainer_edit.jpg), why)
-- [ ] 🛡️ I've added/updated tests to cover my changes if prossible (how?)
-- [ ] 📝 I've added/updated the documentation for any new logic introduced (how?)
+  - [ ] 👐 I've allowed maintainer edits on my branch ([how?](../assets/allow_maintainer_edit.jpg), [why](../CONTRIBUTING.md#db-create-a-pull-request-to-torchmeter))
+- [ ] 🛡️ I've added/updated tests to cover my changes if prossible ([how?](../CONTRIBUTING.md#cb-lint-format-and-test-your-code))
+- [ ] 📝 I've added/updated the documentation for any new logic introduced ([how?](../CONTRIBUTING.md#cc-add-documentation-for-your-code))
 - [ ] ⏳ I understand @Ahzyuan has been busy lately and may need time to review. (we appreciate your patience!)
 
 ## Type of changes
