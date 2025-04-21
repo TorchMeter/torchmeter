@@ -1,0 +1,62 @@
+# TorchMeter, MIT license
+# Author: Ahzyuan
+# Repo: https://github.com/TorchMeter/torchmeter
+
+# This workflow is triggered manually with target PR number as input.
+# 
+# Trigger Conditions  
+#   - Manually triggered
+#   - Runs only on repositories: `TorchMeter/torchmeter`
+#
+# Core functions: 
+# 1. Checks out target PR context, updates coverage badge in README.md and push the change to PR history
+
+name: 🌟 Update README Badge 🔰
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'Target PR Number'
+        required: true
+        type: number
+      coverage_badge_link:
+        description: 'Link of the coverage badge'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  Coverage-Badge:
+    name: 🔄 Update Coverage Badge
+    runs-on: ubuntu-latest
+
+    if: github.repository == 'TorchMeter/torchmeter'
+
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+
+      - name: Checkout PR
+        run: gh pr checkout ${{ github.event.inputs.pr_number }}
+
+      - name: Update README
+        run: |
+          perl -0777 -i -pe '
+            BEGIN { $coverage = shift }
+            s|<!-- Coverage Badge:Begin -->.*?<!-- Coverage Badge:End -->|<!-- Coverage Badge:Begin -->![coverage-badge]($coverage)<!-- Coverage Badge:End -->|sg
+          ' "${{ github.event.inputs.coverage_badge_link }}" README.md
+
+      - name: Commit & Push Changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "Update coverage badge in README"
+          git push

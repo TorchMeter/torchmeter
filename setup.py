@@ -1,5 +1,8 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
+
+# TorchMeter, MIT license
+# Author: Ahzyuan
+# Repo: https://github.com/TorchMeter/torchmeter
 
 from setuptools import setup
 

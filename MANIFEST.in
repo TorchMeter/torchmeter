@@ -7,7 +7,11 @@ global-exclude *.o *.a *.so.* *.dylib.* *.dll.*
 include *.md
 include *.toml
 include *.txt
+include *.yaml
 
 graft examples
-prune *.egg-info 
-prune *.dist-info
+prune tests/
+prune assets/
+prune docs/
+prune *.egg-info/ 
+prune *.dist-info/
