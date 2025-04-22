@@ -1,17 +1,23 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
 
 from enum import Enum, IntFlag, unique
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Union
+    from typing import Type, Union
 
     import numpy as np
 
     FLOAT = Union[float, np.float_]
+    
+    UNITS = Union[Type["CountUnit"], 
+                  Type["BinaryUnit"], 
+                  Type["TimeUnit"], 
+                  Type["SpeedUnit"]]
 
 __all__ = ["CountUnit", "BinaryUnit", "TimeUnit", "SpeedUnit",
            "auto_unit"]
+
 
 @unique
 class CountUnit(Enum):
@@ -19,6 +25,7 @@ class CountUnit(Enum):
     G = 1e9
     M = 1e6
     K = 1e3
+
 
 @unique
 class BinaryUnit(IntFlag):
@@ -28,14 +35,16 @@ class BinaryUnit(IntFlag):
     KiB = 2**10
     B = 2**0
 
+
 @unique
 class TimeUnit(Enum):
-    h  = 60**2
+    h = 60**2
     min = 60**1
-    s  = 60**0
+    s = 60**0
     ms = 1e-3
     us = 1e-6
     ns = 1e-9
+
 
 @unique
 class SpeedUnit(Enum):
@@ -45,8 +54,13 @@ class SpeedUnit(Enum):
     KIPS = 1e3
     IPS = 1e0
 
-def auto_unit(val:Union[int, FLOAT], unit_system=CountUnit) -> str:
-    for unit in list(unit_system):
+
+def auto_unit(val: Union[int, FLOAT], 
+              unit_system: UNITS = CountUnit) -> str:
+    
+    unit: Enum
+    
+    for unit in list(unit_system): # type: ignore
         if val >= unit.value:
             if val % unit.value:
                 return f"{val / unit.value:.2f} {unit.name}"

@@ -1,8 +1,8 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
 
 import os
 from time import perf_counter
+from typing import TYPE_CHECKING
 from inspect import signature
 from functools import partial
 
@@ -10,24 +10,25 @@ from rich.text import Text
 from rich.status import Status
 
 if TYPE_CHECKING:
-    from typing import Any, List, Tuple
-    from typing import Union, Optional, Callable, Iterable
+    from types import TracebackType
+    from typing import Any, List, Type, Tuple, Union, Callable, Iterable, Optional
 
     from polars import PolarsDataType
 
 __all__ = ["dfs_task", "data_repr", "Timer"]
 
-def resolve_savepath(origin_path:str, 
-                     target_ext:str,
-                     default_filename:str='Data') -> Tuple[str, str]:
+
+def resolve_savepath(origin_path: str, 
+                     target_ext: str,
+                     default_filename: str = 'Data') -> Tuple[str, str]:
     origin_path = os.path.abspath(origin_path)
-    dir, file = os.path.split(origin_path)
+    directory, file = os.path.split(origin_path)
     
     # origin_path is a file path
     if '.' in file: 
-        os.makedirs(dir, exist_ok=True)
-        save_dir = dir
-        save_file = os.path.join(dir, os.path.splitext(file)[0]+f".{target_ext}")
+        os.makedirs(directory, exist_ok=True)
+        save_dir = directory
+        save_file = os.path.join(directory, os.path.splitext(file)[0] + f".{target_ext}")
     
     # origin_path is a dir path
     else: 
@@ -37,7 +38,8 @@ def resolve_savepath(origin_path:str,
     
     return save_dir, save_file
 
-def hasargs(func:Callable, *required_args:str) -> None:
+
+def hasargs(func: Callable, *required_args: str) -> None:
     if not required_args:
         return 
         
@@ -47,12 +49,13 @@ def hasargs(func:Callable, *required_args:str) -> None:
     if missing_args:
         raise RuntimeError(f"Function `{func.__name__}()` is missing following required args: {missing_args}.")
 
-def dfs_task(dfs_subject:Any,
-             adj_func:Callable[[Any], Iterable],
-             task_func:Callable[[Any, Any], Any],
-             visited_signal_func:Callable[[Any], Any]=lambda x:id(x),
+
+def dfs_task(dfs_subject: Any,
+             adj_func: Callable[[Any], Iterable],
+             task_func: Callable[[Any, Any], Any],
+             visited_signal_func: Callable[[Any], Any] = lambda x: id(x),
              *,
-             visited:Optional[List]=None) -> Any: 
+             visited: Optional[List] = None) -> Any: 
     hasargs(task_func, 'subject', 'pre_res')
 
     visited_signal = visited_signal_func(dfs_subject)
@@ -68,7 +71,7 @@ def dfs_task(dfs_subject:Any,
             task_res = task_func(subject=dfs_subject, pre_res=[])   # type: ignore
         
         for adj in adj_func(dfs_subject): 
-            dfs_task(dfs_subject=adj,  
+            dfs_task(dfs_subject=adj, 
                      adj_func=adj_func,
                      task_func=partial(task_func, pre_res=task_res), # type: ignore
                      visited_signal_func=visited_signal_func, 
@@ -79,23 +82,24 @@ def dfs_task(dfs_subject:Any,
     except UnboundLocalError: # revisit visited node
         return None
 
-def indent_str(s:Union[str, Iterable[str]], 
-               indent:int=4, 
-               guideline:bool=True,
-               process_first:bool=True) -> str:
+
+def indent_str(s: Union[str, Iterable[str]], 
+               indent: int = 4, 
+               guideline: bool = True,
+               process_first: bool = True) -> str:
     if isinstance(s, str):
-        split_lines:List[str] = s.split("\n")
+        split_lines: List[str] = s.split("\n")
         
     elif hasattr(s, '__iter__'):
         split_lines = []
         for i in s:
-            if not isinstance(i,str):
-                raise TypeError("The input should be a string or an iterable object of strings, " + \
+            if not isinstance(i, str):
+                raise TypeError("The input should be a string or an iterable object of strings, " + 
                                 f"but got `{type(i).__name__}` when travering input.")
             split_lines.extend(i.split("\n"))
             
     else:
-        raise TypeError("The input should be a string or a sequence of strings, " + \
+        raise TypeError("The input should be a string or a sequence of strings, " + 
                         f"but got `{type(s).__name__}`.")
     
     if not isinstance(indent, int):
@@ -103,12 +107,12 @@ def indent_str(s:Union[str, Iterable[str]],
     indent = max(indent, 0)
         
     res = []
-    guideline = not len(split_lines) == 1 and guideline
+    guideline = len(split_lines) != 1 and guideline
     
     if indent:
         for line in split_lines:
             indent_line = "│" if guideline else " " 
-            indent_line += " "*(indent-1) + line
+            indent_line += " " * (indent - 1) + line
             res.append(indent_line)
 
         if not process_first:
@@ -121,17 +125,19 @@ def indent_str(s:Union[str, Iterable[str]],
     
     return '\n'.join(res)
 
-def data_repr(val:Any) -> str:
+
+def data_repr(val: Any) -> str:
     get_type = lambda val: type(val).__name__
 
-    item_repr = lambda val_type, val: (f"[dim]Shape[/]([b green]{list(val.shape)}[/])" if hasattr(val, 'shape') else f"[b green]{val}[/]") + f" [dim]<{val_type}>[/]"
+    item_repr = lambda val_type, val: (f"[dim]Shape[/]([b green]{list(val.shape)}[/])" if hasattr(val, 'shape') else 
+                                       f"[b green]{val}[/]") + f" [dim]<{val_type}>[/]"
 
     val_type = get_type(val)
     if isinstance(val, (list, tuple, set, dict)) and len(val) > 0:
         if isinstance(val, dict):
-            inner_repr_parts = [(item_repr(get_type(k),k), data_repr(v)) for k, v in val.items()]
-            inner_repr:List[str] = [indent_str(f"{record[0]}: {record[1]}", 
-                                               indent=2+Text.from_markup(record[0]).cell_len, 
+            inner_repr_parts = [(item_repr(get_type(k), k), data_repr(v)) for k, v in val.items()]
+            inner_repr: List[str] = [indent_str(f"{record[0]}: {record[1]}", 
+                                               indent=2 + Text.from_markup(record[0]).cell_len, 
                                                guideline=False, process_first=False) 
                                     for record in inner_repr_parts]
         else:
@@ -157,14 +163,15 @@ def data_repr(val:Any) -> str:
     else:
         return item_repr(val_type, val)
 
-def match_polars_type(ipt:Any, *, 
-                      recheck:bool=False,
-                      pre_res:Optional[PolarsDataType]=None)-> PolarsDataType:
+
+def match_polars_type(ipt: Any, *, 
+                      recheck: bool = False,
+                      pre_res: Optional[PolarsDataType] = None) -> PolarsDataType:
         
     import numpy as np
     import polars as pl
-    from polars.datatypes._parse import parse_into_dtype
     from polars.series.series import _resolve_temporal_dtype
+    from polars.datatypes._parse import parse_into_dtype
 
     if not recheck and pre_res is not None:
         return pre_res
@@ -180,7 +187,7 @@ def match_polars_type(ipt:Any, *,
     
     except TypeError:
         if isinstance(ipt, dict):
-            fields = {k:match_polars_type(v) for k,v in ipt.items()}
+            fields = {k: match_polars_type(v) for k, v in ipt.items()}
             return pl.Struct(fields=fields)
         
         elif isinstance(ipt, (np.datetime64, np.timedelta64)):
@@ -208,18 +215,24 @@ def match_polars_type(ipt:Any, *,
             # class instance
             return pl.Object
 
+
 class Timer(Status):
-    def __init__(self, task_desc:str, 
+    def __init__(self, task_desc: str, 
                  *args, **kwargs) -> None:
         super(Timer, self).__init__(status=task_desc, *args, **kwargs) # type: ignore
         self.task_desc = task_desc
     
-    def __enter__(self):
+    def __enter__(self) -> Timer:
         super().__enter__()
         self.__start_time = perf_counter()
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
         elapsed_time = perf_counter() - self.__start_time
         super().__exit__(exc_type, exc_val, exc_tb)
         self.console.print(f"[b blue]Finish {self.task_desc} in [green]{elapsed_time:.4f}[/green] seconds[/]")

@@ -1,27 +1,28 @@
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
 import torch.nn as nn
 from rich import get_console
-from rich.columns import Columns
 from torch import Tensor
 from torch import device as tc_device
+from rich.columns import Columns
 
 from torchmeter.config import get_config
-from torchmeter.statistic import Statistics
 from torchmeter.display import render_perline
+from torchmeter.statistic import Statistics
 
 if TYPE_CHECKING:
     import sys
     from typing import Any, Dict, List, Tuple, Union, Optional
-    
-    from rich.tree import Tree
-    from rich.text import Text
-    from rich.table import Table
+
     from polars import DataFrame
+    from rich.text import Text
+    from rich.tree import Tree
+    from rich.table import Table
 
     from torchmeter.config import FlagNameSpace
-    from torchmeter.statistic import ParamsMeter, CalMeter, MemMeter, IttpMeter
+    from torchmeter.statistic import CalMeter, MemMeter, IttpMeter, ParamsMeter
     
     if sys.version_info >= (3, 8):
         from typing import TypedDict
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
 
 __all__ = ["Meter"]
 __cfg__ = get_config()
+
 
 class Meter:
     """A comprehensive instrumentation tool for PyTorch model performance analysis and visualization.
@@ -176,7 +178,7 @@ class Meter:
     
     def __init__(self, 
                  model: nn.Module,
-                 device:Optional[Union[str, tc_device]]=None) -> None:
+                 device: Optional[Union[str, tc_device]] = None) -> None:
         """Initialize a Meter instance for model performance measurement and visualization.
 
         Args:
@@ -232,7 +234,7 @@ class Meter:
         self.__device = tc_device(device) if isinstance(device, str) else device
         self.model = model.to(self.__device)
 
-        self._ipt:IPT_TYPE = {'args':tuple(), 'kwargs':dict()} # TODO: self.ipt_infer()
+        self._ipt: IPT_TYPE = {'args': tuple(), 'kwargs': dict()} # TODO: self.ipt_infer()
 
         self.optree = OperationTree(self.model)
 
@@ -245,8 +247,8 @@ class Meter:
         self.ittp_warmup = 50
         self.ittp_benchmark_time = 100
 
-        self.__has_nocall_nodes:Optional[bool] = None
-        self.__has_not_support_nodes:Optional[bool] = None
+        self.__has_nocall_nodes: Optional[bool] = None
+        self.__has_not_support_nodes: Optional[bool] = None
 
     def __call__(self, *args, **kwargs) -> Any:
         """Execute model inference while maintaining input and model device synchronization.
@@ -308,7 +310,7 @@ class Meter:
             ```
         """
 
-        new_ipt:IPT_TYPE = {"args": args, "kwargs": kwargs}
+        new_ipt: IPT_TYPE = {"args": args, "kwargs": kwargs}
         if self.__is_ipt_changed(new_ipt):
             self.__measure_param = False
             self.__measure_cal = False
@@ -401,8 +403,8 @@ class Meter:
                 8. `subnodes`
         """
         
-        cls_attrs:Dict[str, bool] = self.__get_clsattr_with_settable_flag()
-        notchange_cls_attrs = [k for k,v in cls_attrs.items() if not v]
+        cls_attrs: Dict[str, bool] = self.__get_clsattr_with_settable_flag()
+        notchange_cls_attrs = [k for k, v in cls_attrs.items() if not v]
         
         if name in notchange_cls_attrs:
             raise AttributeError(f"`{name}` could never be set.")
@@ -418,7 +420,7 @@ class Meter:
         except AttributeError:
             setattr(self.model, name, value)
     
-    def __delattr__(self, name:str) -> None:
+    def __delattr__(self, name: str) -> None:
         """Try to delete attributes from Meter instance first, fall back to underlying model if needed.
 
         This method ensures:
@@ -445,7 +447,7 @@ class Meter:
               for the underlying model without requiring code modifications
         """
         
-        cls_attrs:Dict[str, bool] = self.__get_clsattr_with_settable_flag()
+        cls_attrs: Dict[str, bool] = self.__get_clsattr_with_settable_flag()
         
         if name in cls_attrs:
             raise AttributeError(f"`{name}` could never be deleted.")
@@ -497,7 +499,7 @@ class Meter:
         return self.__device
     
     @device.setter
-    def device(self, new_device:Union[str, tc_device]) -> None:
+    def device(self, new_device: Union[str, tc_device]) -> None:
         """Moves the model and all tensors in captured input to the specified device.
 
         This setter updates the device for both the model and its input tensors (if available).
@@ -544,7 +546,7 @@ class Meter:
         return __cfg__.tree_fold_repeat
     
     @tree_fold_repeat.setter
-    def tree_fold_repeat(self, enable:bool) -> None:
+    def tree_fold_repeat(self, enable: bool) -> None:
         """Control rendering of repeated tree blocks as a single collapsed panel.
 
         Args:
@@ -577,7 +579,7 @@ class Meter:
         """
 
         if not isinstance(enable, bool):
-            raise TypeError("The `tree_fold_repeat` property can only be rewritten with a boolean, " + \
+            raise TypeError("The `tree_fold_repeat` property can only be rewritten with a boolean, " + 
                             f"but got `{type(enable).__name__}`.")
         __cfg__.tree_fold_repeat = enable
 
@@ -600,7 +602,7 @@ class Meter:
         return self.tree_renderer.tree_levels_args
     
     @tree_levels_args.setter
-    def tree_levels_args(self, custom_args:Dict[str, Dict[str, Any]]) -> None:
+    def tree_levels_args(self, custom_args: Dict[str, Dict[str, Any]]) -> None:
         """Sets rendering configuration for various levels of rendered tree structure via a dictionary.
 
         This property is bound to the `tree_levels_args` attribute of the internal `TreeRenderer` instance. 
@@ -676,7 +678,7 @@ class Meter:
         return self.tree_renderer.repeat_block_args
     
     @tree_repeat_block_args.setter
-    def tree_repeat_block_args(self, custom_args:Dict[str, Any]) -> None:
+    def tree_repeat_block_args(self, custom_args: Dict[str, Any]) -> None:
         """Sets rendering configuration for repeated blocks of rendered tree structure via a dictionary.
 
         This property is bound to the `repeat_block_args` attribute of the internal `TreeRenderer` instance. 
@@ -741,7 +743,7 @@ class Meter:
         return self.table_renderer.tb_args
 
     @table_display_args.setter
-    def table_display_args(self, custom_args:Dict[str, Any]) -> None:
+    def table_display_args(self, custom_args: Dict[str, Any]) -> None:
         """Sets comprehensive rendering configuration for rendered tables via a dictionary.
 
         This property is bound to the `tb_args` attribute of the internal `TabularRenderer` instance. 
@@ -807,7 +809,7 @@ class Meter:
         return self.table_renderer.col_args
 
     @table_column_args.setter
-    def table_column_args(self, custom_args:Dict[str, Any]) -> None:
+    def table_column_args(self, custom_args: Dict[str, Any]) -> None:
         """Sets column-level rendering configuration for rendered tables via a dictionary.
 
         This property is bound to the `col_args` attribute of the internal `TabularRenderer` instance. 
@@ -978,7 +980,9 @@ class Meter:
     
         if not self.__measure_cal:
             if self._is_ipt_empty():
-                raise RuntimeError("Input unknown! You should perform at least one feed-forward inference before measuring calculation!") 
+                raise RuntimeError(
+                    "Input unknown! " + 
+                    "You should perform at least one feed-forward inference before measuring calculation!") 
 
             hook_ls = [node.cal.measure() for node in self.optree.all_nodes]
 
@@ -987,7 +991,7 @@ class Meter:
             self.model(*self.ipt['args'], **self.ipt['kwargs']) 
 
             # remove hooks after measurement
-            list(map(lambda x:x.remove() if x is not None else None, hook_ls)) 
+            list(map(lambda x: x.remove() if x is not None else None, hook_ls)) 
 
             self.__measure_cal = True
         
@@ -1021,7 +1025,7 @@ class Meter:
         
         if not self.__measure_mem:
             if self._is_ipt_empty():
-                raise RuntimeError("Input unknown! You should perform at least one feed-forward inference " + \
+                raise RuntimeError("Input unknown! You should perform at least one feed-forward inference " + 
                                    "before measuring the memory cost!") 
 
             hook_ls = [node.mem.measure() for node in self.optree.all_nodes]
@@ -1031,7 +1035,7 @@ class Meter:
             self.model(*self.ipt['args'], **self.ipt['kwargs']) 
 
             # remove hooks after measurement
-            list(map(lambda x:x.remove() if x is not None else None, hook_ls))
+            list(map(lambda x: x.remove() if x is not None else None, hook_ls))
 
             self.__measure_mem = True
 
@@ -1077,8 +1081,9 @@ class Meter:
         from tqdm import tqdm
 
         if self._is_ipt_empty():
-            raise RuntimeError("Input unknown! " + \
-                               "You should perform at least one feed-forward inference before measuring the inference time or throughput!") 
+            raise RuntimeError("Input unknown! " + 
+                               "You should perform at least one feed-forward inference " +
+                               "before measuring the inference time or throughput!") 
         if not isinstance(self.ittp_warmup, int):
             raise TypeError(f"ittp_warmup must be an integer, but got `{type(self.ittp_warmup).__name__}`")
         if self.ittp_warmup < 0:
@@ -1089,7 +1094,7 @@ class Meter:
         for i in tqdm(range(self.ittp_warmup), desc='Warming Up'):
             self.model(*self.ipt['args'], **self.ipt['kwargs'])
 
-        pb = tqdm(total=self.ittp_benchmark_time*len(self.optree.all_nodes), 
+        pb = tqdm(total=self.ittp_benchmark_time * len(self.optree.all_nodes), 
                   desc='Benchmark Inference Time & Throughput', 
                   unit='module')
         hook_ls = [node.ittp.measure(device=self.device, 
@@ -1101,7 +1106,7 @@ class Meter:
         self.model(*self.ipt['args'], **self.ipt['kwargs']) 
 
         # remove hooks after measurement
-        list(map(lambda x:x.remove() if x is not None else None, hook_ls))
+        list(map(lambda x: x.remove() if x is not None else None, hook_ls))
 
         del pb
 
@@ -1127,9 +1132,10 @@ class Meter:
         """
     
         from inspect import signature
-        from torchmeter.utils import indent_str, data_repr
 
-        forward_args:List[str] = list(signature(self.model.forward).parameters.keys())
+        from torchmeter.utils import data_repr, indent_str
+
+        forward_args: List[str] = list(signature(self.model.forward).parameters.keys())
         if self._is_ipt_empty():
             ipt_repr = "[dim]Not Provided\n(give an inference first)[/]"
         else:
@@ -1138,7 +1144,7 @@ class Meter:
             ipt_repr_ls = [f"{args_name} = {data_repr(args_val)}" for args_name, args_val in ipt_dict.items()] 
             ipt_repr = ',\n'.join(ipt_repr_ls) 
 
-        forward_args = ["self"] + forward_args
+        forward_args = ["self", *forward_args]
         infos = '\n'.join([
             f"• [b]Model    :[/b] {self.optree.root.name}",
             f"• [b]Device   :[/b] {self.device}",
@@ -1163,7 +1169,7 @@ class Meter:
         """
         return [f"({node.node_id}) {node.name}" for node in self.optree.all_nodes]
 
-    def to(self, new_device:Union[str, tc_device]) -> None:
+    def to(self, new_device: Union[str, tc_device]) -> None:
         """Move the model to the specified device while keeping input and model device synchronization.
 
         Simulate the `to` method of pytorch model and use it to move model and all tensor data in 
@@ -1190,7 +1196,7 @@ class Meter:
         """
         self.device = new_device # type: ignore
 
-    def rebase(self, node_id:str) -> Meter:
+    def rebase(self, node_id: str) -> Meter:
         """Rebases the Meter instance to a specific node in the operation tree.
 
         This method allows the Meter instance to focus on a specific node in the operation tree,
@@ -1231,7 +1237,7 @@ class Meter:
         if node_id == "0":
             return self
         
-        id_generator = ( (node_idx, node.node_id) for node_idx, node in enumerate(self.optree.all_nodes) )
+        id_generator = ((node_idx, node.node_id) for node_idx, node in enumerate(self.optree.all_nodes))
 
         for idx, valid_id in id_generator:
             if node_id == valid_id:
@@ -1240,7 +1246,7 @@ class Meter:
         else:
             raise ValueError(f"Invalid node_id: {node_id}. Use `Meter(your_model).subnodes` to check valid ones.")
 
-    def stat_info(self, stat_or_statname:Union[str, Statistics], *, show_warning:bool=True) -> Text:
+    def stat_info(self, stat_or_statname: Union[str, Statistics], *, show_warning: bool = True) -> Text:  # noqa: C901
         """Generates a formatted summary of the specified statistics.
 
         This method provides a summary of the given statistics, including its name and the crucial data
@@ -1260,11 +1266,11 @@ class Meter:
             TypeError: If `stat_or_statname` is neither a string nor a `Statistics` object.
 
         Notes:
-            - The main content will be obtained from the `crucial_data` property of the statistics object, which is defined 
-              in the corresponding statistics class.
+            - The main content will be obtained from the `crucial_data` property of the statistics object, which is 
+              defined in the corresponding statistics class.
               
-            - For `ittp`, the number of repeated measurements, namely `Benchmark Times`, will be additionally displayed. 
-              This value can be accessed or modified through the `ittp_benchmark_time' attribute.
+            - For `ittp`, the number of repeated measurements, namely `Benchmark Times`, will be additionally 
+              displayed. This value can be accessed or modified through the `ittp_benchmark_time' attribute.
               
             - `show_warning` option is keyword-only argument, so you should use it through its keyword name.
             
@@ -1300,11 +1306,11 @@ class Meter:
         elif isinstance(stat_or_statname, Statistics):
             stat = stat_or_statname
         else:
-            raise TypeError(f"Invalid type for stat_or_statname: `{type(stat_or_statname).__name__}`. " + \
+            raise TypeError(f"Invalid type for stat_or_statname: `{type(stat_or_statname).__name__}`. " + 
                             "Please pass in the statistics name or the statistics object itself.")
 
         stat_name = stat.name
-        infos_ls:List[str] = [f"• [b]Statistics:[/b] {stat_name}"]
+        infos_ls: List[str] = [f"• [b]Statistics:[/b] {stat_name}"]
         
         if stat_name == 'ittp':
             infos_ls.append(f"• [b]Benchmark Times:[/b] {self.ittp_benchmark_time}")
@@ -1313,8 +1319,8 @@ class Meter:
             f"• [b]{k}:[/b] {v}" for k, v in stat.crucial_data.items()
         ])
         
-        ## warning field, only works when stat is "cal" or "mem"
-        if show_warning and stat_name not in ("param", "ittp"):
+        # warning field, only works when stat is "cal" or "mem"
+        if show_warning and stat_name in ("cal", "mem"):
             # cache for __has_nocall_nodes
             if self.__has_nocall_nodes is None:
                 from operator import attrgetter
@@ -1324,7 +1330,7 @@ class Meter:
                     list(map(crucial_data_getter, self.optree.all_nodes))
                     self.__has_nocall_nodes = False
                 except RuntimeError:
-                    self.__has_nocall_nodes = True  
+                    self.__has_nocall_nodes = True 
             
             # cache for __has_not_support_nodes
             if stat_name == "cal" and self.__has_not_support_nodes is None:
@@ -1333,12 +1339,20 @@ class Meter:
             
             warns_ls = []
             if self.__has_nocall_nodes:
-                warns_ls.append(" "*2 + "[dim yellow]:arrow_forward:  Some nodes are defined but not called explicitly.[/]")
+                warns_ls.append(" " * 2 + 
+                                "[dim yellow]:arrow_forward:  " +
+                                "Some nodes are defined but not called explicitly.[/]")
+                
             if stat_name == "cal" and self.__has_not_support_nodes:
-                warns_ls.append(" "*2 + "[dim yellow]:arrow_forward:  Some modules don't support calculation measurement yet.[/]")
+                warns_ls.append(" " * 2 + 
+                                "[dim yellow]:arrow_forward:  " + 
+                                "Some modules don't support calculation measurement yet.[/]")
+                
             if warns_ls:
                 warns_ls.insert(0, "[dim yellow]:warning:  Warning: the result may be inaccurate, cause:[/]")
-                warns_ls.append(" "*2 + f"[dim cyan]:ballot_box_with_check:  use `Meter(your_model).profile('{stat_name}')` to see more.[/]")
+                warns_ls.append(" " * 2 + 
+                                "[dim cyan]:ballot_box_with_check:  " +
+                                f"use `Meter(your_model).profile('{stat_name}')` to see more.[/]")
             
             infos_ls.extend(warns_ls)
                     
@@ -1347,7 +1361,7 @@ class Meter:
         console = get_console()
         return console.render_str(infos)
 
-    def overview(self, *order:str, show_warning:bool=True) -> Columns:
+    def overview(self, *order: str, show_warning: bool = True) -> Columns:
         """Generates an overview of all statistics in a formatted layout.
 
         This method creates a visual overview of model statistics, including basic model 
@@ -1387,8 +1401,9 @@ class Meter:
         """
         
         from functools import partial
-        from rich.panel import Panel
+
         from rich.box import HORIZONTALS
+        from rich.panel import Panel
 
         order = order or self.optree.root.statistics
         
@@ -1407,7 +1422,7 @@ class Meter:
         
         return container
 
-    def table_cols(self, stat_name:str) -> Tuple[str, ...]:
+    def table_cols(self, stat_name: str) -> Tuple[str, ...]:
         """Get all column names of the backend dataframe for the specified statistics.
         
         This method returns the column names of the backend dataframe associated with the given statistics. 
@@ -1470,23 +1485,23 @@ class Meter:
         if not isinstance(stat_name, str):
             raise TypeError(f"stat_name must be a string, but got `{type(stat_name).__name__}`.")
         
-        stats_data_dict:Dict[str, DataFrame] = self.table_renderer.stats_data
+        stats_data_dict: Dict[str, DataFrame] = self.table_renderer.stats_data
         
         if stat_name not in stats_data_dict:
             raise KeyError(f"Statistics `{stat_name}` not in {tuple(stats_data_dict.keys())}.")
         
-        stat_data:DataFrame = stats_data_dict[stat_name]
+        stat_data: DataFrame = stats_data_dict[stat_name]
         
         if stat_data.is_empty():
-            cols:Tuple[str, ...] = getattr(self.optree.root, stat_name).tb_fields
+            cols: Tuple[str, ...] = getattr(self.optree.root, stat_name).tb_fields
         else:
             cols = tuple(stat_data.columns)
         
         return cols
     
     def profile(self, 
-                stat_name:str, 
-                show:bool=True, no_tree:bool=False, 
+                stat_name: str, 
+                show: bool = True, no_tree: bool = False, 
                 **tb_kwargs) -> Tuple[Table, DataFrame]:
         """Render a tabular report of the specified statistics with rich visualization.
 
@@ -1687,7 +1702,7 @@ class Meter:
             raise TypeError(f"stat_name must be a string, but got `{type(stat_name).__name__}`.") 
 
         if TREE_TABLE_GAP < 0:
-            raise ValueError("The gap between the rendered tree and the rendered table should be non-negative, " + \
+            raise ValueError("The gap between the rendered tree and the rendered table should be non-negative, " + 
                              f"but got `{TREE_TABLE_GAP}`.")
         
         stat = getattr(self, stat_name)
@@ -1704,7 +1719,7 @@ class Meter:
         actual_tb_width = min(desirable_tb_width, console.width - tree_width - TREE_TABLE_GAP)
         
         if actual_tb_width <= 5: # 5 is the minimum width of table
-            raise RuntimeError("The width of the terminal is too small, try to maximize the window or " + \
+            raise RuntimeError("The width of the terminal is too small, try to maximize the window or " + 
                                "set a smaller `horizon_gap` value in config and try again.")
         
         # when some cells in the table is overflown, we need to show a line between rows
@@ -1713,7 +1728,7 @@ class Meter:
         
         # get main content(i.e. tree & statistics table)
         if no_tree:
-            main_content = tb
+            main_content: Union[Table, Layout] = tb
             tree_height = 0
         else:
             main_content = Layout()
@@ -1728,7 +1743,7 @@ class Meter:
 
         # get footer content
         footer = Columns(title=Rule('[gray54]s u m m a r y[/]', characters='-', style='gray54'), # type: ignore
-                         padding=(1,1),
+                         padding=(1, 1),
                          equal=True, 
                          expand=True)
         
@@ -1806,7 +1821,7 @@ class Meter:
                        for k, v in self._ipt['kwargs'].items()}
         }
 
-    def __device_detect(self, model) -> Union[str, tc_device]:
+    def __device_detect(self, model: nn.Module) -> Union[str, tc_device]:
         """Detects the device where the model are located via model's parameters.
 
         This method detects the model's device by checking its parameters' location. 
@@ -1831,15 +1846,16 @@ class Meter:
             return model_first_param.device
         
         except StopIteration:
-            warnings.warn(category=UserWarning, message=\
-                "We can't detect the device where your model is located because no parameter was found in your model. " + \
-                "We'll move your model to CPU and do all subsequent analysis based on this CPU version. " + \
-                "If this isn't what you want, set a specific device when initializing the `Meter` class, " + \
-                "e.g. `Meter(your_model, device='cuda:0')`.")
+            warnings.warn(
+                category=UserWarning, 
+                message="We can't detect the device where your model is located because no parameter was found " +
+                "in your model. We'll move your model to CPU and do all subsequent analysis based on this CPU " +
+                "version. If this isn't what you want, change the device with `to` method, " + 
+                "e.g. `metered_model.to('cuda')`.")
                           
             return "cpu"
         
-    def __is_ipt_changed(self, new_ipt:IPT_TYPE) -> bool:
+    def __is_ipt_changed(self, new_ipt: IPT_TYPE) -> bool:  # noqa: C901
         """Determines if the new input differs from the current captured input.
 
         Compares both positional arguments (args) and keyword arguments (kwargs) between current and new input:
@@ -1866,35 +1882,37 @@ class Meter:
         
         is_changed = False
         
-        if len(self._ipt["args"]) == len(new_ipt["args"]):
-            for origin, new in zip(self._ipt["args"], new_ipt["args"]): 
-                if type(origin) is not type(new):
-                    is_changed = True
-                elif isinstance(origin, Tensor):
-                    is_changed = origin.shape != new.shape or origin.dtype != new.dtype
-                else:
-                    is_changed = origin != new   
-                
-                if is_changed:
-                    return True
-        else:
+        # check anonymous arguments
+        if len(self._ipt["args"]) != len(new_ipt["args"]):
             return True
+        
+        for origin, new in zip(self._ipt["args"], new_ipt["args"]): 
+            if type(origin) is not type(new):
+                is_changed = True
+            elif isinstance(origin, Tensor):
+                is_changed = origin.shape != new.shape or origin.dtype != new.dtype
+            else:
+                is_changed = origin != new   
+            
+            if is_changed:
+                return True
 
-        if set(self._ipt["kwargs"].keys()) == set(new_ipt["kwargs"].keys()):
-            for k, origin in self._ipt["kwargs"].items():
-                new = new_ipt["kwargs"][k]
-                
-                if type(origin) is not type(new):
-                    is_changed = True
-                elif isinstance(origin, Tensor):
-                    is_changed = origin.shape != new.shape or origin.dtype != new.dtype
-                else:
-                    is_changed = origin != new   
-                
-                if is_changed:
-                    return True
-        else:
+        # check named arguments
+        if set(self._ipt["kwargs"].keys()) != set(new_ipt["kwargs"].keys()):
             return True
+        
+        for k, origin in self._ipt["kwargs"].items():
+            new = new_ipt["kwargs"][k]
+            
+            if type(origin) is not type(new):
+                is_changed = True
+            elif isinstance(origin, Tensor):
+                is_changed = origin.shape != new.shape or origin.dtype != new.dtype
+            else:
+                is_changed = origin != new   
+            
+            if is_changed:
+                return True
         
         return False
         
@@ -1914,6 +1932,6 @@ class Meter:
             whether the attribute has a setter method (True if settable, False otherwise).
         """
         
-        return {k:v.fset is not None for k,v in cls.__dict__.items() 
+        return {k: v.fset is not None for k, v in cls.__dict__.items() 
                 if isinstance(v, property)}
         
