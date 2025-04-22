@@ -1,27 +1,27 @@
 from typing import Union
 from decimal import Decimal
 
-import pytest
 import numpy as np
+import pytest
 
-from torchmeter._stat_numeric import (
-    CountUnit, BinaryUnit,
-    NumericData, UpperLinkData, MetricsData
-)
+from torchmeter._stat_numeric import CountUnit, BinaryUnit, MetricsData, NumericData, UpperLinkData
 
 pytestmark = pytest.mark.vital
 
+
 class SimpleNumeric(NumericData):
-    def __init__(self, value: Union[int, float]):
+    def __init__(self, value: Union[int, float]) -> None:
         self._value = value
 
     @property
     def raw_data(self) -> float:
         return float(self._value)
 
+
 @pytest.fixture
 def base_upperlink_data():
     return UpperLinkData(val=100)
+
 
 @pytest.fixture
 def linked_upperlink_data():
@@ -33,7 +33,7 @@ def linked_upperlink_data():
 class TestNumericData:
     
     @pytest.mark.parametrize(
-        argnames=["a", "b", "expected"], 
+        argnames=("a", "b", "expected"), 
         argvalues=[
             (5.0, 5.0, True),
             (5.0, 5, True),
@@ -42,7 +42,7 @@ class TestNumericData:
             (0.0, 0, True)
         ]
     )
-    def test_equality(self, a, b, expected):
+    def test_equality(self, a, b, expected) -> None:
         """Test the logic of __eq__ and __ne__"""
         
         num_a = SimpleNumeric(a)
@@ -50,7 +50,7 @@ class TestNumericData:
         assert (num_a != b) != expected
 
     @pytest.mark.parametrize(
-        argnames=["a", "b", "latter_larger"], 
+        argnames=("a", "b", "latter_larger"), 
         argvalues=[
             (5.0, 3.0, False),
             (2.5, 3.0, True),
@@ -58,7 +58,7 @@ class TestNumericData:
             (0.0, 0.0, False)
         ]
     )
-    def test_ordering(self, a, b, latter_larger):
+    def test_ordering(self, a, b, latter_larger) -> None:
         """Test the logic of __lt__, __le__, __gt__, __ge__"""
         
         num_a = SimpleNumeric(a)
@@ -68,7 +68,7 @@ class TestNumericData:
         assert (num_a >= b) == (not latter_larger or a == b)
 
     @pytest.mark.parametrize(
-        argnames=["op", "a", "b", "expected"], 
+        argnames=("op", "a", "b", "expected"), 
         argvalues=[
             ('+', 5.0, 3.0, 8.0),
             ('+', -2.5, 3.0, 0.5),
@@ -81,7 +81,7 @@ class TestNumericData:
             ('/', 9.0, SimpleNumeric(3), 3.0)
         ]
     )
-    def test_arithmetic_operations(self, op, a, b, expected):
+    def test_arithmetic_operations(self, op, a, b, expected) -> None:
         """Test the logic of arithmetic operations"""
         
         if isinstance(a, float):
@@ -98,7 +98,7 @@ class TestNumericData:
         
         assert expected == pytest.approx(result)
 
-    def test_reverse_operations(self):
+    def test_reverse_operations(self) -> None:
         """Test the logic of reverse arithmetic operations"""
         
         num = SimpleNumeric(3.0)
@@ -116,14 +116,14 @@ class TestNumericData:
         assert pytest.approx(6 / num) == 2.0
 
     @pytest.mark.parametrize(
-        argnames=["value", "expected"], 
+        argnames=("value", "expected"), 
         argvalues=[
             (5.5, 5.5),
             (-3.2, -3.2),
             (0.0, 0.0)
         ]
     )
-    def test_type_conversion(self, value, expected):
+    def test_type_conversion(self, value, expected) -> None:
         """Test type conversion"""
         
         num = SimpleNumeric(value)
@@ -131,7 +131,7 @@ class TestNumericData:
         assert int(num) == int(expected)
         assert round(num) == round(expected)
 
-    def test_hash_behavior(self):
+    def test_hash_behavior(self) -> None:
         """Test unhashable"""
         
         with pytest.raises(TypeError):
@@ -140,7 +140,7 @@ class TestNumericData:
         with pytest.raises(TypeError):
             _ = {SimpleNumeric(5.0), SimpleNumeric(5.0)}
     
-    def test_numpy_compatability(self):
+    def test_numpy_compatability(self) -> None:
         """Test the compatibility with numpy"""
         
         num = SimpleNumeric(3.5)
@@ -149,7 +149,7 @@ class TestNumericData:
         assert np.mean(arr) == pytest.approx((3.5 + 1.5 + 2.0) / 3)
         assert np.sum(np.sort(arr) == [1.5, 2.0, 3.5]) == len(arr)
     
-    def test_polars_compatability(self):
+    def test_polars_compatability(self) -> None:
         """Test the compatibility with polars"""
         
         from polars import Series
@@ -167,15 +167,16 @@ class TestNumericData:
         Decimal('10.5'),
         {'key': 'value'}
     ])
-    def test_invalid_operations(self, invalid_input):
+    def test_invalid_operations(self, invalid_input) -> None:
         """Test exception thrown in invalid operations"""
         
         num = SimpleNumeric(5.0)
         with pytest.raises(TypeError):
             _ = num + invalid_input    
 
+
 class TestUpperLinkData:
-    def test_valid_init(self):
+    def test_valid_init(self) -> None:
         """Test initialization with different arguments"""
         data = UpperLinkData()
         assert data.val == 0
@@ -196,7 +197,7 @@ class TestUpperLinkData:
         assert data._UpperLinkData__unit_sys is BinaryUnit
         assert data.none_str == "N/A"
 
-    def test_invalid_init(self):
+    def test_invalid_init(self) -> None:
         """Test invalid initialization"""
         with pytest.raises(TypeError):
             UpperLinkData(val={})
@@ -210,32 +211,32 @@ class TestUpperLinkData:
         with pytest.raises(TypeError):
             UpperLinkData(none_str=22)
 
-    def test_slots(self, base_upperlink_data):
+    def test_slots(self, base_upperlink_data) -> None:
         """Test __slots__ restriction"""
         assert not hasattr(base_upperlink_data, "__dict__")
         
         with pytest.raises(AttributeError):
             base_upperlink_data.invalid_attribute = 42
 
-    def test_raw_data(self, base_upperlink_data):
+    def test_raw_data(self, base_upperlink_data) -> None:
         """Test whether the raw_data property is correcttly calculated"""
         assert base_upperlink_data.raw_data == 100.0
         base_upperlink_data.val = 150
         assert base_upperlink_data.raw_data == 150.0
 
-    def test_mark_access(self, base_upperlink_data):
+    def test_mark_access(self, base_upperlink_data) -> None:
         """Test whether the mark_access method is correct"""
         assert base_upperlink_data._UpperLinkData__access_cnt == 1
         base_upperlink_data.mark_access()
         base_upperlink_data.mark_access()
         assert base_upperlink_data._UpperLinkData__access_cnt == 3
 
-    def test_inplace_addition(self, base_upperlink_data):
+    def test_inplace_addition(self, base_upperlink_data) -> None:
         """Test inplace addition"""
         base_upperlink_data += 50
         assert base_upperlink_data.val == 150
 
-    def test_linked_update(self, linked_upperlink_data):
+    def test_linked_update(self, linked_upperlink_data) -> None:
         """Test whether the inplace addition will trigger the update of parent data"""
         parent, child = linked_upperlink_data
         
@@ -264,7 +265,7 @@ class TestUpperLinkData:
         assert parent.val == 450
         assert grandparent.val == 700
 
-    def test_repr(self, linked_upperlink_data):
+    def test_repr(self, linked_upperlink_data) -> None:
         """Test correct representation"""
         
         # no unit_sys
@@ -279,16 +280,17 @@ class TestUpperLinkData:
         # re-access representation
         data = UpperLinkData(val=300)
         data.mark_access()
-        assert repr(data) == "150.0 [dim](×2)[/]"
+        assert repr(data) == "150.0 [dim](×2)[/]"  # noqa: RUF001
 
-    def test_edge_cases(self, base_upperlink_data):
+    def test_edge_cases(self, base_upperlink_data) -> None:
         """Test some edge cases"""
         # add invalid data
         with pytest.raises(TypeError):
             base_upperlink_data += "invalid_type"
         
+
 class TestMetricsData:
-    def test_valid_init(self):
+    def test_valid_init(self) -> None:
         """Test initialization with different arguments"""
         m = MetricsData()
         assert isinstance(m.vals, np.ndarray)
@@ -303,7 +305,7 @@ class TestMetricsData:
         assert m._MetricsData__unit_sys is BinaryUnit
         assert m.none_str == "N/A"
 
-    def test_invalid_init(self):
+    def test_invalid_init(self) -> None:
         """Test invalid initialization"""
         with pytest.raises(TypeError):
             MetricsData(reduce_func=100)
@@ -317,33 +319,33 @@ class TestMetricsData:
         with pytest.raises(TypeError):
             MetricsData(none_str=22)
 
-    def test_slots(self):
+    def test_slots(self) -> None:
         """Test __slots__ restriction"""   
         m = MetricsData()
         with pytest.raises(AttributeError):
             m.invalid_attr = 100
 
-    def test_empty_data_properties(self):
+    def test_empty_data_properties(self) -> None:
         empty_m = MetricsData()
         assert empty_m.metrics == 0.0
         assert empty_m.iqr == 0.0
         assert empty_m.val == (0.0, 0.0)
         assert empty_m.raw_data == 0.0
 
-    def test_single_value_properties(self):
+    def test_single_value_properties(self) -> None:
         m = MetricsData()
         m.append(5.0)
         assert m.metrics == 5.0
         assert not m.iqr
         assert m.val == (5.0, 0.0)
 
-    def test_multi_value_properties(self):
+    def test_multi_value_properties(self) -> None:
         m = MetricsData()
         m.vals = np.array([2.0, 4.0, 6.0, 10.0])
         assert m.metrics == 5.5
         assert m.iqr == 3.5  # Q3=7.0, Q1=3.5
 
-    def test_reduce_func(self):
+    def test_reduce_func(self) -> None:
         m = MetricsData()
         m.vals = np.array([1.0, 2.0, 6.0])
         assert m.metrics == 3.0  # mean
@@ -354,7 +356,7 @@ class TestMetricsData:
         m._MetricsData__reduce_func = np.sum
         assert m.metrics == 9.0  # sum
 
-    def test_data_management(self):
+    def test_data_management(self) -> None:
         m = MetricsData()
 
         with pytest.raises(TypeError):
@@ -368,27 +370,27 @@ class TestMetricsData:
         m.clear()
         assert not len(m.vals)
 
-    def test_repr(self):
+    def test_repr(self) -> None:
         """Test correct representation"""
         # no unit
         m = MetricsData(unit_sys=None)
         m.append(1.5)
         m.append(2.5)
-        assert repr(m) == "2.00 ± 0.50"  # mean 2.0，IQR=0.5（Q3=2.25, Q1=1.75）
+        assert repr(m) == "2.00 ± 0.50"  # mean 2.0, IQR=0.5(Q3=2.25, Q1=1.75)
 
         # default unit: CountUnit
         m = MetricsData()
         m.append(1000)
         m.append(2000)
-        assert repr(m) == "1.50 K ± 500.00"  # mean 1500，IQR=500
+        assert repr(m) == "1.50 K ± 500.00"  # mean 1500, IQR=500
         
         # custom unit
         m = MetricsData(unit_sys=BinaryUnit)
         m.append(1000)
         m.append(2000)
-        assert repr(m) == "1.46 KiB ± 500 B"  # (mean 1500)/1024，IQR=500
+        assert repr(m) == "1.46 KiB ± 500 B"  # (mean 1500)/1024, IQR=500
         
-    def test_edge_cases(self):
+    def test_edge_cases(self) -> None:
         """Test some edge cases"""    
         # all zero
         m = MetricsData()

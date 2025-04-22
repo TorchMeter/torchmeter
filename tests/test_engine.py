@@ -4,15 +4,12 @@ from unittest.mock import patch
 import pytest
 import torch.nn as nn
 
-from torchmeter.engine import (
-    OperationNode, OperationTree,
-    ParamsMeter, CalMeter, 
-    MemMeter, IttpMeter
-)
+from torchmeter.engine import CalMeter, MemMeter, IttpMeter, ParamsMeter, OperationNode, OperationTree
 
 @pytest.fixture
 def linear_model():
     return nn.Linear(10, 5)
+
 
 @pytest.fixture
 def sequential_model():
@@ -24,6 +21,7 @@ def sequential_model():
         ("second_relu", nn.ReLU())
     ]))
 
+
 @pytest.fixture
 def nested_model(linear_model, sequential_model):
     return nn.Sequential(OrderedDict([
@@ -31,20 +29,22 @@ def nested_model(linear_model, sequential_model):
         ("l", linear_model)
     ]))
 
+
 @pytest.fixture
 def check_scanning_process(capsys):
     yield
     captured = capsys.readouterr()
     assert "Finish Scanning model in" in captured.out
 
+
 @pytest.mark.vital
 class TestOPN:
-    def test_invalid_init(self):
+    def test_invalid_init(self) -> None:
         """Test whether non-module object cannot be initialized"""
         with pytest.raises(TypeError):
             OperationNode(module="not_a_module")
             
-    def test_valid_init(self, linear_model):
+    def test_valid_init(self, linear_model) -> None:
         """Test basic attributes"""
         
         assert OperationNode.statistics == ('param', 'cal', 'mem', 'ittp')
@@ -68,7 +68,7 @@ class TestOPN:
         assert node._render_when_repeat is False
         assert node._is_folded is False
 
-    def test_module_repr(self, linear_model, sequential_model):
+    def test_module_repr(self, linear_model, sequential_model) -> None:
         """Test the module_repr attribute"""
 
         node = OperationNode(module=linear_model)
@@ -77,12 +77,12 @@ class TestOPN:
         node = OperationNode(module=sequential_model)
         assert node.module_repr == str(sequential_model.__class__.__name__)
 
-    def test_default_name(self, linear_model):
+    def test_default_name(self, linear_model) -> None:
         """Test the default name is the type name when no name is provided"""
         node = OperationNode(module=linear_model)
         assert node.name == "Linear"
 
-    def test_hierarchical_attrs(self, linear_model):
+    def test_hierarchical_attrs(self, linear_model) -> None:
         """Test parent-child relationship"""
         parent = OperationNode(module=nn.Module(), node_id="1")
         child = OperationNode(
@@ -97,7 +97,7 @@ class TestOPN:
         assert "1.1" in parent.childs
         assert parent.childs["1.1"] is child
 
-    def test_is_leaf(self, linear_model, sequential_model):
+    def test_is_leaf(self, linear_model, sequential_model) -> None:
         """Test the is_leaf property is correcttly set"""
         leaf_node = OperationNode(module=linear_model)
         non_leaf_node = OperationNode(module=sequential_model)
@@ -114,7 +114,7 @@ class TestOPN:
             ("ittp", IttpMeter)
         ]
     )
-    def test_statistic_attrs(self, linear_model, stat_name, stat_cls):
+    def test_statistic_attrs(self, linear_model, stat_name, stat_cls) -> None:
         """Test whether all the statistic attributes are created correctly and are all read-only"""
         node = OperationNode(module=linear_model)
         
@@ -128,18 +128,19 @@ class TestOPN:
         with pytest.raises(AttributeError):
             delattr(node, stat_name)
 
-    def test_repr(self, linear_model, sequential_model):
+    def test_repr(self, linear_model, sequential_model) -> None:
         """Test repr"""
         leaf_node = OperationNode(module=linear_model)
         non_leaf_node = OperationNode(module=sequential_model)
         
-        assert repr(leaf_node) == f"0 Linear: {str(linear_model)}"
+        assert repr(leaf_node) == f"0 Linear: {linear_model!s}"
         assert repr(non_leaf_node) == "0 Sequential: Sequential"
+
 
 @pytest.mark.vital
 @pytest.mark.usefixtures("check_scanning_process")
 class TestOPT:        
-    def test_single_layer_model(self, linear_model):
+    def test_single_layer_model(self, linear_model) -> None:
         """Test building operation tree for a single-layer model"""
         tree = OperationTree(linear_model)
         
@@ -167,7 +168,7 @@ class TestOPT:
         assert root._render_when_repeat is True
         assert root._is_folded is False
 
-    def test_sequential_model(self, sequential_model):
+    def test_sequential_model(self, sequential_model) -> None:
         """Test building operation tree for a sequential model"""
         tree = OperationTree(sequential_model)
         
@@ -225,7 +226,7 @@ class TestOPT:
         assert root.childs['3']._is_folded is False # False because skip the visit
         assert root.childs['4']._is_folded is False # False because skip the visit
         
-    def test_nested_model(self, nested_model):
+    def test_nested_model(self, nested_model) -> None:
         """Test building operation tree for a sequential model"""
         tree = OperationTree(nested_model)
         
@@ -297,7 +298,7 @@ class TestOPT:
         assert child_1.childs['1.3']._is_folded is False # False because skip the visit
         assert child_1.childs['1.4']._is_folded is False # False because skip the visit
 
-    def test_repeat_detection(self):
+    def test_repeat_detection(self) -> None:
         """Test repeat detection"""
         model = nn.Sequential(
             *[nn.Conv2d(3, 6, 3) for _ in range(4)],
@@ -331,7 +332,7 @@ class TestOPT:
         assert root.childs['4']._is_folded is False  # False because skip the visit
         assert root.childs['5']._is_folded is False 
 
-    def test_display_tree_construction(self, nested_model):
+    def test_display_tree_construction(self, nested_model) -> None:
         """Test building display tree"""
         tree = OperationTree(nested_model)
         
@@ -350,7 +351,7 @@ class TestOPT:
         assert not len(child_2.display_root.children)
         assert child_2.display_root in root.display_root.children
 
-    def test_large_scale_model_construction(self):
+    def test_large_scale_model_construction(self) -> None:
         model = nn.Sequential(
             *[nn.Sequential(nn.Linear(100, 100), nn.ReLU()) for _ in range(100)]
         )
@@ -359,10 +360,10 @@ class TestOPT:
         assert len(tree.all_nodes) == 301
         assert tree.root.childs['100'].childs['100.2'].type == "ReLU"
 
-    def test_custom_module(self):
+    def test_custom_module(self) -> None:
         """Test model made up of custom module and standard module"""
         class CustomLayer(nn.Module):
-            def __init__(self):
+            def __init__(self) -> None:
                 super().__init__()
                 self.layer = nn.Linear(10, 10)
         
@@ -384,7 +385,7 @@ class TestOPT:
         assert root.childs['2'].childs['2.2'].name == "1"
         assert root.childs['2'].childs['2.2'].type == "Tanh"
 
-    def test_repr(self, nested_model):
+    def test_repr(self, nested_model) -> None:
         """Test __repr__ logic"""
 
         tree = OperationTree(nested_model)
@@ -394,8 +395,9 @@ class TestOPT:
             str(tree)
             mock_opn_repr.assert_called_once()
 
+
 @pytest.mark.vital
-def test_invalid_init():
+def test_invalid_init() -> None:
     """Test whether non-module object cannot be initialized"""
     with pytest.raises(TypeError):
         OperationTree(model="not_a_module")

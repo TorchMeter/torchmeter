@@ -3,15 +3,17 @@ import pytest
 from torchmeter.utils import dfs_task
 
 class TreeNode:
-    def __init__(self, val, left=None, right=None):
+    def __init__(self, val, left=None, right=None) -> None:
         self.val = val
         self.left = left
         self.right = right
 
+
 class GraphNode:
-    def __init__(self, val):
+    def __init__(self, val) -> None:
         self.val = val
         self.children = []
+
 
 @pytest.fixture
 def binary_tree_root():
@@ -27,6 +29,7 @@ def binary_tree_root():
     n2 = TreeNode(2, n4, n5)
     n3 = TreeNode(3)
     return TreeNode(1, n2, n3)
+
 
 @pytest.fixture
 def cyclic_graph_stnode():
@@ -46,10 +49,11 @@ def cyclic_graph_stnode():
     node_d.children = [node_a]
     return node_a
 
+
 @pytest.mark.vital
 class TestDfsTask:
     # basic funtion test
-    def test_binary_tree_traversal(self, binary_tree_root):
+    def test_binary_tree_traversal(self, binary_tree_root) -> None:
         """Test standard binary tree preorder traversal using DFS"""
 
         traversal_order = []
@@ -59,7 +63,7 @@ class TestDfsTask:
             if subject is None:
                 return pre_res
             traversal_order.append(subject.val)
-            return pre_res + [subject.val]
+            return [*pre_res, subject.val]
         
         dfs_task(
             dfs_subject=binary_tree_root,
@@ -71,13 +75,13 @@ class TestDfsTask:
         
         assert traversal_order == [1, 2, 4, 5, 3]
 
-    def test_cyclic_graph_traversal(self, cyclic_graph_stnode):
+    def test_cyclic_graph_traversal(self, cyclic_graph_stnode) -> None:
         """Test the traversal of a cyclic graph"""
         visited_nodes = []
         
         def track_nodes(subject, pre_res=[]):
             visited_nodes.append(subject.val)
-            return pre_res + [subject.val]
+            return [*pre_res, subject.val]
         
         dfs_task(
             dfs_subject=cyclic_graph_stnode,
@@ -90,10 +94,10 @@ class TestDfsTask:
         assert visited_nodes == ['A', 'B', 'C', 'D']
 
     # boundary condition test
-    def test_single_node_traversal(self, binary_tree_root):
+    def test_single_node_traversal(self, binary_tree_root) -> None:
         """Test single node traversal"""
         def identity_task(subject, pre_res=[]):
-            return pre_res + [subject.val]
+            return [*pre_res, subject.val]
         
         result = dfs_task(
             dfs_subject=binary_tree_root,
@@ -104,7 +108,7 @@ class TestDfsTask:
         
         assert result == [1]
 
-    def test_custom_visit_signal(self):
+    def test_custom_visit_signal(self) -> None:
         """Test custom visit signal function"""
         visited_signals = []
         
@@ -115,7 +119,7 @@ class TestDfsTask:
         
         dfs_task(
             dfs_subject=1,
-            adj_func=lambda x: [x+1] if x < 3 else [],
+            adj_func=lambda x: [x + 1] if x < 3 else [],
             task_func=lambda subject, pre_res=[]: None,
             visited_signal_func=custom_signal,
             visited=[]
@@ -124,7 +128,7 @@ class TestDfsTask:
         assert visited_signals == ["CUSTOM_1", "CUSTOM_2", "CUSTOM_3"]
 
     # Error handling test
-    def test_invalid_task_function(self):
+    def test_invalid_task_function(self) -> None:
         """Test invalid task function signature"""
         def invalid_task(missing_arg):
             return missing_arg
@@ -140,10 +144,10 @@ class TestDfsTask:
         assert "missing following required args: ['subject', 'pre_res']" in str(excinfo.value).lower()
 
     # Special scenario testing
-    def test_mutable_default_visited(self):
+    def test_mutable_default_visited(self) -> None:
         """Test whether the default visited argument is isolated"""
         def safe_task(subject, pre_res=[]):
-            return pre_res + [subject]
+            return [*pre_res, subject]
         
         result1 = dfs_task(
             dfs_subject="test",

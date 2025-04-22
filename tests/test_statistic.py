@@ -3,34 +3,38 @@ import warnings
 from collections import namedtuple
 from unittest.mock import MagicMock, PropertyMock, patch
 
-import pytest
 import numpy as np
+import pytest
 import torch.nn as nn
-from pympler.asizeof import asizeof
+from torch import int8 as torch_int8
 from torch import ones as torch_ones
+from torch import int16 as torch_int16
+from torch import int64 as torch_int64
 from torch import randn as torch_randn
 from torch import device as torch_device
+from torch import float16 as torch_float16
+from torch import float64 as torch_float64
 from torch.cuda import is_available as is_cuda
-from torch import (
-    float16 as torch_float16, 
-    float64 as torch_float64, 
-    int16 as torch_int16, 
-    int64 as torch_int64, 
-    int8 as torch_int8
-)
+from pympler.asizeof import asizeof
 
-from torchmeter.engine import (
-    OperationNode,
-    OperationTree
-)
+from torchmeter.engine import OperationNode, OperationTree
 from torchmeter.statistic import (
-    UpperLinkData, MetricsData,
-    BinaryUnit, CountUnit, TimeUnit, SpeedUnit,
-    Statistics, ParamsMeter, CalMeter, MemMeter, IttpMeter
+    CalMeter,
+    MemMeter,
+    TimeUnit,
+    CountUnit,
+    IttpMeter,
+    SpeedUnit,
+    BinaryUnit,
+    Statistics,
+    MetricsData,
+    ParamsMeter,
+    UpperLinkData,
 )
 
 pytestmark = pytest.mark.vital
 STAT_TESTED_NOW = ""
+
 
 @pytest.fixture
 def empty_model_root():
@@ -38,12 +42,13 @@ def empty_model_root():
     optree = OperationTree(model)
     return model, optree.root
 
+
 @pytest.fixture
 def simple_model_root():
     from torch import mean as torch_mean
     
     class SimpleModel(nn.Module):
-        def __init__(self):
+        def __init__(self) -> None:
             super(SimpleModel, self).__init__()
             self.conv = nn.Conv2d(3, 16, 3)
             self.linear = nn.Linear(16, 10)
@@ -61,6 +66,7 @@ def simple_model_root():
     optree = OperationTree(model)
     return model, optree.root
 
+
 @pytest.fixture
 def measured_simple_model(simple_model_root):
     simple_model, simple_oproot = simple_model_root
@@ -77,30 +83,34 @@ def measured_simple_model(simple_model_root):
             getattr(child, STAT_TESTED_NOW).measure()
         stat.measure()
 
-    simple_model(torch_randn(1,3,64,64))
+    simple_model(torch_randn(1, 3, 64, 64))
 
     return simple_model, simple_oproot, stat
 
-@pytest.fixture()
+
+@pytest.fixture
 def toggle_to_cal():
     global STAT_TESTED_NOW
     STAT_TESTED_NOW = "cal"
     yield
     STAT_TESTED_NOW = ""
 
-@pytest.fixture()
+
+@pytest.fixture
 def toggle_to_mem():
     global STAT_TESTED_NOW
     STAT_TESTED_NOW = "mem"
     yield
     STAT_TESTED_NOW = ""
 
-@pytest.fixture()
+
+@pytest.fixture
 def toggle_to_ittp():
     global STAT_TESTED_NOW
     STAT_TESTED_NOW = "ittp"
     yield
     STAT_TESTED_NOW = ""
+
 
 class ConcreteStat(Statistics):
     detail_val_container = namedtuple('Detail',  # type: ignore
@@ -128,13 +138,13 @@ class ConcreteStat(Statistics):
     def crucial_data(self):
         return {"key": "value"}
 
-    def measure(self): ...
+    def measure(self) -> None: ...
 
 
 class TestStatistics:
-    def test_mandatory_attributes_check(self):
+    def test_mandatory_attributes_check(self) -> None:
         """Test whether the necessary class properties are implemented."""
-        class MissingAll(Statistics):...
+        class MissingAll(Statistics): ...
         with pytest.raises(AttributeError) as e1:
             MissingAll()
         assert "detail_val_container" in str(e1.value)
@@ -151,7 +161,7 @@ class TestStatistics:
             MissingDetailContainer()
         assert "detail_val_container" in str(e3.value)
         
-    def test_required_method_property(self):
+    def test_required_method_property(self) -> None:
         """Test whether all abstract methods and property are implemented"""
         class InvalidSubclass(Statistics):
             detail_val_container = namedtuple('Detail', ['a'])
@@ -163,7 +173,7 @@ class TestStatistics:
         required = ["name", "val", "detail_val", "crucial_data", "measure"]
         assert all(method in str(e.value) for method in required)
 
-    def test_init_linkdata(self):
+    def test_init_linkdata(self) -> None:
         """Test init_linkdata method"""
         # init a upperlinkdata without parent 
         linked_data = ConcreteStat().init_linkdata("StatVal", init_val=100)
@@ -181,7 +191,7 @@ class TestStatistics:
         linked_data += 50
         assert mock_opnode.parent.con_stat.StatVal.val == 100 # 50 + 50
 
-    def test_repr(self):
+    def test_repr(self) -> None:
         """Test correct representation"""
         # without upperlinkdata 
         stat = ConcreteStat()
@@ -220,20 +230,21 @@ class TestStatistics:
 
             assert mock_val.call_count == 2 # max_len + for loop
 
-    def test_tbov_fields(self):
+    def test_tbov_fields(self) -> None:
         """Test tb_fields and ov_fields are set correctly"""
         stat = ConcreteStat()
         assert stat.tb_fields == ("field1", "field2")
-        assert stat.ov_fields == ("summary","other_field")
+        assert stat.ov_fields == ("summary", "other_field")
 
-    def test_crucial_data(self):
+    def test_crucial_data(self) -> None:
         """Test crucial_data is set correctly"""
         stat = ConcreteStat()
         data = stat.crucial_data
-        assert data == {"key":"value"}
+        assert data == {"key": "value"}
+
 
 class TestParamsMeter:
-    def test_cls_variable(self):
+    def test_cls_variable(self) -> None:
         """Test detail_val_container and overview_val_container settings"""
         assert hasattr(ParamsMeter, "detail_val_container")
         dc = ParamsMeter.detail_val_container
@@ -243,7 +254,7 @@ class TestParamsMeter:
         oc = ParamsMeter.overview_val_container
         assert all(v is None for v in oc._field_defaults.values())
     
-    def test_valid_init(self, simple_model_root):
+    def test_valid_init(self, simple_model_root) -> None:
         """Test valid initialization"""
         model, oproot = simple_model_root
         
@@ -266,14 +277,14 @@ class TestParamsMeter:
         assert param_meter.TotalNum._UpperLinkData__parent_data is None
         assert param_meter.TotalNum._UpperLinkData__unit_sys is CountUnit
 
-    def test_invalid_init(self):
+    def test_invalid_init(self) -> None:
         """Test invalid initialization"""
         with pytest.raises(TypeError):
             ParamsMeter(opnode="0")
 
-    def test_val_property(self, simple_model_root):
+    def test_val_property(self, simple_model_root) -> None:
         """Test whether the val property is properly set"""
-        simple_model, simple_oproot = simple_model_root
+        _simple_model, simple_oproot = simple_model_root
         param_meter = simple_oproot.param
         for child in simple_oproot.childs.values():
             child.param.measure()
@@ -287,25 +298,25 @@ class TestParamsMeter:
         assert overview.Total_Params is param_meter.TotalNum
         assert overview.Learnable_Params is param_meter.RegNum
 
-    def test_crucial_data_format(self, simple_model_root):
+    def test_crucial_data_format(self, simple_model_root) -> None:
         """Test whether the crucial_data is return in correct format"""
-        simple_model, simple_oproot = simple_model_root
+        _simple_model, simple_oproot = simple_model_root
         param_meter = simple_oproot.param
         crucial_data = param_meter.crucial_data
         assert isinstance(crucial_data, dict)
                 
         # verify align
         keys = list(crucial_data.keys())
-        assert all(isinstance(k, str) for k in crucial_data.keys())
+        assert all(isinstance(k, str) for k in crucial_data)
         assert all(len(k) == len(keys[0]) for k in keys[1:])
         
         # verify value
-        assert all(isinstance(v,str) for v in crucial_data.values())
+        assert all(isinstance(v, str) for v in crucial_data.values())
 
-    def test_param_measure(self, empty_model_root, simple_model_root):
+    def test_param_measure(self, empty_model_root, simple_model_root) -> None:
         """Test whether the measure method works well"""
         # model without parameters
-        empty_model, empty_oproot = empty_model_root
+        _empty_model, empty_oproot = empty_model_root
         empty_pm = empty_oproot.param
         empty_pm.measure()
         
@@ -350,7 +361,7 @@ class TestParamsMeter:
                 else:
                     assert record.Requires_Grad is False
 
-    def test_measure_cache(self):
+    def test_measure_cache(self) -> None:
         """Test whether the measure method will be revisited after the first call"""        
         model = nn.Linear(10, 5)
         opnode = OperationNode(module=model)
@@ -365,11 +376,11 @@ class TestParamsMeter:
         
         assert pm.TotalNum.val == initial_total
 
-    def test_none_parameter_handling(self):
+    def test_none_parameter_handling(self) -> None:
         """Test whether the None parameter is skipped correctly"""
         
         class BadModule(nn.Module):
-            def __init__(self):
+            def __init__(self) -> None:
                 super().__init__()
                 self.weight = nn.Parameter(torch_randn(10, 10))
                 self.bias = None
@@ -382,9 +393,10 @@ class TestParamsMeter:
         assert len(pm.detail_val) == 1
         assert pm.detail_val[0].Param_Name == "weight"
 
+
 @pytest.mark.usefixtures("toggle_to_cal")
 class TestCalMeter:
-    def test_cls_variable(self):
+    def test_cls_variable(self) -> None:
         """Test detail_val_container and overview_val_container settings"""
         assert hasattr(CalMeter, "detail_val_container")
         dc = CalMeter.detail_val_container
@@ -394,7 +406,7 @@ class TestCalMeter:
         oc = CalMeter.overview_val_container
         assert all(v is None for v in oc._field_defaults.values())
     
-    def test_valid_init(self, simple_model_root):
+    def test_valid_init(self, simple_model_root) -> None:
         """Test valid initialization"""
         model, oproot = simple_model_root
         
@@ -424,12 +436,12 @@ class TestCalMeter:
         assert cal_meter.Flops._UpperLinkData__unit_sys is CountUnit
         assert cal_meter.Flops.none_str == "Not Supported"
 
-    def test_invalid_init(self):
+    def test_invalid_init(self) -> None:
         """Test invalid initialization"""
         with pytest.raises(TypeError):
             CalMeter(opnode="0")
 
-    def test_val_property(self, measured_simple_model):
+    def test_val_property(self, measured_simple_model) -> None:
         """Test whether the val property is properly set"""
         *_, cal_meter = measured_simple_model
         
@@ -441,7 +453,7 @@ class TestCalMeter:
         assert overview.MACs is cal_meter.Macs
         assert overview.FLOPs is cal_meter.Flops
 
-    def test_crucial_data_format(self, measured_simple_model):
+    def test_crucial_data_format(self, measured_simple_model) -> None:
         """Test whether the crucial_data is return in correct format"""
         *_, cal_meter = measured_simple_model
         crucial_data = cal_meter.crucial_data
@@ -449,18 +461,18 @@ class TestCalMeter:
                 
         # verify align
         keys = list(crucial_data.keys())
-        assert all(isinstance(k,str) for k in crucial_data.keys())
+        assert all(isinstance(k, str) for k in crucial_data)
         assert all(len(k) == len(keys[0]) for k in keys[1:])
         
         # verify value
-        assert all(isinstance(v,str) for v in crucial_data.values())
+        assert all(isinstance(v, str) for v in crucial_data.values())
 
     @pytest.mark.parametrize(
         argnames=("module", "target_hook"), 
         argvalues=[
             (nn.Sequential(nn.Identity()), "__container_hook"),
             (nn.ModuleList([nn.Identity()]), "__container_hook"), 
-            (nn.ModuleDict({"example":nn.Identity()}), "__container_hook"), 
+            (nn.ModuleDict({"example": nn.Identity()}), "__container_hook"), 
 
             (nn.Conv1d(10, 5, 3), "__conv_hook"), 
             (nn.Conv2d(10, 5, 3), "__conv_hook"), 
@@ -493,7 +505,7 @@ class TestCalMeter:
             (nn.Identity(), "__not_support_hook"), 
         ]
     )
-    def test_cal_measure(self, module, target_hook):
+    def test_cal_measure(self, module, target_hook) -> None:
         """Test whether the measure method works well"""
         opnode = OperationNode(module=module)
         cal_meter = opnode.cal
@@ -503,9 +515,9 @@ class TestCalMeter:
         assert len(module._forward_hooks) == 1
         assert next(iter(module._forward_hooks.values())).__name__ == target_hook
         
-    def test_measure_cache(self, simple_model_root):
+    def test_measure_cache(self, simple_model_root) -> None:
         """Test whether the measure method will be revisited after the first call"""
-        model, oproot = simple_model_root
+        _model, oproot = simple_model_root
         cal_meter = oproot.cal
         
         res = cal_meter.measure()
@@ -514,9 +526,9 @@ class TestCalMeter:
         res = cal_meter.measure()
         assert res is None
 
-    def test_valid_access(self, simple_model_root):
+    def test_valid_access(self, simple_model_root) -> None:
         """Test whether the invalid access will be blocked"""
-        model, oproot = simple_model_root
+        _model, oproot = simple_model_root
         cal_meter = oproot.cal
         
         # access property before measure
@@ -546,32 +558,32 @@ class TestCalMeter:
     @pytest.mark.parametrize(
         argnames=("iopt", "expected"),
         argvalues=[
-            (torch_randn(3,4,5), "[3, 4, 5]"),
+            (torch_randn(3, 4, 5), "[3, 4, 5]"),
             
             (None, "None"),
             (123, "int"),
             (1.5, "float"),
-            (np.array([1,2,3]), "ndarray"),
+            (np.array([1, 2, 3]), "ndarray"),
             
-            ((torch_randn(1,2,3),), "[1, 2, 3]"),
-            ([torch_randn(4,5,6)], "[4, 5, 6]"),
-            ({torch_randn(7,8,9)}, "[7, 8, 9]"),
-            ({"k":torch_randn(2,4,6)}, "{str: [2, 4, 6]}"),
+            ((torch_randn(1, 2, 3),), "[1, 2, 3]"),
+            ([torch_randn(4, 5, 6)], "[4, 5, 6]"),
+            ({torch_randn(7, 8, 9)}, "[7, 8, 9]"),
+            ({"k": torch_randn(2, 4, 6)}, "{str: [2, 4, 6]}"),
             
-            ((torch_randn(2,3),)*3, ("([2, 3],\n" 
+            ((torch_randn(2, 3),) * 3, ("([2, 3],\n" 
                                      " [2, 3],\n"
                                      " [2, 3])")),
-            ([torch_randn(3,4)]*3, ("([3, 4],\n" 
+            ([torch_randn(3, 4)] * 3, ("([3, 4],\n" 
                                     " [3, 4],\n"
                                     " [3, 4])")),
-            ({"k":torch_randn(2,3),
-              "l":torch_randn(4,5),
-              "m":torch_randn(6,7)}, ("{str: [2, 3],\n"
+            ({"k": torch_randn(2, 3),
+              "l": torch_randn(4, 5),
+              "m": torch_randn(6, 7)}, ("{str: [2, 3],\n"
                                       " str: [4, 5],\n"
                                       " str: [6, 7]}")),
         ]
     ) 
-    def test_iopt_repr(self, iopt, expected):
+    def test_iopt_repr(self, iopt, expected) -> None:
         """Test whether the __iopt_repr method works well"""
         oproot = OperationNode(module=nn.Identity())
         cal_meter = oproot.cal
@@ -615,14 +627,14 @@ class TestCalMeter:
             (nn.Identity(), (1, 10)), 
         ]
     )
-    def test_reaccess_module(self, module, ipt_shape):
+    def test_reaccess_module(self, module, ipt_shape) -> None:
         """Test reaccess handling"""
         oproot = OperationTree(module).root
         cal_meter = oproot.cal
         
         cal_meter.measure()
         if not oproot.is_leaf:
-            list(map(lambda x:x.cal.measure(), oproot.childs.values()))
+            list(map(lambda x: x.cal.measure(), oproot.childs.values()))
         module(torch_randn(*ipt_shape))
         
         assert cal_meter.Macs._UpperLinkData__access_cnt == 1
@@ -642,35 +654,38 @@ class TestCalMeter:
                   "expected_macs", "expected_flops"),
         argvalues=[
             (nn.Sequential(nn.Identity()), (1, 10), (1, 10), 0, 0),
-            (nn.Sequential(nn.Conv2d(3,10,3),
-                           nn.Conv2d(10,30,1)), (1, 3, 32, 32), (1, 30, 30, 30), 30**2*10*27+30**3*10, 30**2*20*27+30**3*20),
             
-            (nn.Linear(10, 5, bias=True), (1, 10), (1, 5), 5*10, 5*10*2),
-            (nn.Linear(10, 5, bias=False), (1, 10), (1, 5), 5*10, 5*10*2-5),
+            (nn.Sequential(nn.Conv2d(3, 10, 3),
+                           nn.Conv2d(10, 30, 1)), (1, 3, 32, 32), (1, 30, 30, 30), 
+                                                           30**2 * 10 * 27 + 30**3 * 10, 30**2 * 20 * 27 + 30**3 * 20),
             
-            (nn.Conv1d(10, 5, 3, bias=True), (1, 10, 32), (1, 5, 30), 150*30, 150*30*2),
-            (nn.Conv1d(10, 5, 3, bias=False), (1, 10, 32), (1, 5, 30), 150*30, 150*30*2-150),
-            (nn.Conv2d(10, 5, 3, bias=True), (1, 10, 32, 32), (1, 5, 30, 30), 4500*90, 4500*2*90),
-            (nn.Conv2d(10, 5, 3, bias=False), (1, 10, 32, 32), (1, 5, 30, 30), 4500*90, 4500*2*90-4500),
-            (nn.Conv3d(10, 5, 3, bias=True), (1, 10, 32, 32, 32), (1, 5, 30, 30, 30), 135000*270, 135000*270*2),
-            (nn.Conv3d(10, 5, 3, bias=False), (1, 10, 32, 32, 32), (1, 5, 30, 30, 30), 135000*270, 135000*270*2-135000),
+            (nn.Linear(10, 5, bias=True), (1, 10), (1, 5), 5 * 10, 5 * 10 * 2),
+            (nn.Linear(10, 5, bias=False), (1, 10), (1, 5), 5 * 10, 5 * 10 * 2 - 5),
             
-            (nn.MaxPool1d(3, ceil_mode=False), (1, 10, 32), (1, 10, 10), 2*100, 2*100),
-            (nn.MaxPool2d(3, ceil_mode=False), (1, 10, 32, 32), (1, 10, 10, 10), 8*10**3, 8*10**3),
-            (nn.MaxPool3d(3, ceil_mode=False), (1, 10, 32, 32, 32), (1, 10, 10, 10, 10), 26*10**4, 26*10**4),
-            (nn.MaxPool1d(3, ceil_mode=True), (1, 10, 32), (1, 10, 11), 2*110, 2*110),
-            (nn.MaxPool2d(3, ceil_mode=True), (1, 10, 32, 32), (1, 10, 11, 11), 80*11**2, 80*11**2),
-            (nn.MaxPool3d(3, ceil_mode=True), (1, 10, 32, 32, 32), (1, 10, 11, 11, 11), 260*11**3, 260*11**3),
-            (nn.AvgPool1d(3, ceil_mode=False), (1, 10, 32), (1, 10, 10), 2*100, 5*100),
-            (nn.AvgPool2d(3, ceil_mode=False), (1, 10, 32, 32), (1, 10, 10, 10), 8*10**3, 17*10**3),
-            (nn.AvgPool3d(3, ceil_mode=False), (1, 10, 32, 32, 32), (1, 10, 10, 10, 10), 26*10**4, 53*10**4),
-            (nn.AvgPool1d(3, ceil_mode=True), (1, 10, 32), (1, 10, 11), 2*110, 5*110),
-            (nn.AvgPool2d(3, ceil_mode=True), (1, 10, 32, 32), (1, 10, 11, 11), 80*11**2, 170*11**2),
-            (nn.AvgPool3d(3, ceil_mode=True), (1, 10, 32, 32, 32), (1, 10, 11, 11, 11), 260*11**3, 530*11**3),
+            (nn.Conv1d(10, 5, 3, bias=True), (1, 10, 32), (1, 5, 30), 150 * 30, 150 * 30 * 2),
+            (nn.Conv1d(10, 5, 3, bias=False), (1, 10, 32), (1, 5, 30), 150 * 30, 150 * 30 * 2 - 150),
+            (nn.Conv2d(10, 5, 3, bias=True), (1, 10, 32, 32), (1, 5, 30, 30), 4500 * 90, 4500 * 2 * 90),
+            (nn.Conv2d(10, 5, 3, bias=False), (1, 10, 32, 32), (1, 5, 30, 30), 4500 * 90, 4500 * 2 * 90 - 4500),
+            (nn.Conv3d(10, 5, 3, bias=True), (1, 10, 32, 32, 32), (1, 5, 30, 30, 30), 135000 * 270, 135000 * 270 * 2),
+            (nn.Conv3d(10, 5, 3, bias=False), (1, 10, 32, 32, 32), (1, 5, 30, 30, 30), 
+                                                                             135000 * 270, 135000 * 270 * 2 - 135000),
             
-            (nn.BatchNorm1d(10), (1, 10, 32), (1, 10, 32), 320*2, 320*4),
-            (nn.BatchNorm2d(10), (1, 10, 32, 32), (1, 10, 32, 32), 32*32*20, 32*32*40),
-            (nn.BatchNorm3d(10), (1, 10, 32, 32, 32), (1, 10, 32, 32, 32), 32**3*20, 32**3*40),
+            (nn.MaxPool1d(3, ceil_mode=False), (1, 10, 32), (1, 10, 10), 2 * 100, 2 * 100),
+            (nn.MaxPool2d(3, ceil_mode=False), (1, 10, 32, 32), (1, 10, 10, 10), 8 * 10**3, 8 * 10**3),
+            (nn.MaxPool3d(3, ceil_mode=False), (1, 10, 32, 32, 32), (1, 10, 10, 10, 10), 26 * 10**4, 26 * 10**4),
+            (nn.MaxPool1d(3, ceil_mode=True), (1, 10, 32), (1, 10, 11), 2 * 110, 2 * 110),
+            (nn.MaxPool2d(3, ceil_mode=True), (1, 10, 32, 32), (1, 10, 11, 11), 80 * 11**2, 80 * 11**2),
+            (nn.MaxPool3d(3, ceil_mode=True), (1, 10, 32, 32, 32), (1, 10, 11, 11, 11), 260 * 11**3, 260 * 11**3),
+            (nn.AvgPool1d(3, ceil_mode=False), (1, 10, 32), (1, 10, 10), 2 * 100, 5 * 100),
+            (nn.AvgPool2d(3, ceil_mode=False), (1, 10, 32, 32), (1, 10, 10, 10), 8 * 10**3, 17 * 10**3),
+            (nn.AvgPool3d(3, ceil_mode=False), (1, 10, 32, 32, 32), (1, 10, 10, 10, 10), 26 * 10**4, 53 * 10**4),
+            (nn.AvgPool1d(3, ceil_mode=True), (1, 10, 32), (1, 10, 11), 2 * 110, 5 * 110),
+            (nn.AvgPool2d(3, ceil_mode=True), (1, 10, 32, 32), (1, 10, 11, 11), 80 * 11**2, 170 * 11**2),
+            (nn.AvgPool3d(3, ceil_mode=True), (1, 10, 32, 32, 32), (1, 10, 11, 11, 11), 260 * 11**3, 530 * 11**3),
+            
+            (nn.BatchNorm1d(10), (1, 10, 32), (1, 10, 32), 320 * 2, 320 * 4),
+            (nn.BatchNorm2d(10), (1, 10, 32, 32), (1, 10, 32, 32), 32 * 32 * 20, 32 * 32 * 40),
+            (nn.BatchNorm3d(10), (1, 10, 32, 32, 32), (1, 10, 32, 32, 32), 32**3 * 20, 32**3 * 40),
             
             (nn.Sigmoid(), (1, 10), (1, 10), 20, 40),
             (nn.Tanh(), (1, 10), (1, 10), 50, 90),
@@ -687,7 +702,7 @@ class TestCalMeter:
         ]
     )
     def test_module_measurement_logic(self, module, ipt_shape, expected_opt_shape, 
-                                      expected_macs, expected_flops):
+                                      expected_macs, expected_flops) -> None:
         """Test whether the measurement logic is true"""
         oproot = OperationTree(module).root
         cal_meter = oproot.cal
@@ -695,7 +710,7 @@ class TestCalMeter:
         assert not cal_meter._CalMeter__stat_ls
         cal_meter.measure()
         if not oproot.is_leaf:
-            list(map(lambda x:x.cal.measure(), oproot.childs.values()))
+            list(map(lambda x: x.cal.measure(), oproot.childs.values()))
         opt = module(torch_randn(*ipt_shape))
         assert tuple(opt.shape) == expected_opt_shape
         assert len(cal_meter._CalMeter__stat_ls) == 1
@@ -703,7 +718,7 @@ class TestCalMeter:
         assert cal_meter.Macs.val == expected_macs    
         assert cal_meter.Flops.val == expected_flops
 
-    def test_not_supported_flag(self):
+    def test_not_supported_flag(self) -> None:
         """Test the is_not_supported property is set and retrieved correctly"""
         
         model = nn.Identity()
@@ -723,9 +738,10 @@ class TestCalMeter:
         with pytest.raises(AttributeError):
             del cal_meter.is_not_supported
 
+
 @pytest.mark.usefixtures("toggle_to_mem")
 class TestMemMeter:
-    def test_cls_variable(self):
+    def test_cls_variable(self) -> None:
         """Test detail_val_container and overview_val_container settings"""
         assert hasattr(MemMeter, "detail_val_container")
         dc = MemMeter.detail_val_container
@@ -735,7 +751,7 @@ class TestMemMeter:
         oc = MemMeter.overview_val_container
         assert all(v is None for v in oc._field_defaults.values())
     
-    def test_valid_init(self, simple_model_root):
+    def test_valid_init(self, simple_model_root) -> None:
         """Test valid initialization"""
         model, oproot = simple_model_root
         
@@ -770,12 +786,12 @@ class TestMemMeter:
         assert mem_meter.TotalCost._UpperLinkData__parent_data is None
         assert mem_meter.TotalCost._UpperLinkData__unit_sys is BinaryUnit
 
-    def test_invalid_init(self):
+    def test_invalid_init(self) -> None:
         """Test invalid initialization"""
         with pytest.raises(TypeError):
             MemMeter(opnode="0")
 
-    def test_val_property(self, measured_simple_model):
+    def test_val_property(self, measured_simple_model) -> None:
         """Test whether the val property is properly set"""
         *_, mem_meter = measured_simple_model
         
@@ -789,7 +805,7 @@ class TestMemMeter:
         assert overview.Output_Cost is mem_meter.OutputCost
         assert overview.Total is mem_meter.TotalCost
 
-    def test_crucial_data_format(self, measured_simple_model):
+    def test_crucial_data_format(self, measured_simple_model) -> None:
         """Test whether the crucial_data is return in correct format"""
         *_, mem_meter = measured_simple_model
         crucial_data = mem_meter.crucial_data
@@ -797,13 +813,13 @@ class TestMemMeter:
                 
         # verify align
         keys = list(crucial_data.keys())
-        assert all(isinstance(k,str) for k in crucial_data.keys())
+        assert all(isinstance(k, str) for k in crucial_data)
         assert all(len(k) == len(keys[0]) for k in keys[1:])
         
         # verify value
-        assert all(isinstance(v,str) for v in crucial_data.values())
+        assert all(isinstance(v, str) for v in crucial_data.values())
 
-    def test_mem_measure(self):
+    def test_mem_measure(self) -> None:
         """Test whether the measure method works well"""
         module = nn.Identity()
         opnode = OperationNode(module)
@@ -814,9 +830,9 @@ class TestMemMeter:
         assert len(module._forward_hooks) == 1
         assert next(iter(module._forward_hooks.values())).__name__ == "__hook_func"
         
-    def test_measure_cache(self, simple_model_root):
+    def test_measure_cache(self, simple_model_root) -> None:
         """Test whether the measure method will be revisited after the first call"""
-        model, oproot = simple_model_root
+        _model, oproot = simple_model_root
         mem_meter = oproot.mem
         
         res = mem_meter.measure()
@@ -825,9 +841,9 @@ class TestMemMeter:
         res = mem_meter.measure()
         assert res is None
 
-    def test_valid_access(self, simple_model_root):
+    def test_valid_access(self, simple_model_root) -> None:
         """Test whether the invalid access will be blocked"""
-        model, oproot = simple_model_root
+        _model, oproot = simple_model_root
         mem_meter = oproot.mem
         
         # access property before measure
@@ -879,7 +895,7 @@ class TestMemMeter:
             (nn.PReLU(), (1, 10), False),
             (nn.Sigmoid(), (1, 10), False),
             (nn.Tanh(), (1, 10), False),
-            (nn.Conv1d(10,5,3), (1, 10, 32), False),
+            (nn.Conv1d(10, 5, 3), (1, 10, 32), False),
             (nn.Linear(10, 5), (1, 10), False),
             (nn.BatchNorm1d(10), (1, 10, 32), False),
             (nn.AvgPool1d(3), (1, 10, 32), False),
@@ -889,7 +905,7 @@ class TestMemMeter:
             (nn.Sequential(nn.Identity()), (1, 10), False),
         ]
     )
-    def test_inplace_module_handling(self, module, ipt_shape, is_inplace):
+    def test_inplace_module_handling(self, module, ipt_shape, is_inplace) -> None:
         """Test whether the inplace module will be handled properly"""
         opnode = OperationNode(module)
         mem_meter = opnode.mem
@@ -910,47 +926,47 @@ class TestMemMeter:
     @pytest.mark.parametrize(
         argnames=("opts", "expected_opt_cost"),
         argvalues=[
-            (1, 32),  
+            (1, 32), 
             (1., 24), # python default size for float
 
             ("1", 1 + (49 if sys.version_info < (3, 12) else 41)),
-            ("-"*50, 50 + (49 if sys.version_info < (3, 12) else 41)),
+            ("-" * 50, 50 + (49 if sys.version_info < (3, 12) else 41)),
 
             (None, 16), # python default size for None
 
             (tuple(), 0),
-            ((1,2,3), 32*3),
+            ((1, 2, 3), 32 * 3),
             
             # value change between python version
             (list(), asizeof([])),
-            ([1,2,3], asizeof([1,2,3])), 
+            ([1, 2, 3], asizeof([1, 2, 3])), 
 
             (set(), 216),
-            ({1,2,3}, 216 + 32*3),
+            ({1, 2, 3}, 216 + 32 * 3),
 
             # hard to resolve the component
             (dict(), asizeof(dict())), 
-            ({"a":1, "b":2}, asizeof({"a":1, "b":2})), 
-            ({"a":1., "b":2.}, asizeof({"a":1., "b":2.})),
+            ({"a": 1, "b": 2}, asizeof({"a": 1, "b": 2})), 
+            ({"a": 1., "b": 2.}, asizeof({"a": 1., "b": 2.})),
 
-            (np.array([1,2,3], dtype=np.int8), 1*3),
-            (np.array([1,2,3], dtype=np.int16), 2*3),
-            (np.array([1,2,3], dtype=np.int64), 8*3),
-            (np.array([1,2,3], dtype=np.float16), 2*3),
-            (np.array([1,2,3], dtype=np.float64), 8*3),
+            (np.array([1, 2, 3], dtype=np.int8), 1 * 3),
+            (np.array([1, 2, 3], dtype=np.int16), 2 * 3),
+            (np.array([1, 2, 3], dtype=np.int64), 8 * 3),
+            (np.array([1, 2, 3], dtype=np.float16), 2 * 3),
+            (np.array([1, 2, 3], dtype=np.float64), 8 * 3),
 
-            (torch_randn(1,2,3), 6*4),
-            (torch_randn(1,2,3, dtype=torch_float16), 6*2),
-            (torch_randn(1,2,3, dtype=torch_float64), 6*8),
-            (torch_ones(1,2,3, dtype=torch_int8), 6*1),
-            (torch_ones(1,2,3, dtype=torch_int16), 6*2),
-            (torch_ones(1,2,3, dtype=torch_int64), 6*8)
+            (torch_randn(1, 2, 3), 6 * 4),
+            (torch_randn(1, 2, 3, dtype=torch_float16), 6 * 2),
+            (torch_randn(1, 2, 3, dtype=torch_float64), 6 * 8),
+            (torch_ones(1, 2, 3, dtype=torch_int8), 6 * 1),
+            (torch_ones(1, 2, 3, dtype=torch_int16), 6 * 2),
+            (torch_ones(1, 2, 3, dtype=torch_int64), 6 * 8)
         ]
     )
-    def test_multitype_output_handling(self, opts, expected_opt_cost):
+    def test_multitype_output_handling(self, opts, expected_opt_cost) -> None:
         """Test whether the different types' output will be handled properly"""
         class MultiOutputModel(nn.Module):
-            def __init__(self):
+            def __init__(self) -> None:
                 super(MultiOutputModel, self).__init__()
 
             def forward(self):
@@ -970,35 +986,35 @@ class TestMemMeter:
         argvalues=[
             ((1, 1.), 32 + 24), 
             ((1, "1"), 32 + 1 + (49 if sys.version_info < (3, 12) else 41)),
-            ((1, None), 32 + 16),  
+            ((1, None), 32 + 16), 
             ((1, ()), 32 + 40),
-            ((1, (1,2,3)), 32 + 40*4),
-            ((1, [1,2,3]), 32 + asizeof([1,2,3])),
-            ((1, {1,2,3}), 32 + 216 + 32*3),
-            ((1, {"a":1, "b":2}), 32 + asizeof({"a":1, "b":2})),
+            ((1, (1, 2, 3)), 32 + 40 * 4),
+            ((1, [1, 2, 3]), 32 + asizeof([1, 2, 3])),
+            ((1, {1, 2, 3}), 32 + 216 + 32 * 3),
+            ((1, {"a": 1, "b": 2}), 32 + asizeof({"a": 1, "b": 2})),
 
-            (("1", "2."), 3 + 2*(49 if sys.version_info < (3, 12) else 41)),
+            (("1", "2."), 3 + 2 * (49 if sys.version_info < (3, 12) else 41)),
             (("1", 2.), 1 + 24 + (49 if sys.version_info < (3, 12) else 41)),
             (("1", None), 1 + 16 + (49 if sys.version_info < (3, 12) else 41)),
 
             ((None, None), 16 + 16),
             ((None, 2.), 16 + 24),
 
-            ((1, np.array([1,2,3], dtype=np.int8)), 32 + 1*3),
-            ((1, torch_ones(1,2,3, dtype=torch_int8)), 32 + 1*6),
-            ((torch_randn(1,2,3, dtype=torch_float64), None), 6*8 + 16),
+            ((1, np.array([1, 2, 3], dtype=np.int8)), 32 + 1 * 3),
+            ((1, torch_ones(1, 2, 3, dtype=torch_int8)), 32 + 1 * 6),
+            ((torch_randn(1, 2, 3, dtype=torch_float64), None), 6 * 8 + 16),
 
-            ((torch_randn(1,2,3, dtype=torch_float16), 
-              np.array([1,2,3], dtype=np.int8)), 6*2 + 1*3),
+            ((torch_randn(1, 2, 3, dtype=torch_float16), 
+              np.array([1, 2, 3], dtype=np.int8)), 6 * 2 + 1 * 3),
 
-            ((torch_randn(1,2,3, dtype=torch_float64),
-              torch_ones(1,2,3, dtype=torch_int64)), 6*8 + 6*8)
+            ((torch_randn(1, 2, 3, dtype=torch_float64),
+              torch_ones(1, 2, 3, dtype=torch_int64)), 6 * 8 + 6 * 8)
         ]
     )
-    def test_multi_output_handling(self, opts, expected_opt_cost):
+    def test_multi_output_handling(self, opts, expected_opt_cost) -> None:
         """Test whether the multi output module will be handled properly"""
         class MultiOutputModel(nn.Module):
-            def __init__(self):
+            def __init__(self) -> None:
                 super(MultiOutputModel, self).__init__()
 
             def forward(self):
@@ -1049,7 +1065,7 @@ class TestMemMeter:
             (nn.Identity(), (1, 10)), 
         ]
     )
-    def test_reaccess_module(self, module, ipt_shape):
+    def test_reaccess_module(self, module, ipt_shape) -> None:
         """Test reaccess handling"""
         opnode = OperationNode(module)
         mem_meter = opnode.mem
@@ -1081,30 +1097,30 @@ class TestMemMeter:
         argnames=("module", "ipt_shape", "expected_param_cost",
                   "expected_buffer_cost", "expected_output_cost"),
         argvalues=[
-            (nn.Sequential(nn.Identity()), (1, 10), 0, 0, 10*4),
-            (nn.Sequential(nn.Conv2d(3,10,3),
-                           nn.Conv2d(10,30,1)), (1, 3, 32, 32), 610*4, 0, 9000*4+27000*4),
+            (nn.Sequential(nn.Identity()), (1, 10), 0, 0, 10 * 4),
+            (nn.Sequential(nn.Conv2d(3, 10, 3),
+                           nn.Conv2d(10, 30, 1)), (1, 3, 32, 32), 610 * 4, 0, 9000 * 4 + 27000 * 4),
             
-            (nn.Linear(10, 5, bias=True), (1, 10), 55*4, 0, 5*4),
-            (nn.Linear(10, 5, bias=False), (1, 10), 50*4, 0, 5*4),
+            (nn.Linear(10, 5, bias=True), (1, 10), 55 * 4, 0, 5 * 4),
+            (nn.Linear(10, 5, bias=False), (1, 10), 50 * 4, 0, 5 * 4),
             
-            (nn.Conv1d(10, 5, 3, bias=True), (1, 10, 32), 155*4, 0, 150*4),
-            (nn.Conv1d(10, 5, 3, bias=False), (1, 10, 32), 150*4, 0, 150*4),
-            (nn.Conv2d(10, 5, 3, bias=True), (1, 10, 32, 32), 455*4, 0, 4500*4),
-            (nn.Conv2d(10, 5, 3, bias=False), (1, 10, 32, 32), 450*4, 0, 4500*4),
-            (nn.Conv3d(10, 5, 3, bias=True), (1, 10, 32, 32, 32), 1355*4, 0, 135000*4),
-            (nn.Conv3d(10, 5, 3, bias=False), (1, 10, 32, 32, 32), 1350*4, 0, 135000*4),
+            (nn.Conv1d(10, 5, 3, bias=True), (1, 10, 32), 155 * 4, 0, 150 * 4),
+            (nn.Conv1d(10, 5, 3, bias=False), (1, 10, 32), 150 * 4, 0, 150 * 4),
+            (nn.Conv2d(10, 5, 3, bias=True), (1, 10, 32, 32), 455 * 4, 0, 4500 * 4),
+            (nn.Conv2d(10, 5, 3, bias=False), (1, 10, 32, 32), 450 * 4, 0, 4500 * 4),
+            (nn.Conv3d(10, 5, 3, bias=True), (1, 10, 32, 32, 32), 1355 * 4, 0, 135000 * 4),
+            (nn.Conv3d(10, 5, 3, bias=False), (1, 10, 32, 32, 32), 1350 * 4, 0, 135000 * 4),
             
-            (nn.MaxPool1d(3), (1, 10, 32), 0, 0, 4*1e2),
-            (nn.MaxPool2d(3), (1, 10, 32, 32), 0, 0, 4*1e3),
-            (nn.MaxPool3d(3), (1, 10, 32, 32, 32), 0, 0, 4*1e4),
-            (nn.AvgPool1d(3), (1, 10, 32), 0, 0, 4*1e2),
-            (nn.AvgPool2d(3), (1, 10, 32, 32), 0, 0, 4*1e3),
-            (nn.AvgPool3d(3), (1, 10, 32, 32, 32), 0, 0, 4*1e4),
+            (nn.MaxPool1d(3), (1, 10, 32), 0, 0, 4 * 1e2),
+            (nn.MaxPool2d(3), (1, 10, 32, 32), 0, 0, 4 * 1e3),
+            (nn.MaxPool3d(3), (1, 10, 32, 32, 32), 0, 0, 4 * 1e4),
+            (nn.AvgPool1d(3), (1, 10, 32), 0, 0, 4 * 1e2),
+            (nn.AvgPool2d(3), (1, 10, 32, 32), 0, 0, 4 * 1e3),
+            (nn.AvgPool3d(3), (1, 10, 32, 32, 32), 0, 0, 4 * 1e4),
             
-            (nn.BatchNorm1d(10), (1, 10, 32), 80, 88, 32*40),
-            (nn.BatchNorm2d(10), (1, 10, 32, 32), 80, 88, 32*32*40),
-            (nn.BatchNorm3d(10), (1, 10, 32, 32, 32), 80, 88, 32**3*40),
+            (nn.BatchNorm1d(10), (1, 10, 32), 80, 88, 32 * 40),
+            (nn.BatchNorm2d(10), (1, 10, 32, 32), 80, 88, 32 * 32 * 40),
+            (nn.BatchNorm3d(10), (1, 10, 32, 32, 32), 80, 88, 32**3 * 40),
             
             (nn.Sigmoid(), (1, 10), 0, 0, 40),
             (nn.Tanh(), (1, 10), 0, 0, 40),
@@ -1125,12 +1141,12 @@ class TestMemMeter:
             (nn.Threshold(0.1, 20, inplace=True), (1, 10), 0, 0, 0),
             
             (nn.Dropout(0.5), (1, 10), 0, 0, 40),
-            (nn.AdaptiveAvgPool1d(1), (1, 32, 8), 0, 0, 32*4), 
+            (nn.AdaptiveAvgPool1d(1), (1, 32, 8), 0, 0, 32 * 4), 
             (nn.Identity(), (1, 10), 0, 0, 40), 
         ]
     )
     def test_module_measurement_logic(self, module, ipt_shape, 
-                                      expected_param_cost, expected_buffer_cost, expected_output_cost):
+                                      expected_param_cost, expected_buffer_cost, expected_output_cost) -> None:
         """Test whether the measurement logic is true"""
         oproot = OperationTree(module).root
         mem_meter = oproot.mem
@@ -1146,7 +1162,7 @@ class TestMemMeter:
         assert mem_meter.BufferCost.val == expected_buffer_cost
         assert mem_meter.OutputCost.val == expected_output_cost  
         assert mem_meter.TotalCost.val == expected_param_cost + \
-                                          expected_buffer_cost  + \
+                                          expected_buffer_cost + \
                                           expected_output_cost
 
         record = mem_meter._MemMeter__stat_ls[0]
@@ -1163,9 +1179,10 @@ class TestMemMeter:
                 else:
                     assert isinstance(field_val, UpperLinkData)
 
+
 @pytest.mark.usefixtures("toggle_to_ittp")
 class TestIttpMeter:
-    def test_cls_variable(self):
+    def test_cls_variable(self) -> None:
         """Test detail_val_container and overview_val_container settings"""
         assert hasattr(IttpMeter, "detail_val_container")
         dc = MemMeter.detail_val_container
@@ -1175,7 +1192,7 @@ class TestIttpMeter:
         oc = MemMeter.overview_val_container
         assert all(v is None for v in oc._field_defaults.values())
     
-    def test_valid_init(self, simple_model_root):
+    def test_valid_init(self, simple_model_root) -> None:
         """Test valid initialization"""
         model, oproot = simple_model_root
         
@@ -1199,12 +1216,12 @@ class TestIttpMeter:
         assert ittp_meter.Throughput._MetricsData__reduce_func is np.median
         assert ittp_meter.Throughput._MetricsData__unit_sys is SpeedUnit
 
-    def test_invalid_init(self):
+    def test_invalid_init(self) -> None:
         """Test invalid initialization"""
         with pytest.raises(TypeError):
             IttpMeter(opnode="0")
 
-    def test_val_property(self, measured_simple_model):
+    def test_val_property(self, measured_simple_model) -> None:
         """Test whether the val property is properly set"""
         *_, ittp_meter = measured_simple_model
         
@@ -1216,7 +1233,7 @@ class TestIttpMeter:
         assert overview.Infer_Time is ittp_meter.InferTime
         assert overview.Throughput is ittp_meter.Throughput
 
-    def test_crucial_data_format(self, measured_simple_model):
+    def test_crucial_data_format(self, measured_simple_model) -> None:
         """Test whether the crucial_data is return in correct format"""
         *_, ittp_meter = measured_simple_model
         crucial_data = ittp_meter.crucial_data
@@ -1224,13 +1241,13 @@ class TestIttpMeter:
                 
         # verify align
         keys = list(crucial_data.keys())
-        assert all(isinstance(k,str) for k in crucial_data.keys())
+        assert all(isinstance(k, str) for k in crucial_data)
         assert all(len(k) == len(keys[0]) for k in keys[1:])
         
         # verify value
-        assert all(isinstance(v,str) for v in crucial_data.values())
+        assert all(isinstance(v, str) for v in crucial_data.values())
 
-    def test_ittp_measure(self):
+    def test_ittp_measure(self) -> None:
         """Test whether the measure method works well"""
         module = nn.Identity()
         opnode = OperationNode(module)
@@ -1241,9 +1258,9 @@ class TestIttpMeter:
         assert len(module._forward_hooks) == 1
         assert next(iter(module._forward_hooks.values())).func.__name__ == "__hook_func"
         
-    def test_no_measure_cache(self, simple_model_root):
+    def test_no_measure_cache(self, simple_model_root) -> None:
         """Test whether the measure method will be revisited after the first call"""
-        model, oproot = simple_model_root
+        _model, oproot = simple_model_root
         ittp_meter = oproot.ittp
         
         res = ittp_meter.measure(device=torch_device("cpu"))
@@ -1253,7 +1270,7 @@ class TestIttpMeter:
         assert res is not None
 
     @pytest.mark.skipif(not is_cuda(), reason="No GPUs detected")
-    def test_model_device_dismatch(self):
+    def test_model_device_dismatch(self) -> None:
         """Test whether the measure method works well 
            when model's device is the same with given argument"""
         model = nn.Linear(10, 5)
@@ -1264,7 +1281,7 @@ class TestIttpMeter:
         ittp_meter.measure(device=torch_device("cuda:0"), repeat=1)
         assert len(model._forward_hooks) == 1
 
-    def test_measure_on_different_device(self):
+    def test_measure_on_different_device(self) -> None:
         """Test whether the measure method works well for model on different device"""
         model = nn.Linear(10, 5)
         opnode = OperationNode(model)
@@ -1291,15 +1308,18 @@ class TestIttpMeter:
                 assert cpu_timer.call_count == 0
                 assert gpu_timer.call_count == 1
         else:
-            warnings.warn(message="No Nvidia GPU detected on this device, the test of measuring ittp of model on GPU will be skipped.", 
-                          category=UserWarning)
+            warnings.warn(
+                category=UserWarning,
+                message="No Nvidia GPU detected on this device, " +
+                        "the test of measuring ittp of model on GPU will be skipped."
+            )
 
     @pytest.mark.parametrize(
         argnames="repeat_time",
-        argvalues=range(10,101,10),
+        argvalues=range(10, 101, 10),
         ids=lambda x: f"repeat measurement {x} times"        
     )
-    def test_repeat_measure(self, repeat_time):
+    def test_repeat_measure(self, repeat_time) -> None:
         """Test whether the repeat setting works well"""
         model = nn.Linear(10, 5)
         opnode = OperationNode(model)
@@ -1311,9 +1331,9 @@ class TestIttpMeter:
         assert len(ittp_meter.InferTime.vals) == repeat_time
         assert len(ittp_meter.Throughput.vals) == repeat_time   
 
-    def test_valid_access(self, simple_model_root):
+    def test_valid_access(self, simple_model_root) -> None:
         """Test whether the invalid access will be blocked"""
-        model, oproot = simple_model_root
+        _model, oproot = simple_model_root
         ittp_meter = oproot.ittp
         
         # access property before measure
@@ -1340,7 +1360,7 @@ class TestIttpMeter:
         with pytest.raises(RuntimeError):
             ittp_meter.crucial_data
 
-    def test_reaccess_module(self):
+    def test_reaccess_module(self) -> None:
         """Test reaccess handling"""
         model = nn.Linear(10, 5)
         opnode = OperationNode(model)
@@ -1363,16 +1383,16 @@ class TestIttpMeter:
     @pytest.mark.parametrize(
         argnames=("repeat_time", "expected_it", "expected_tp"),
         argvalues=[
-            (11, 6, 1/6),
-            (21, 11, 1/11),
-            (31, 16, 1/16),
-            (41, 21, 1/21),
-            (51, 26, 1/26)
+            (11, 6, 1 / 6),
+            (21, 11, 1 / 11),
+            (31, 16, 1 / 16),
+            (41, 21, 1 / 21),
+            (51, 26, 1 / 26)
         ],
         ids=lambda x: f"{x}" if isinstance(x, int) else f"{x:g}"
     )
     def test_module_measurement_logic(self, repeat_time, 
-                                      expected_it, expected_tp):
+                                      expected_it, expected_tp) -> None:
         """Test whether the measurement logic is true"""
         model = nn.Linear(10, 5)
         opnode = OperationNode(model)
@@ -1383,7 +1403,7 @@ class TestIttpMeter:
         ittp_meter.measure(device=torch_device("cpu"), repeat=repeat_time)
         with patch("torchmeter.statistic.perf_counter") as cpu_timer:
             se_time_vals = []
-            for sub_res in range(1, repeat_time+1):
+            for sub_res in range(1, repeat_time + 1):
                 se_time_vals.extend([0, sub_res])
             cpu_timer.side_effect = se_time_vals
             model(torch_randn(1, 10, device=torch_device("cpu")))
@@ -1394,12 +1414,15 @@ class TestIttpMeter:
         if is_cuda():
             ittp_meter.measure(device=torch_device("cuda:0"), repeat=repeat_time)
             with patch("torchmeter.statistic.cuda_event.elapsed_time") as gpu_timer:
-                gpu_timer.side_effect = map(lambda x:int(x*1e3), range(1, repeat_time+1))
+                gpu_timer.side_effect = map(lambda x: int(x * 1e3), range(1, repeat_time + 1))
                 model(torch_randn(1, 10, device=torch_device("cuda:0")))
                 assert ittp_meter.InferTime.metrics == expected_it
                 assert ittp_meter.Throughput.metrics == pytest.approx(expected_tp)
         else:
-            warnings.warn(message="No Nvidia GPU detected on this device, the test of ittp measuring logic on GPU will be skipped.", 
-                          category=UserWarning)
+            warnings.warn(
+                category=UserWarning,
+                message="No Nvidia GPU detected on this device, " +
+                        "the test of ittp measuring logic on GPU will be skipped."
+            )
             
     

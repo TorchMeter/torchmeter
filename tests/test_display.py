@@ -1,28 +1,23 @@
 import os
-from unittest.mock import ANY, Mock
-from unittest.mock import call, patch
+from unittest.mock import ANY, Mock, call, patch
 
 import pytest
 import torch.nn as nn
 from torch import randn as torch_randn
-from rich.text import Text
+from polars import Series, DataFrame
 from rich.rule import Rule
+from rich.text import Text
 from rich.tree import Tree
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 from rich.columns import Columns
+from rich.console import Group, Console
 from rich.segment import Segment
-from rich.console import Console, Group
-from polars import DataFrame, Series
 
 from torchmeter.config import FlagNameSpace
 from torchmeter.engine import OperationNode, OperationTree
-from torchmeter._stat_numeric import UpperLinkData, MetricsData, CountUnit
-from torchmeter.display import (
-    __cfg__, 
-    dfs_task, render_perline, apply_setting,
-    TreeRenderer, TabularRenderer
-)
+from torchmeter.display import TreeRenderer, TabularRenderer, __cfg__, dfs_task, apply_setting, render_perline
+from torchmeter._stat_numeric import CountUnit, MetricsData, UpperLinkData
 
 pytestmark = pytest.mark.vital
 
@@ -34,48 +29,54 @@ TREE_CHILD2 = EXAMPLE_TREE.add("Child2")
 TREE_CHILD2.add("2.1")
 TREE_CHILD2.add("2.2")
 
-EXAMPLE_TABLE = Table("A","B")
+EXAMPLE_TABLE = Table("A", "B")
 EXAMPLE_TABLE.add_row("1", "2")
 EXAMPLE_TABLE.add_row("3", "4")
 
+
 class NoVPAObj:
     """No Variable Positional Arguments"""
-    def __init__(self, a, b, c=3):
+    def __init__(self, a, b, c=3) -> None:
         self._a = a
         self._b = b
         self._c = c
         
         self._all = a + b + c
 
+
 class VPAFObj:
     """Variable Positional Arguments at Front"""
-    def __init__(self, *a, b=2, c=3):
+    def __init__(self, *a, b=2, c=3) -> None:
         self._a = a
         self._b = b
         self._c = c
+
 
 class VPAMObj:
     """Variable Positional Arguments at Middle"""
-    def __init__(self, a, *b, c=3):
+    def __init__(self, a, *b, c=3) -> None:
         self._a = a
         self._b = b
         self._c = c
+
 
 class VPALObj:
     """Variable Positional Arguments as Last"""
-    def __init__(self, a, b, *c):
+    def __init__(self, a, b, *c) -> None:
         self._a = a
         self._b = b
         self._c = c
 
+
 class MixedArgsObj:
     """All types of arguments"""
-    def __init__(self, a, b=2, *c, d=4, **e):
+    def __init__(self, a, b=2, *c, d=4, **e) -> None:
         self._a = a
         self._b = b
         self._c = c
         self._d = d
         self._e = e
+
 
 @pytest.fixture
 def mock_console():
@@ -84,12 +85,14 @@ def mock_console():
     console.render_lines.return_value = [[Segment("line1")], [Segment("line2")]]
     return console
 
+
 @pytest.fixture
-def mock_config(monkeypatch):
+def mock_config(monkeypatch) -> None:
     """Fixture to mock the __cfg__ object"""
     class MockConfig:
         render_interval = 0.1
     monkeypatch.setattr("torchmeter.display.__cfg__", MockConfig())
+
 
 @pytest.fixture
 def simple_tree_renderer():
@@ -97,10 +100,11 @@ def simple_tree_renderer():
     yield TreeRenderer(opnode)
     __cfg__.restore()
 
+
 @pytest.fixture
 def repeat_tree_renderer():
     class RepeatModel(nn.Module):
-        def __init__(self):
+        def __init__(self) -> None:
             super(RepeatModel, self).__init__()
             self.layer0 = nn.Linear(10, 10)
             self.layer1 = nn.Sequential(
@@ -116,16 +120,18 @@ def repeat_tree_renderer():
     
     __cfg__.restore()
 
+
 @pytest.fixture
 def simple_tabular_renderer():
     opnode = OperationNode(nn.Identity())
     yield TabularRenderer(opnode)
     __cfg__.restore()
 
+
 @pytest.fixture
 def universal_tabular_renderer():
     class UnuseModel(nn.Module):
-        def __init__(self):
+        def __init__(self) -> None:
             super(UnuseModel, self).__init__()
             
             self.conv = nn.Conv2d(3, 3, 3)
@@ -141,6 +147,7 @@ def universal_tabular_renderer():
     
     __cfg__.restore()
             
+
 @pytest.fixture
 def example_df():
     """
@@ -160,7 +167,7 @@ def example_df():
     df = DataFrame({
         "numeric": [1, 2, None],
         "text": ["a", None, "c"],
-        "list_col": [[1,2], [3], None],
+        "list_col": [[1, 2], [3], None],
         "nomal_obj": [
             Text("example"), 
             Text("dataframe"), 
@@ -174,12 +181,13 @@ def example_df():
             None,
             MetricsData()
         ],
-        dtype = pl_obj
+        dtype=pl_obj
     )
 
     df.insert_column(len(df.columns), self_obj_col)
     
     return df
+
 
 @pytest.fixture
 def export_dir(tmpdir):
@@ -187,40 +195,41 @@ def export_dir(tmpdir):
     if tmpdir.exists():
         tmpdir.remove(rec=1)
 
+
 class TestApplySetting:
 
-    def test_valid_usage(self):
+    def test_valid_usage(self) -> None:
         """"Test basic functionality and common usage cases"""
         
         # all settings are changed
         obj = NoVPAObj(1, 2, 3)
-        apply_setting(obj, setting={"a":10, "b":20, "c":30})
+        apply_setting(obj, setting={"a": 10, "b": 20, "c": 30})
         assert obj._a == 10
         assert obj._b == 20
         assert obj._c == 30
 
         # partial settings are changed
         obj = NoVPAObj(1, 2, 3)
-        apply_setting(obj, setting={"a":10, "b":20})
+        apply_setting(obj, setting={"a": 10, "b": 20})
         assert obj._a == 10
         assert obj._b == 20
         assert obj._c == 3
     
-    def test_invalid_usage(self):
+    def test_invalid_usage(self) -> None:
         """Test invalid usage cases"""
         
         # invlaid setting type
         with pytest.raises(TypeError):
-            apply_setting(NoVPAObj(1,2,3), setting=10)
+            apply_setting(NoVPAObj(1, 2, 3), setting=10)
         
         # invalid omit type, see `test_omit_type`
         
         # required initializatio argument absent
         with pytest.raises(RuntimeError) as e:
-            apply_setting(NoVPAObj(1,2,3), setting={'a':10})
+            apply_setting(NoVPAObj(1, 2, 3), setting={'a': 10})
             assert "`b` unknown" in str(e.value)
 
-    def test_setting(self):
+    def test_setting(self) -> None:
         """Test the logic of getting setting_dict"""
         
         # use FlagNameSpace to store the setting
@@ -232,14 +241,14 @@ class TestApplySetting:
         
         # use dict to store the setting
         obj = NoVPAObj(1, 2, 3)
-        apply_setting(obj, setting={"a":1000, "b":2000, "c":3000})
+        apply_setting(obj, setting={"a": 1000, "b": 2000, "c": 3000})
         assert obj._a == 1000
         assert obj._b == 2000
         assert obj._c == 3000
         
         # update setting with extra_settings
         obj = NoVPAObj(1, 2, 3)
-        apply_setting(obj, setting={"a":1000, "b":2000, "c":3000}, 
+        apply_setting(obj, setting={"a": 1000, "b": 2000, "c": 3000}, 
                       c=30)
         assert obj._a == 1000
         assert obj._b == 2000
@@ -247,7 +256,7 @@ class TestApplySetting:
         
         # invalid setting type
         with pytest.raises(TypeError):
-            apply_setting(NoVPAObj(1,2,3), setting=10)
+            apply_setting(NoVPAObj(1, 2, 3), setting=10)
 
     @pytest.mark.parametrize(
         argnames=("omit_args", "is_error", "key_error_info"),
@@ -257,82 +266,86 @@ class TestApplySetting:
             (["a", "b"], False, None), # list
             (("a", "c"), False, None), # list
             ({"a", "b", "c"}, False, None), # set
-            ({"a":1, "b":2, "c":3}, True, "but got `dict`"), # dict
+            ({"a": 1, "b": 2, "c": 3}, True, "but got `dict`"), # dict
             (123, True, "but got `int`"), # int
-            ([1,2,3], True, "`list` of `int`") # container of non-str
+            ([1, 2, 3], True, "`list` of `int`") # container of non-str
         ]
     )
-    def test_omit_type(self, omit_args, is_error, key_error_info):
+    def test_omit_type(self, omit_args, is_error, key_error_info) -> None:
         """Test the pass-in type limitation"""
 
         if is_error:
             with pytest.raises(TypeError) as e:
                 apply_setting(NoVPAObj(1, 2, c=10), 
-                              setting={"a":10, "b":20, "c":30}, 
+                              setting={"a": 10, "b": 20, "c": 30}, 
                               omit=omit_args)
                 assert key_error_info in str(e.value)
         else:
             apply_setting(NoVPAObj(1, 2, c=10), 
-                          setting={"a":10, "b":20, "c":30}, 
+                          setting={"a": 10, "b": 20, "c": 30}, 
                           omit=omit_args)
     
     @pytest.mark.parametrize(
         argnames=("obj", "setting", "omit_args", "expected_state"),
         argvalues=[
             # omit one argument
-            (NoVPAObj(1, 2, 10), {"a":10, "b":20, "c":30}, "_c", {"_a":10, "_b":20, "_c":10, "_all":60}), 
+            (NoVPAObj(1, 2, 10), {"a": 10, "b": 20, "c": 30}, "_c", {"_a": 10, "_b": 20, "_c": 10, "_all": 60}), 
             
             # not omit one argument
-            (NoVPAObj(1, 2, 10), {"a":10, "b":20, "c":30}, "", {"_a":10, "_b":20, "_c":30, "_all":60}),
+            (NoVPAObj(1, 2, 10), {"a": 10, "b": 20, "c": 30}, "", {"_a": 10, "_b": 20, "_c": 30, "_all": 60}),
 
             # omit multiple arguments
-            (NoVPAObj(1, 2, 10), {"a":10, "b":20, "c":30}, ["_a", "_b"], {"_a":1, "_b":2, "_c":30, "_all":60}), 
-            (NoVPAObj(1, 2, 10), {"a":10, "b":20, "c":30}, ("_a", "_c"), {"_a":1, "_b":20, "_c":10, "_all":60}),
-            (NoVPAObj(1, 2, 10), {"a":10, "b":20, "c":30}, {"_a", "_b", "_c"}, {"_a":1, "_b":2, "_c":10, "_all":60}), 
-
-            # not omit multiple arguments
-            (NoVPAObj(1, 2, 10), {"a":10, "b":20, "c":30}, "", {"_a":10, "_b":20, "_c":30, "_all":60}),
+            (NoVPAObj(1, 2, 10), {"a": 10, "b": 20, "c": 30}, ["_a", "_b"], {"_a": 1, "_b": 2, "_c": 30, "_all": 60}), 
+            (NoVPAObj(1, 2, 10), {"a": 10, "b": 20, "c": 30}, ("_a", "_c"), {"_a": 1, "_b": 20, "_c": 10, "_all": 60}),
+            (NoVPAObj(1, 2, 10), {"a": 10, "b": 20, "c": 30}, {"_a", "_b", "_c"}, {"_a": 1, "_b": 2, 
+                                                                                   "_c": 10, "_all": 60}), 
 
             # omit variable positional arguments
-            (VPAFObj(1, 2, 3, 4, 5), {"a":[7,8,9], "b":40, "c":50}, "_a", {"_a":(1,2,3,4,5), "_b":40, "_c":50}),
-            (VPAMObj(1, 2, 3, 4, 5), {"a":10, "b":[7,8,9], "c":50}, "_b", {"_a":10, "_b":(2,3,4,5), "_c":50}),
-            (VPALObj(1, 2, 3, 4, 5), {"a":10, "b":20, "c":[7,8,9]}, "_c", {"_a":10, "_b":20, "_c":(3,4,5)}),
+            (VPAFObj(1, 2, 3, 4, 5), {"a": [7, 8, 9], "b": 40, "c": 50}, "_a", {"_a": (1, 2, 3, 4, 5), 
+                                                                                "_b": 40, "_c": 50}),
+            
+            (VPAMObj(1, 2, 3, 4, 5), {"a": 10, "b": [7, 8, 9], "c": 50}, "_b", {"_a": 10, "_b": (2, 3, 4, 5), 
+                                                                                "_c": 50}),
+            
+            (VPALObj(1, 2, 3, 4, 5), {"a": 10, "b": 20, "c": [7, 8, 9]}, "_c", {"_a": 10, "_b": 20, "_c": (3, 4, 5)}),
 
             # not omit variable positional arguments
-            (VPAFObj(1, 2, 3, 4, 5), {"a":[7,8,9], "b":40, "c":50}, "", {"_a":(7,8,9), "_b":40, "_c":50}),
-            (VPAMObj(1, 2, 3, 4, 5), {"a":10, "b":[7,8,9], "c":50}, "", {"_a":10, "_b":(7,8,9), "_c":50}),
-            (VPALObj(1, 2, 3, 4, 5), {"a":10, "b":20, "c":[7,8,9]}, "", {"_a":10, "_b":20, "_c":(7,8,9)}),
+            (VPAFObj(1, 2, 3, 4, 5), {"a": [7, 8, 9], "b": 40, "c": 50}, "", {"_a": (7, 8, 9), "_b": 40, "_c": 50}),
+            (VPAMObj(1, 2, 3, 4, 5), {"a": 10, "b": [7, 8, 9], "c": 50}, "", {"_a": 10, "_b": (7, 8, 9), "_c": 50}),
+            (VPALObj(1, 2, 3, 4, 5), {"a": 10, "b": 20, "c": [7, 8, 9]}, "", {"_a": 10, "_b": 20, "_c": (7, 8, 9)}),
 
             # omit mixed arguments
-            (MixedArgsObj(2, 4, 6, 8, d=10, f=12), {"a":10, "b":20, "c":[1,2,3], "d":40, "g":"G"},  
-                                             "_a", {"_a":2, "_b":20, "_c":(1,2,3), "_d":40, "_e":{"g":"G"}}),
-            (MixedArgsObj(2, 4, 6, 8, d=10, f=12), {"a":10, "b":20, "c":[1,2,3], "d":40, "g":"G"}, 
-                                             "_c", {"_a":10, "_b":20, "_c":(6,8), "_d":40, "_e":{"g":"G"}}),
-            (MixedArgsObj(2, 4, 6, 8, d=10, f=12), {"a":10, "b":20, "c":[1,2,3], "d":40, "g":"G"},
-                                             "_d", {"_a":10, "_b":20, "_c":(1,2,3), "_d":10, "_e":{"g":"G"}}),
-            (MixedArgsObj(2, 4, 6, 8, d=10, f=12), {"a":10, "b":20, "c":[1,2,3], "d":40, "g":"G"},
-                                             "_e", {"_a":10, "_b":20, "_c":(1,2,3), "_d":40, "_e":{"f":12}}),
+            (MixedArgsObj(2, 4, 6, 8, d=10, f=12), {"a": 10, "b": 20, "c": [1, 2, 3], "d": 40, "g": "G"}, 
+                                             "_a", {"_a": 2, "_b": 20, "_c": (1, 2, 3), "_d": 40, "_e": {"g": "G"}}),
+            (MixedArgsObj(2, 4, 6, 8, d=10, f=12), {"a": 10, "b": 20, "c": [1, 2, 3], "d": 40, "g": "G"}, 
+                                             "_c", {"_a": 10, "_b": 20, "_c": (6, 8), "_d": 40, "_e": {"g": "G"}}),
+            (MixedArgsObj(2, 4, 6, 8, d=10, f=12), {"a": 10, "b": 20, "c": [1, 2, 3], "d": 40, "g": "G"},
+                                             "_d", {"_a": 10, "_b": 20, "_c": (1, 2, 3), "_d": 10, "_e": {"g": "G"}}),
+            (MixedArgsObj(2, 4, 6, 8, d=10, f=12), {"a": 10, "b": 20, "c": [1, 2, 3], "d": 40, "g": "G"},
+                                             "_e", {"_a": 10, "_b": 20, "_c": (1, 2, 3), "_d": 40, "_e": {"f": 12}}),
             
             # not omit mixed arguments
-            (MixedArgsObj(2, 4, 6, 8, d=10, f=12), {"a":10, "b":20, "c":[1,2,3], "d":40, "g":"G"},
-                                               "", {"_a":10, "_b":20, "_c":(1,2,3), "_d":40, "_e":{"g":"G"}}),
+            (MixedArgsObj(2, 4, 6, 8, d=10, f=12), {"a": 10, "b": 20, "c": [1, 2, 3], "d": 40, "g": "G"},
+                                               "", {"_a": 10, "_b": 20, "_c": (1, 2, 3), "_d": 40, "_e": {"g": "G"}}),
         ]
     )
-    def test_omit_logic(self, obj, setting, omit_args, expected_state):
+    def test_omit_logic(self, obj, setting, omit_args, expected_state) -> None:
         """Test the logic of omitting the update of specified arguments"""
         apply_setting(obj, setting, omit=omit_args)
         assert obj.__dict__ == expected_state
 
-    def test_slots_object(self):
+    def test_slots_object(self) -> None:
         """Test the logic of dealing with slots object"""
         class OneSlotObj:
             __slots__ = "_a"
-            def __init__(self, a):
+
+            def __init__(self, a) -> None:
                 self._a = a
 
         class MultiSlotObj:
             __slots__ = ["_a", "_b", "_c"]
-            def __init__(self, a, b, c=3):
+
+            def __init__(self, a, b, c=3) -> None:
                 self._a = a
                 self._b = b
                 self._c = c
@@ -343,16 +356,16 @@ class TestApplySetting:
         assert obj._a == 10
 
         # slots just multi attributes
-        obj = MultiSlotObj(1,2,3)
-        apply_setting(obj, {"a": 10, "b":20})
+        obj = MultiSlotObj(1, 2, 3)
+        apply_setting(obj, {"a": 10, "b": 20})
         assert obj._a == 10
         assert obj._b == 20
         assert obj._c == 3
 
-    def test_private_property(self):
+    def test_private_property(self) -> None:
         """Test whether the function works well when the inner attribute is private"""
         class PrivateObj:
-            def __init__(self, a):
+            def __init__(self, a) -> None:
                 self.__a = a
             
             @property
@@ -361,7 +374,8 @@ class TestApplySetting:
                 
         class PrivateSlotObj:
             __slots__ = "__a"
-            def __init__(self, a):
+
+            def __init__(self, a) -> None:
                 self.__a = a
             
             @property
@@ -376,10 +390,10 @@ class TestApplySetting:
         apply_setting(obj, setting={'a': 10})
         assert obj.a_val == 10
 
-    def test_indirect_property(self):
+    def test_indirect_property(self) -> None:
         """Test whether indirect initialization properties will change synchronously."""
         class IndirectObj:
-            def __init__(self, a):
+            def __init__(self, a) -> None:
                 self.a = a
                 self.computed = a * 2 
 
@@ -388,14 +402,14 @@ class TestApplySetting:
         assert obj.a == 5
         assert obj.computed == 10 
 
-    def test_inplace_update(self):
+    def test_inplace_update(self) -> None:
         """Test whether the settings are updated inplace"""
         class Child:
-            def __init__(self, value):
+            def __init__(self, value) -> None:
                 self.value = value
 
         class Parent:
-            def __init__(self, child: Child):
+            def __init__(self, child: Child) -> None:
                 self.child = child
 
         child = Child(1)
@@ -405,25 +419,26 @@ class TestApplySetting:
         assert child.value == 10
         assert parent.child.value == 10
 
-    def test_edge_cases(self):
+    def test_edge_cases(self) -> None:
         # omit list is empty
         obj = NoVPAObj(1, 2, 3) 
         apply_setting(obj, 
-                      setting={"a":10, "b":20, "c":30}, 
+                      setting={"a": 10, "b": 20, "c": 30}, 
                       omit=[])
         assert obj._a == 10
         assert obj._b == 20
         assert obj._c == 30
 
+
 class TestRenderPerline:
-    def test_negative_interval(self, mock_config, monkeypatch):
+    def test_negative_interval(self, mock_config, monkeypatch) -> None:
         """Test ValueError when render_interval is negative"""
         monkeypatch.setattr("torchmeter.display.__cfg__.render_interval", -0.5)
         with pytest.raises(ValueError) as excinfo:
             render_perline("test")
         assert "non-negative" in str(excinfo.value)
 
-    def test_instant_render(self, mock_config, mock_console, monkeypatch):
+    def test_instant_render(self, mock_config, mock_console, monkeypatch) -> None:
         """Test immediate rendering when time_sep is 0"""
         with patch("rich.get_console", return_value=mock_console), \
             patch("time.sleep") as mock_sleep:
@@ -437,7 +452,7 @@ class TestRenderPerline:
             # and no sleep calls
             mock_sleep.assert_not_called()
 
-    def test_render_line_by_line(self, mock_config, mock_console, monkeypatch):
+    def test_render_line_by_line(self, mock_config, mock_console, monkeypatch) -> None:
         """Test line-by-line rendering with time interval"""
         with patch("rich.get_console", return_value=mock_console), \
              patch("time.sleep") as mock_sleep:
@@ -480,9 +495,8 @@ class TestRenderPerline:
         ]
     )
     def test_various_content(self, content, render_lines_num,
-                             mock_console, monkeypatch):
+                             mock_console, monkeypatch) -> None:
         """Test handling empty renderable content"""
-        
         
         with patch("rich.get_console", return_value=mock_console), \
              patch("time.sleep") as mock_sleep:
@@ -497,11 +511,12 @@ class TestRenderPerline:
             render_perline(content)
             mock_sleep.call_count == render_lines_num
 
+
 class TestTreeRenderer:
-    def teardown_method(self, method):
+    def teardown_method(self, method) -> None:
         __cfg__.restore()
         
-    def test_valid_init(self, simple_tree_renderer):
+    def test_valid_init(self, simple_tree_renderer) -> None:
         """Test valid initialization"""
         assert isinstance(simple_tree_renderer.opnode, OperationNode)
         assert simple_tree_renderer.render_unfold_tree is None
@@ -509,22 +524,22 @@ class TestTreeRenderer:
         assert isinstance(simple_tree_renderer.loop_algebras, str)
         assert len(simple_tree_renderer.loop_algebras) >= 10
 
-    def test_invalid_init(self):
+    def test_invalid_init(self) -> None:
         """Test invalid initialization"""
         with pytest.raises(TypeError):
             TreeRenderer(1)
 
-    def test_default_level_args(self, simple_tree_renderer):
+    def test_default_level_args(self, simple_tree_renderer) -> None:
         """Test if default_level_args is set and retrieved correctly"""
         
         # retrieve
-        ## when default settings is defined
+        # when default settings is defined
         default_args = simple_tree_renderer.default_level_args
         assert isinstance(default_args, FlagNameSpace)
         assert default_args.is_change()  # newly created, mark as changed
         assert hasattr(default_args, "label")
         
-        ## when default settings is not defined
+        # when default settings is not defined
         delattr(simple_tree_renderer.tree_levels_args, "default")
         default_args = simple_tree_renderer.default_level_args
         assert isinstance(default_args, FlagNameSpace)
@@ -546,20 +561,20 @@ class TestTreeRenderer:
         assert default_args.style == "cyan"
 
         # overwrite
-        ## with invalid type
+        # with invalid type
         with pytest.raises(TypeError):
             simple_tree_renderer.default_level_args = 1
         
-        ## with invalid field
+        # with invalid field
         with pytest.raises(KeyError):
             simple_tree_renderer.default_level_args = {'invalid_field': 'value'}
         
-        ## with combination of invalid field and valid field
+        # with combination of invalid field and valid field
         with pytest.raises(KeyError):
             simple_tree_renderer.default_level_args = {'invalid_field': 'value',
                                                 'label': "test"}
         
-        ## update nothing
+        # update nothing
         default_args.mark_unchange()
         simple_tree_renderer.default_level_args = {}
         assert default_args.is_change()
@@ -567,7 +582,7 @@ class TestTreeRenderer:
                 for f in ['label', 'style', 'guide_style',   # define in display.py::TreeRenderer::default_level_args
                             'highlight', 'hide_root', 'expanded'])
 
-        ## with parts of valid fields
+        # with parts of valid fields
         default_args.mark_unchange()
         simple_tree_renderer.default_level_args = {'label': "test",
                                             'style': "magenta"}
@@ -575,7 +590,7 @@ class TestTreeRenderer:
         assert default_args.label == "test"
         assert default_args.style == "magenta"
     
-    def test_tree_levels_args(self, simple_tree_renderer):
+    def test_tree_levels_args(self, simple_tree_renderer) -> None:
         """Test if tree_levels_args is set and retrieved correctly"""
         
         # retrieve
@@ -600,34 +615,33 @@ class TestTreeRenderer:
         assert level_0_settings.label == "level zero"
 
         # overwrite
-        ## with invalid type
+        # with invalid type
         with pytest.raises(TypeError):
             simple_tree_renderer.tree_levels_args = 1
         
-        ## with invalid field
+        # with invalid field
         with pytest.raises(KeyError):
-            simple_tree_renderer.tree_levels_args = {'default':{'invalid_field': 'value'}}
+            simple_tree_renderer.tree_levels_args = {'default': {'invalid_field': 'value'}}
         
-        ## with combination of invalid field and valid field
+        # with combination of invalid field and valid field
         with pytest.raises(KeyError):
-            simple_tree_renderer.tree_levels_args = {"default":{'invalid_field': 'value',
+            simple_tree_renderer.tree_levels_args = {"default": {'invalid_field': 'value',
                                                                 'label': "test"}}
         
-        ## with invalid level 
+        # with invalid level 
         levels_args.mark_unchange()
         with pytest.warns(UserWarning):
             simple_tree_renderer.tree_levels_args = {"invalid_level": {'label': "test"}}
         assert levels_args.is_change()
         assert not hasattr(levels_args, "invalid_level")
 
-
-        ## assign `default` settings
+        # assign `default` settings
         levels_args.mark_unchange()
         simple_tree_renderer.tree_levels_args = {"default": {'label': "test"}}
         assert levels_args.default.label == "test"
         assert levels_args.is_change()
 
-        ## assign `all` settings
+        # assign `all` settings
         levels_args.mark_unchange()
         simple_tree_renderer.tree_levels_args = {"1": {'label': "test"}}
         simple_tree_renderer.tree_levels_args = {"all": {'label': "all label"}}
@@ -637,15 +651,15 @@ class TestTreeRenderer:
         assert not hasattr(levels_args, "1")
         assert not hasattr(levels_args, "all")
         
-        ## update nothing
+        # update nothing
         levels_args.mark_unchange()
         simple_tree_renderer.tree_levels_args = {}
         assert levels_args.is_change()
         assert hasattr(levels_args, "default")
         
-        ## update and new level settings
+        # update and new level settings
         levels_args.mark_unchange()
-        simple_tree_renderer.tree_levels_args = {"default":{"guide_style": "blue"},
+        simple_tree_renderer.tree_levels_args = {"default": {"guide_style": "blue"},
                                           "3": {"label": "label 3",
                                                 "style": "green",
                                                 "guide_style": "red"}}
@@ -659,13 +673,13 @@ class TestTreeRenderer:
         assert level_3_settings.style == "green"
         assert level_3_settings.guide_style == "red"
         
-        ## verify level case insensitive
+        # verify level case insensitive
         levels_args.mark_unchange()
         simple_tree_renderer.tree_levels_args = {"DeFaulT": {"highlight": False}}
         assert levels_args.is_change()
         assert simple_tree_renderer.default_level_args.highlight is False
 
-    def test_repeat_block_args(self, simple_tree_renderer):
+    def test_repeat_block_args(self, simple_tree_renderer) -> None:
         """Test if repeat_block_args is set and retrieved correctly"""
         
         # retrieve
@@ -686,26 +700,26 @@ class TestTreeRenderer:
         assert rpbk_args.title_align == "left"
 
         # overwrite
-        ## with invalid type
+        # with invalid type
         with pytest.raises(TypeError):
             simple_tree_renderer.repeat_block_args = 1
         
-        ## with invalid field
+        # with invalid field
         with pytest.raises(KeyError):
             simple_tree_renderer.repeat_block_args = {'invalid_field': 'value'}
         
-        ## with combination of invalid field and valid field
+        # with combination of invalid field and valid field
         with pytest.raises(KeyError):
             simple_tree_renderer.repeat_block_args = {'invalid_field': 'value',
                                                       'border_style': 'yellow'}
             
-        ## update nothing
+        # update nothing
         rpbk_args.mark_unchange()
         simple_tree_renderer.repeat_block_args = {}
         assert rpbk_args.is_change()
         assert hasattr(rpbk_args, "title")
         
-        ## update several settings without repeat_footer 
+        # update several settings without repeat_footer 
         rpbk_args.mark_unchange()
         simple_tree_renderer.repeat_block_args = {"subtitle": "this is a subtitle",
                                            "subtitle_align": "left",
@@ -715,21 +729,21 @@ class TestTreeRenderer:
         assert rpbk_args.subtitle_align == "left"
         assert rpbk_args.style == "cyan"
         
-        ## update several settings with repeat_footer 
+        # update several settings with repeat_footer 
         rpbk_args.mark_unchange()
         simple_tree_renderer.repeat_block_args = {"style": "red",
-                                                  "repeat_footer": lambda :"Footer"}
+                                                  "repeat_footer": lambda: "Footer"}
         assert rpbk_args.is_change()
         assert rpbk_args.style == "red"
         assert not hasattr(rpbk_args, "repeat_footer")
         assert simple_tree_renderer.repeat_footer == "Footer"
 
-    def test_repeat_footer(self, simple_tree_renderer):
+    def test_repeat_footer(self, simple_tree_renderer) -> None:
         """Test if repeat_footer is set and retrieved correctly"""
         
         from inspect import signature
         
-        ## retrieve
+        # retrieve
         repeat_footer = simple_tree_renderer.repeat_footer
         rpbk_args = simple_tree_renderer.repeat_block_args
         assert rpbk_args.is_change()
@@ -742,54 +756,54 @@ class TestTreeRenderer:
                 res = repeat_footer()
                 assert isinstance(res, (type(None), str))
         
-        ## set with None
+        # set with None
         rpbk_args.mark_unchange()
         simple_tree_renderer.repeat_footer = None
         assert simple_tree_renderer.repeat_footer is None
         assert rpbk_args.is_change()
         
-        ## set with str
+        # set with str
         rpbk_args.mark_unchange()
         simple_tree_renderer.repeat_footer = "Footer"
         assert simple_tree_renderer.repeat_footer == "Footer"
         assert rpbk_args.is_change()
 
-        ## set with no arg function
+        # set with no arg function
         rpbk_args.mark_unchange()
-        simple_tree_renderer.repeat_footer = lambda :"footer"
+        simple_tree_renderer.repeat_footer = lambda: "footer"
         assert simple_tree_renderer.repeat_footer == "footer"
         assert rpbk_args.is_change()
         
         with pytest.raises(RuntimeError):
-            simple_tree_renderer.repeat_footer = lambda :2
+            simple_tree_renderer.repeat_footer = lambda: 2
         
-        ## set with one arg function
+        # set with one arg function
         rpbk_args.mark_unchange()
         simple_tree_renderer.repeat_footer = lambda x: f"Footer {x}"
         assert simple_tree_renderer.repeat_footer("test") == "Footer test"
         assert rpbk_args.is_change()
         
-        ## set with more than one args function
+        # set with more than one args function
         with pytest.raises(RuntimeError):
             simple_tree_renderer.repeat_footer = lambda x, y: f"Footer {x} {y}"
         
-        ## set with invalid input
+        # set with invalid input
         with pytest.raises(RuntimeError):
             simple_tree_renderer.repeat_footer = 33
 
-    def test_default_footer(self, monkeypatch):
+    def test_default_footer(self, monkeypatch) -> None:
         """Test the default_rpft method logic"""
         from random import sample
 
         monkeypatch.setattr("torchmeter.display.TreeRenderer.loop_algebras", "xy")
 
         class RepeatWinszModel(nn.Module):
-            def __init__(self, repeat_winsz=1, repeat_time=3):
+            def __init__(self, repeat_winsz=1, repeat_time=3) -> None:
                 super(RepeatWinszModel, self).__init__()
                 
                 candidate_layers = (
-                    nn.Linear(1,10),
-                    nn.Conv2d(3,10,1),
+                    nn.Linear(1, 10),
+                    nn.Conv2d(3, 10, 1),
                     nn.MaxPool2d(3),
                     nn.AvgPool2d(3),
                     nn.BatchNorm2d(10),
@@ -819,7 +833,7 @@ class TestTreeRenderer:
         footer_str = Text.from_markup(footer).plain
         assert footer_str == "Where x = 1, 3, 5"            
 
-    def test_resolve_attr(self, simple_tree_renderer):
+    def test_resolve_attr(self, simple_tree_renderer) -> None:
         """Test whether the resolve_attr method works well"""
         simple_tree_renderer.resolve_attr = lambda x: str(x)
         mock_node = Mock(node_id="1.2")
@@ -845,7 +859,7 @@ class TestTreeRenderer:
         )
         assert result == "Node 12345"
 
-    def test_resolve_argtext(self, simple_tree_renderer):
+    def test_resolve_argtext(self, simple_tree_renderer) -> None:
         """Test whether argtext is resolved correctly"""
             
         simple_tree_renderer.resolve_attr = lambda x: str(x)
@@ -875,7 +889,7 @@ class TestTreeRenderer:
         )
         assert result == "Node 1.2 test"
     
-    def test_loop_algebra_rotation(self):
+    def test_loop_algebra_rotation(self) -> None:
         """Test algebraic symbol cyclic rotation logic"""
         
         # no use algebras
@@ -921,7 +935,7 @@ class TestTreeRenderer:
         tree_renderer()
         assert tree_renderer.loop_algebras == 'ba'
     
-    def test_fold_repeat(self, repeat_tree_renderer, monkeypatch):
+    def test_fold_repeat(self, repeat_tree_renderer, monkeypatch) -> None:
         """Test whether the fold_repeat option works well"""
 
         monkeypatch.setattr("torchmeter.display.__cfg__.tree_fold_repeat", True)
@@ -938,7 +952,7 @@ class TestTreeRenderer:
         assert isinstance(res.children[1].children[0].label, str)
         assert isinstance(res.children[1].children[0], Tree)
 
-    def test_isolated_rendering(self, repeat_tree_renderer, monkeypatch):
+    def test_isolated_rendering(self, repeat_tree_renderer, monkeypatch) -> None:
         """Test whether the rendering is performed in a deepcopy tree"""
         
         monkeypatch.setattr("torchmeter.display.__cfg__.tree_fold_repeat", True)
@@ -955,15 +969,15 @@ class TestTreeRenderer:
 
         # not pollute the original operation tree
         oproot = repeat_tree_renderer.opnode
-        assert all(c.node_id == f"2.{c_idx+1}" 
+        assert all(c.node_id == f"2.{c_idx + 1}" 
                    for c_idx, c in enumerate(oproot.childs["2"].childs.values()))
 
-    def test_node_id_generation(self, repeat_tree_renderer, monkeypatch):
+    def test_node_id_generation(self, repeat_tree_renderer, monkeypatch) -> None:
         """Test the generation logic of tree label"""
 
         repeat_tree_renderer.loop_algebras = "xx"
         repeat_tree_renderer.repeat_footer = None
-        repeat_tree_renderer.tree_levels_args = {"all":{"label": "<node_id>"}}
+        repeat_tree_renderer.tree_levels_args = {"all": {"label": "<node_id>"}}
 
         # fold_repeat = True
         monkeypatch.setattr("torchmeter.display.__cfg__.tree_fold_repeat", True)
@@ -1004,7 +1018,7 @@ class TestTreeRenderer:
         assert child_2_3.label == "2.3"
         assert child_2_4.label == "2.4"
 
-    def test_skip_rendering(self, repeat_tree_renderer, monkeypatch):
+    def test_skip_rendering(self, repeat_tree_renderer, monkeypatch) -> None:
         """Test whether the skip logic when fold_repeat = True is correct"""
 
         monkeypatch.setattr("torchmeter.display.__cfg__.tree_fold_repeat", True)
@@ -1021,7 +1035,7 @@ class TestTreeRenderer:
 
         res = repeat_tree_renderer()
 
-        ## display tree is not change
+        # display tree is not change
         assert res.label == "0"
         assert res.children[0].label == "1"
         assert res.children[1].label == "1"
@@ -1037,13 +1051,13 @@ class TestTreeRenderer:
         oproot.childs["2"].childs["2.3"]._is_folded = True
         oproot.childs["2"].childs["2.4"]._is_folded = True
 
-        ## display tree is not change
+        # display tree is not change
         assert res.label == "0"
         assert res.children[0].label == "1"
         assert res.children[1].label == "1"
         assert all(c.label == "2" for c in res.children[1].children)
 
-    def test_repeat_body_generation(self, repeat_tree_renderer, monkeypatch):
+    def test_repeat_body_generation(self, repeat_tree_renderer, monkeypatch) -> None:
         """Test whether the repeat body tree is generated correctly"""
         
         monkeypatch.setattr("torchmeter.display.__cfg__.tree_fold_repeat", True)
@@ -1064,7 +1078,7 @@ class TestTreeRenderer:
         assert "Linear" in repeat_body_tree.children[0].label
         assert "ReLU" in repeat_body_tree.children[1].label
 
-    def test_repeat_block_rendering(self, repeat_tree_renderer, monkeypatch):
+    def test_repeat_block_rendering(self, repeat_tree_renderer, monkeypatch) -> None:
         """Test whether the repeat block(panel) can be rendered correctly"""
         
         monkeypatch.setattr("torchmeter.display.__cfg__.tree_fold_repeat", True)
@@ -1088,7 +1102,7 @@ class TestTreeRenderer:
         assert isinstance(footer, str)
         assert "Footer" in footer
 
-    def test_style_application(self, repeat_tree_renderer, monkeypatch):
+    def test_style_application(self, repeat_tree_renderer, monkeypatch) -> None:
         """Test the levels styles and repeat block styles are applied correctly"""
         
         monkeypatch.setattr("torchmeter.display.__cfg__.tree_fold_repeat", True)
@@ -1132,11 +1146,11 @@ class TestTreeRenderer:
         assert child_2_2.label == "[2.(x+1)] 1-ReLU"
         assert all(c.guide_style == "red" for c in [child_2_1, child_2_2])
 
-    def test_edge_cases(self):
+    def test_edge_cases(self) -> None:
         """Test the edge cases in rendering"""
         
         class EdgeModel(nn.Module):
-            def __init__(self):
+            def __init__(self) -> None:
                 super(EdgeModel, self).__init__()
         
         optree = OperationTree(EdgeModel())
@@ -1157,23 +1171,24 @@ class TestTreeRenderer:
         with pytest.raises(RuntimeError):
             tree_renderer()
             
+
 class TestTabularRenderer:
 
     tbval_getter = lambda _, row_idx, col_idx, tb: tb.columns[col_idx]._cells[row_idx]
 
-    def test_valid_init(self, simple_tabular_renderer):
+    def test_valid_init(self, simple_tabular_renderer) -> None:
         """Test valid initialization"""
         assert isinstance(simple_tabular_renderer.opnode, OperationNode)
         
         stats_data = simple_tabular_renderer._TabularRenderer__stats_data
         assert len(stats_data) == len(OperationNode.statistics)
 
-    def test_invalid_init(self):
+    def test_invalid_init(self) -> None:
         """Test invalid initialization"""
         with pytest.raises(TypeError):
             TabularRenderer(1)
 
-    def test_stats_data(self, simple_tabular_renderer):
+    def test_stats_data(self, simple_tabular_renderer) -> None:
         """Test if the stats data property is set and retrieved correctly"""
         
         stats_data = simple_tabular_renderer.stats_data
@@ -1181,7 +1196,7 @@ class TestTabularRenderer:
         assert tuple(stats_data.keys()) == OperationNode.statistics
         assert all(df.is_empty() for df in stats_data.values())
 
-    def test_tb_args(self, simple_tabular_renderer):
+    def test_tb_args(self, simple_tabular_renderer) -> None:
         """Test if tb_args is set and retrieved correctly"""
         
         # retrieve
@@ -1202,26 +1217,26 @@ class TestTabularRenderer:
         assert tb_args.highlight is False
 
         # overwrite
-        ## with invalid type
+        # with invalid type
         with pytest.raises(TypeError):
             simple_tabular_renderer.tb_args = 1
         
-        ## with invalid field
+        # with invalid field
         with pytest.raises(KeyError):
             simple_tabular_renderer.tb_args = {'invalid_field': 'value'}
         
-        ## with combination of invalid field and valid field
+        # with combination of invalid field and valid field
         with pytest.raises(KeyError):
             simple_tabular_renderer.tb_args = {'invalid_field': 'value',
                                                'border_style': 'yellow'}
             
-        ## update nothing
+        # update nothing
         tb_args.mark_unchange()
         simple_tabular_renderer.tb_args = {}
         assert tb_args.is_change()
         assert hasattr(tb_args, "box")
         
-        ## update several settings
+        # update several settings
         tb_args.mark_unchange()
         simple_tabular_renderer.tb_args = {"style": "red",
                                            "expand": True}
@@ -1229,7 +1244,7 @@ class TestTabularRenderer:
         assert tb_args.style == "red"
         assert tb_args.expand is True
     
-    def test_col_args(self, simple_tabular_renderer):
+    def test_col_args(self, simple_tabular_renderer) -> None:
         """Test if tb_args is set and retrieved correctly"""
         
         # retrieve
@@ -1250,26 +1265,26 @@ class TestTabularRenderer:
         assert col_args.justify == "left"
 
         # overwrite
-        ## with invalid type
+        # with invalid type
         with pytest.raises(TypeError):
             simple_tabular_renderer.col_args = 1
         
-        ## with invalid field
+        # with invalid field
         with pytest.raises(KeyError):
             simple_tabular_renderer.col_args = {'invalid_field': 'value'}
         
-        ## with combination of invalid field and valid field
+        # with combination of invalid field and valid field
         with pytest.raises(KeyError):
             simple_tabular_renderer.col_args = {'invalid_field': 'value',
                                                 'no_wrap': True}
             
-        ## update nothing
+        # update nothing
         col_args.mark_unchange()
         simple_tabular_renderer.col_args = {}
         assert col_args.is_change()
         assert hasattr(col_args, "style")
         
-        ## update several settings
+        # update several settings
         col_args.mark_unchange()
         simple_tabular_renderer.col_args = {"style": "red",
                                             "vertical": "top"}
@@ -1277,7 +1292,7 @@ class TestTabularRenderer:
         assert col_args.style == "red"
         assert col_args.vertical == "top"
     
-    def test_df2tb_structure(self, simple_tabular_renderer, example_df):
+    def test_df2tb_structure(self, simple_tabular_renderer, example_df) -> None:
         """Test the rendering table structure"""
 
         with patch("torchmeter.display.apply_setting", side_effect=apply_setting) as mock_apply:
@@ -1288,12 +1303,12 @@ class TestTabularRenderer:
         assert res.row_count == 3
 
         tb_headers = [col_obj.header for col_obj in res.columns]
-        assert tb_headers == ["numeric" ,  "text" ,  "list_col"  ,  "nomal_obj" , "self_obj"]
+        assert tb_headers == ["numeric", "text", "list_col", "nomal_obj", "self_obj"]
 
-        assert str(example_df[0,0]) == self.tbval_getter(0, 0, res)
-        assert str(example_df[2,1]) == self.tbval_getter(2, 1, res)
-        assert str(example_df[1,2].to_list()) == self.tbval_getter(1, 2, res)
-        assert str(example_df[0,3]) == self.tbval_getter(0, 3, res)
+        assert str(example_df[0, 0]) == self.tbval_getter(0, 0, res)
+        assert str(example_df[2, 1]) == self.tbval_getter(2, 1, res)
+        assert str(example_df[1, 2].to_list()) == self.tbval_getter(1, 2, res)
+        assert str(example_df[0, 3]) == self.tbval_getter(0, 3, res)
         
         # 验证样式应用调用
         mock_apply.assert_any_call(obj=ANY,
@@ -1305,7 +1320,7 @@ class TestTabularRenderer:
                                    setting=simple_tabular_renderer.col_args, 
                                    highlight=simple_tabular_renderer.tb_args.highlight)
     
-    def test_df2tb_none_handling(self, simple_tabular_renderer, example_df):
+    def test_df2tb_none_handling(self, simple_tabular_renderer, example_df) -> None:
         """Test none replacement in rendering table"""
         res = simple_tabular_renderer.df2tb(example_df)
         
@@ -1325,7 +1340,7 @@ class TestTabularRenderer:
         # self object none
         assert self.tbval_getter(1, 4, res) == "test none_str"
 
-    def test_df2tb_show_raw(self, simple_tabular_renderer, example_df):
+    def test_df2tb_show_raw(self, simple_tabular_renderer, example_df) -> None:
         """Test whether the show_raw argument works well"""
 
         noraml_res = simple_tabular_renderer.df2tb(example_df, show_raw=False)
@@ -1347,7 +1362,7 @@ class TestTabularRenderer:
         assert self.tbval_getter(0, 4, raw_res) == "100000.0"
         assert self.tbval_getter(2, 4, raw_res) == "0.0"
     
-    def test_clear(self, simple_tabular_renderer, example_df, monkeypatch):
+    def test_clear(self, simple_tabular_renderer, example_df, monkeypatch) -> None:
         """Test the stat dataframe clearing logic"""
 
         monkeypatch.setattr(simple_tabular_renderer, 
@@ -1379,24 +1394,24 @@ class TestTabularRenderer:
             simple_tabular_renderer.clear(1)
 
     def test_export(self, simple_tabular_renderer, 
-                    example_df, export_dir):
+                    example_df, export_dir) -> None:
         """Test whether the export method works well"""
         
         from polars import read_csv
         
-        # format is not specified
+        # extension is not specified
         with pytest.raises(ValueError):
             simple_tabular_renderer.export(df=example_df,
                                            save_path=export_dir)
         
-        # format is unsupported
+        # extension is unsupported
         with pytest.raises(ValueError):
             simple_tabular_renderer.export(df=example_df,
                                            save_path=export_dir,
-                                           format="png")
+                                           ext="png")
         
-        # without format specified
-        ## file path specified
+        # without extension specified
+        # file path specified
         expected_file = os.path.join(export_dir, "Data.csv")
         assert not os.path.exists(expected_file)
         simple_tabular_renderer.export(df=example_df,
@@ -1404,24 +1419,24 @@ class TestTabularRenderer:
         assert os.path.exists(expected_file)
         os.remove(expected_file)
                 
-        # with format specified
-        ## dir path specified
-        ## format without dot
+        # with extension specified
+        # dir path specified
+        # extension without dot
         expected_file = os.path.join(export_dir, "Identity.xlsx")
         assert not os.path.exists(expected_file)
         simple_tabular_renderer.export(df=example_df,
                                        save_path=export_dir,
-                                       format="xlsx")
+                                       ext="xlsx")
         assert os.path.exists(expected_file)
         os.remove(expected_file)
         
         # without file suffix
-        ## format with dot
+        # extension with dot
         expected_file = os.path.join(export_dir, "Identity.csv")
         assert not os.path.exists(expected_file)
         simple_tabular_renderer.export(df=example_df,
                                        save_path=export_dir,
-                                       format=".csv") 
+                                       ext=".csv") 
         assert os.path.exists(expected_file)
         os.remove(expected_file)
         
@@ -1430,7 +1445,7 @@ class TestTabularRenderer:
         assert not os.path.exists(expected_file)
         simple_tabular_renderer.export(df=example_df,
                                        save_path=export_dir,
-                                       format=".csv",
+                                       ext=".csv",
                                        file_suffix="suffix") 
         assert os.path.exists(expected_file)
         os.remove(expected_file)
@@ -1462,7 +1477,7 @@ class TestTabularRenderer:
         os.remove(expected_normal_file)
         os.remove(expected_raw_file)
         
-    def test_new_col(self, simple_tabular_renderer, example_df):
+    def test_new_col(self, simple_tabular_renderer, example_df) -> None:
         """Test whether the __new_col method works well"""
         
         from polars import Float64
@@ -1492,26 +1507,26 @@ class TestTabularRenderer:
                     col_func="test")
                 
         # invalid column function argument num
-        ## lack
+        # lack
         with pytest.raises(TypeError):
             new_col(df=example_df,
                     col_name="new_col",
-                    col_func=lambda :...)
+                    col_func=lambda: ...)
         
-        ## exceed
+        # exceed
         with pytest.raises(TypeError):
             new_col(df=example_df,
                     col_name="new_col",
-                    col_func=lambda x, y:...)
+                    col_func=lambda x, y: ...)
         
         # invalid column function return
-        ## invalid return type
+        # invalid return type
         with pytest.raises(TypeError):
             new_col(df=example_df,
                     col_name="new_col",
                     col_func=lambda x: 1)
         
-        ## invalid return len
+        # invalid return len
         with pytest.raises(RuntimeError):
             new_col(df=example_df,
                     col_name="new_col",
@@ -1520,11 +1535,11 @@ class TestTabularRenderer:
         # verify function is applied correctly
         new_df = new_col(df=example_df,
                          col_name="new_col",
-                         col_func=lambda x: ["test"]*len(x),
+                         col_func=lambda x: ["test"] * len(x),
                          col_idx=0)
         assert new_df.shape == (3, 6)
         assert new_df.columns[0] == "new_col"
-        assert new_df["new_col"].to_list() == ["test"]*3
+        assert new_df["new_col"].to_list() == ["test"] * 3
         
         # verify funtion operation will not influence the original dataframe
         new_df = new_col(df=example_df,
@@ -1537,46 +1552,46 @@ class TestTabularRenderer:
         assert new_df["origin_numeric"].to_list() == example_df["numeric"].to_list()
 
         # verify col_idx
-        ## non-negative and in range
+        # non-negative and in range
         new_df = new_col(df=example_df,
                          col_name="new_col",
-                         col_func=lambda x: ["test"]*len(x),
+                         col_func=lambda x: ["test"] * len(x),
                          col_idx=1)
         assert new_df.shape == (3, 6)
         assert new_df.columns[1] == "new_col"
         
-        ## non-negative and out of range (add last)
+        # non-negative and out of range (add last)
         new_df = new_col(df=example_df,
                          col_name="new_col",
-                         col_func=lambda x: ["test"]*len(x),
+                         col_func=lambda x: ["test"] * len(x),
                          col_idx=8) 
         assert new_df.shape == (3, 6)
         assert new_df.columns[5] == "new_col"
 
-        ## negative and in range
+        # negative and in range
         new_df = new_col(df=example_df,
                          col_name="new_col",
-                         col_func=lambda x: ["test"]*len(x),
+                         col_func=lambda x: ["test"] * len(x),
                          col_idx=-1)
         assert new_df.shape == (3, 6)
         assert new_df.columns[-1] == "new_col"
         
-        ## negative and out of range (add first)
+        # negative and out of range (add first)
         new_df = new_col(df=example_df,
                          col_name="new_col",
-                         col_func=lambda x: ["test"]*len(x),
+                         col_func=lambda x: ["test"] * len(x),
                          col_idx=-9)
         assert new_df.shape == (3, 6)
         assert new_df.columns[0] == "new_col"
     
-        ## verify return_type is correctly applied
+        # verify return_type is correctly applied
         new_df = new_col(df=example_df,
                          col_name="new_col",
-                         col_func=lambda x: [1]*len(x),
+                         col_func=lambda x: [1] * len(x),
                          return_type=float)
         assert new_df["new_col"].dtype == Float64
     
-    def test_call_valid_use(self, universal_tabular_renderer):
+    def test_call_valid_use(self, universal_tabular_renderer) -> None:
         """Test the valid usage cases of TabularRenderer.__call__"""
         
         tb, data = universal_tabular_renderer(stat_name="param")
@@ -1585,7 +1600,7 @@ class TestTabularRenderer:
         assert isinstance(data, DataFrame)
         assert data.shape == (3, 6) # 1 (unuse) + 2 (conv: weight + bias) 
       
-    def test_call_invalid_use(self, simple_tabular_renderer):
+    def test_call_invalid_use(self, simple_tabular_renderer) -> None:
         """Test the invalid usage cases of TabularRenderer.__call__"""
         
         # invalid stat name
@@ -1606,13 +1621,14 @@ class TestTabularRenderer:
     
     @patch("torchmeter.display.dfs_task", side_effect=dfs_task)
     def test_call_data_acquisition(self, mock_dfs_task,
-                                   simple_tabular_renderer, universal_tabular_renderer):
+                                   simple_tabular_renderer, universal_tabular_renderer) -> None:
         """Test the stat data acquisition logic"""
         
         class EasyModel(nn.Module):
-            def __init__(self):
+            def __init__(self) -> None:
                 super(EasyModel, self).__init__()
-                self.conv = nn.Conv2d(3,10,3)
+                self.conv = nn.Conv2d(3, 10, 3)
+
             def forward(self, x):
                 return self.conv(x)
                 
@@ -1625,7 +1641,7 @@ class TestTabularRenderer:
         optree = OperationTree(EasyModel())
         tabular_renderer = TabularRenderer(optree.root)
         tabular_renderer.clear()
-        tb,data1 = tabular_renderer(stat_name="param")
+        _tb, data1 = tabular_renderer(stat_name="param")
         assert data1.shape == (2, 6) # 2: weight + bias 
         assert mock_dfs_task.call_count == 2 # root + conv
         
@@ -1633,19 +1649,19 @@ class TestTabularRenderer:
         assert not stat_data["param"].is_empty()
         
         # reuse data in latter call
-        tb, data2 = tabular_renderer(stat_name="param")
+        _tb, _data2 = tabular_renderer(stat_name="param")
         assert mock_dfs_task.call_count == 2 # stay no change
         
         # verify no-called module warning
         oproot = universal_tabular_renderer.opnode
         universal_tabular_renderer.clear()
-        list(map(lambda n:n.cal.measure(), list(oproot.childs.values()) + [oproot]))
+        list(map(lambda n: n.cal.measure(), [*list(oproot.childs.values()), oproot]))
         with pytest.warns(RuntimeWarning) as w:
             oproot.operation(torch_randn(1, 3, 20, 20))
-            tb, data = universal_tabular_renderer(stat_name="cal")
+            _tb, _data = universal_tabular_renderer(stat_name="cal")
         assert "not explicitly called" in str(w[0].message)        
         
-    def test_call_pick_col(self, universal_tabular_renderer):
+    def test_call_pick_col(self, universal_tabular_renderer) -> None:
         """Test the column selection logic"""
         
         universal_tabular_renderer.clear()
@@ -1671,7 +1687,7 @@ class TestTabularRenderer:
             universal_tabular_renderer(stat_name="param",
                                        pick_cols=["invalid_col"])
             
-    def test_call_exclude_col(self, universal_tabular_renderer):
+    def test_call_exclude_col(self, universal_tabular_renderer) -> None:
         """Test the column exclusion logic"""
         
         universal_tabular_renderer.clear()
@@ -1682,7 +1698,7 @@ class TestTabularRenderer:
         assert "Operation_Type" not in data.columns
         assert "Operation_Name" not in data.columns
 
-    def test_call_custom_col(self, universal_tabular_renderer):
+    def test_call_custom_col(self, universal_tabular_renderer) -> None:
         """Test column name customization logic"""
         
         universal_tabular_renderer.clear()
@@ -1713,7 +1729,7 @@ class TestTabularRenderer:
         assert "Operation_Id" not in data.columns
         assert "Operation Id" in data.columns
         
-        ## the same column name's recustomization should base on the new name
+        # the same column name's recustomization should base on the new name
         _, data = universal_tabular_renderer(stat_name="param",
                                              keep_custom_name=True,
                                              custom_cols={"Operation_Id": "Operation ID"})
@@ -1724,7 +1740,7 @@ class TestTabularRenderer:
                                              custom_cols={"Operation Id": "Operation ID"})
         assert "Operation ID" in data.columns
             
-    def test_call_pick_exclude_cooperation(self, universal_tabular_renderer):
+    def test_call_pick_exclude_cooperation(self, universal_tabular_renderer) -> None:
         """Test whether exclude logic and selection logic work well together"""
         
         universal_tabular_renderer.clear()
@@ -1747,7 +1763,7 @@ class TestTabularRenderer:
                                              exclude_cols=["Operation_Id"])
         assert data.columns == ["Param_Name", "Numeric_Num"]
 
-    def test_call_pick_custom_cooperation(self, universal_tabular_renderer):
+    def test_call_pick_custom_cooperation(self, universal_tabular_renderer) -> None:
         """Test whether custom_col logic works after selection logic"""
         
         universal_tabular_renderer.clear()
@@ -1774,7 +1790,7 @@ class TestTabularRenderer:
                                        pick_cols=["Operation ID2"],
                                        custom_cols={"Operation ID": "Operation ID2"})
         
-    def test_call_keep_new_col(self, universal_tabular_renderer):
+    def test_call_keep_new_col(self, universal_tabular_renderer) -> None:
         """Test whether the keep_new_col option works well"""
         
         universal_tabular_renderer.clear()
@@ -1782,7 +1798,7 @@ class TestTabularRenderer:
         # not to keep
         _, data = universal_tabular_renderer(stat_name="param",
                                              newcol_name="test",
-                                             newcol_func=lambda x: ["test"]*len(x),
+                                             newcol_func=lambda x: ["test"] * len(x),
                                              keep_new_col=False)
         assert "test" in data.columns
         assert "test" not in universal_tabular_renderer.stats_data["param"].columns
@@ -1790,13 +1806,13 @@ class TestTabularRenderer:
         # keep
         _, data = universal_tabular_renderer(stat_name="param",
                                              newcol_name="test",
-                                             newcol_func=lambda x: ["test"]*len(x),
+                                             newcol_func=lambda x: ["test"] * len(x),
                                              keep_new_col=True)
         assert "test" in data.columns
         assert "test" in universal_tabular_renderer.stats_data["param"].columns
 
     @patch('torchmeter.display.TabularRenderer.export')
-    def test_export_trigger(self, mock_export, universal_tabular_renderer):
+    def test_export_trigger(self, mock_export, universal_tabular_renderer) -> None:
         """Test whether the save_to argument can trigger export"""
 
         # not trigger
@@ -1807,7 +1823,7 @@ class TestTabularRenderer:
         universal_tabular_renderer(stat_name="param", save_to="test.csv")
         mock_export.assert_called_once()
 
-    def test_style_application(self, universal_tabular_renderer):
+    def test_style_application(self, universal_tabular_renderer) -> None:
         """Test the levels styles and repeat block styles are applied correctly"""
         
         universal_tabular_renderer.tb_args = {
@@ -1835,7 +1851,7 @@ class TestTabularRenderer:
         assert col.justify == "left"
         assert col.no_wrap is True
 
-    def test_edge_cases(self, simple_tabular_renderer):
+    def test_edge_cases(self, simple_tabular_renderer) -> None:
         """Test the edge cases in rendering"""
         
         from polars import Float64 as pl_float64

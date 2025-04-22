@@ -1,18 +1,25 @@
 import os
 from enum import Enum
-from unittest.mock import patch, Mock, PropertyMock
+from unittest.mock import Mock, PropertyMock, patch
 
 import yaml
 import pytest
 
 from torchmeter.config import (
-    UNSAFE_KV, DEFAULT_CFG, DEFAULT_FIELDS,
-    dict_to_namespace, namespace_to_dict, list_to_callbacklist,
-    FlagNameSpace, CallbackList, CallbackSet,
-    get_config, Config
+    UNSAFE_KV,
+    DEFAULT_CFG,
+    DEFAULT_FIELDS,
+    Config,
+    CallbackSet,
+    CallbackList,
+    FlagNameSpace,
+    get_config,
+    dict_to_namespace,
+    namespace_to_dict,
+    list_to_callbacklist,
 )
 
-@pytest.fixture()
+@pytest.fixture
 def default_cfg_path(tmpdir):
     temp_cfg_path = tmpdir.join("default_cfg.yaml")
     with open(temp_cfg_path, 'w') as f:
@@ -21,7 +28,8 @@ def default_cfg_path(tmpdir):
     if tmpdir.exists():
         tmpdir.remove(rec=1)
         
-@pytest.fixture()
+
+@pytest.fixture
 def invalid_cfg_path(tmpdir):
     temp_cfg_path = tmpdir.join("invalid_cfg.txt")
     with open(temp_cfg_path, 'w') as f:
@@ -30,7 +38,8 @@ def invalid_cfg_path(tmpdir):
     if tmpdir.exists():
         tmpdir.remove(rec=1)
 
-@pytest.fixture()
+
+@pytest.fixture
 def custom_cfg_path(tmpdir):
     temp_cfg_path = tmpdir.join("custom_cfg.yaml")
     
@@ -44,49 +53,54 @@ def custom_cfg_path(tmpdir):
     if tmpdir.exists():
         tmpdir.remove(rec=1)
 
+
 @pytest.fixture
 def clist():
-    obj = CallbackList([1,2,3,2])
+    obj = CallbackList([1, 2, 3, 2])
     obj._callback_func = Mock()
     return obj
+
 
 @pytest.fixture
 def cset():
-    obj = CallbackSet([1,3,2])
+    obj = CallbackSet([1, 3, 2])
     obj._callback_func = Mock()
     return obj
 
-def pytest_generate_tests(metafunc):
+
+def pytest_generate_tests(metafunc) -> None:
     if "all_type_data" in metafunc.fixturenames:
         metafunc.parametrize(
             argnames="all_type_data", 
             argvalues=[
                 "string", False, 123, 1.23, None, 
-                (1,2,3), [4,5,6], {7,8,9}, {"A":1, "B":2}, 
+                (1, 2, 3), [4, 5, 6], {7, 8, 9}, {"A": 1, "B": 2}, 
                 lambda : None, (_ for _ in range(5))
             ], 
-            ids=map(lambda x:f"val({x})", [
+            ids=map(lambda x: f"val({x})", [
                 "string", "bool", "int", "float", "None", 
-                "tuple", "list", "set","dict",
+                "tuple", "list", "set", "dict",
                 "function", "iterable_obj"
                 ]
             )
         )
 
+
 @pytest.mark.vital
-def test_unsafe_kv():
+def test_unsafe_kv() -> None:
     """Test whether the UNSAFE_KV is correctly defined."""
    
     for key, val in UNSAFE_KV.items():
         assert isinstance(key, str)
-        assert issubclass(val,Enum)
+        assert issubclass(val, Enum)
     
         # test whether the val'repr not equal to its corresponding key
         for k, v in val.__members__.items():
             assert str(v) != k
 
+
 @pytest.mark.vital
-def test_default_fields_in_default_setting():
+def test_default_fields_in_default_setting() -> None:
     """Test whether all default fields are defined in default setting"""
     
     setting_lines_generator = (line for line in DEFAULT_CFG.split('\n')
@@ -100,13 +114,14 @@ def test_default_fields_in_default_setting():
                 assure_fields.append(field)
                 if len(assure_fields) == len(DEFAULT_FIELDS):
                     return
-    pytest.fail(f"These fields are missing in default setting: {set(DEFAULT_FIELDS)-set(assure_fields)}")
+    pytest.fail(f"These fields are missing in default setting: {set(DEFAULT_FIELDS) - set(assure_fields)}")
 
-def test_list_to_callbacklist():
+
+def test_list_to_callbacklist() -> None:
     """Test the logic of list_to_callbacklist function"""
     
     ls = [1, "2", 3., None, (6,), 
-          {7}, {"eight":8}, [9]]
+          {7}, {"eight": 8}, [9]]
     res = list_to_callbacklist(ls)
     assert res[:6] == [1, "2", 3., None, (6,), {7}]
     assert isinstance(res[6], FlagNameSpace)
@@ -114,8 +129,10 @@ def test_list_to_callbacklist():
     assert isinstance(res[7], CallbackList)
     assert res[7] == [9]
     
+
 class TestListToCallbackList:
     ...
+
 
 class TestDictToNamespace:
     
@@ -127,11 +144,11 @@ class TestDictToNamespace:
             (123, True), 
             (1.23, True), 
             (None, True), 
-            ((1,2,3), True)
+            ((1, 2, 3), True)
         ],
-        ids=map(lambda x:f"key({x})", ["string", "bool", "int", "float", "None", "tuple"])
+        ids=map(lambda x: f"key({x})", ["string", "bool", "int", "float", "None", "tuple"])
     )
-    def test_valid_input(self, key, is_error, all_type_data):
+    def test_valid_input(self, key, is_error, all_type_data) -> None:
         """Test normal dictionary conversion"""
         input_dict = {key: all_type_data}
         
@@ -148,13 +165,13 @@ class TestDictToNamespace:
             else:
                 assert key_res == all_type_data
 
-    def test_invalid_input(self, all_type_data):
+    def test_invalid_input(self, all_type_data) -> None:
         """Test non-dictionary input"""
         if not isinstance(all_type_data, dict):
             with pytest.raises(TypeError):
                 dict_to_namespace(all_type_data)
 
-    def test_nested_dict(self):
+    def test_nested_dict(self) -> None:
         """Test the conversion of nested dictionary"""
         
         nested_dict = {
@@ -173,11 +190,11 @@ class TestDictToNamespace:
         }
         result = dict_to_namespace(nested_dict)
         
-        def dfs_assert(namespace, depth=0):
+        def dfs_assert(namespace, depth=0) -> None:
             for k, v in namespace.data_dict.items():
                 
                 if isinstance(v, FlagNameSpace):
-                    dfs_assert(v, depth+1)
+                    dfs_assert(v, depth + 1)
                 else:
                     assert k == "key"
                     assert v == "value"
@@ -185,7 +202,7 @@ class TestDictToNamespace:
         assert isinstance(result, FlagNameSpace)
         dfs_assert(result)
 
-    def test_list(self):
+    def test_list(self) -> None:
         """Test the conversion of dictionary containing list"""
         input_dict = {"list": [{"key1": "value1"}, "item2"]}
         result = dict_to_namespace(input_dict)
@@ -197,7 +214,7 @@ class TestDictToNamespace:
         assert result.list[0].key1 == "value1"
         assert result.list[1] == "item2"
         
-    def test_set(self):
+    def test_set(self) -> None:
         """Test the conversion of dictionary containing set"""
         input_dict = {"set": {"item1", "item2"}}
         result = dict_to_namespace(input_dict)
@@ -209,8 +226,8 @@ class TestDictToNamespace:
 
     @pytest.mark.parametrize(argnames="unsafe_key",
                              argvalues=UNSAFE_KV.keys(),
-                             ids=map(lambda x:f"unsafe_key({x})", UNSAFE_KV.keys()))
-    def test_unsafe_key(self, unsafe_key):
+                             ids=map(lambda x: f"unsafe_key({x})", UNSAFE_KV.keys()))
+    def test_unsafe_key(self, unsafe_key) -> None:
         """""Test the conversion of dict containing unsafe key"""
         vals_enum = UNSAFE_KV[unsafe_key]
         
@@ -229,7 +246,7 @@ class TestDictToNamespace:
                 invalid_safeval *= 2
             result = dict_to_namespace({unsafe_key: invalid_safeval})
 
-    def test_invalid_key(self):
+    def test_invalid_key(self) -> None:
         """Test the conversion of dictionary containing invalid key"""
 
         with pytest.raises(AttributeError):
@@ -238,26 +255,27 @@ class TestDictToNamespace:
         with pytest.raises(AttributeError):
             dict_to_namespace({"__flag_key": 123})
 
+
 class TestNamespaceToDict:
-    def test_valid_input(self, all_type_data):
+    def test_valid_input(self, all_type_data) -> None:
         """Test normal namespace conversion"""
         ns = FlagNameSpace(key1=all_type_data)
         result = namespace_to_dict(ns)
         assert isinstance(result, dict)
         assert result["key1"] == all_type_data
 
-    def test_invalid_input(self, all_type_data):
+    def test_invalid_input(self, all_type_data) -> None:
         """Test non-FlagNameSpace input"""
         with pytest.raises(TypeError):
             namespace_to_dict(all_type_data)
 
     @pytest.mark.parametrize(argnames="unsafe_key",
                              argvalues=UNSAFE_KV.keys(),
-                             ids=map(lambda x:f"unsafe_key({x})", UNSAFE_KV.keys()))
+                             ids=map(lambda x: f"unsafe_key({x})", UNSAFE_KV.keys()))
     @pytest.mark.parametrize(argnames="safe_resolve",
                              argvalues=(True, False),
-                             ids=lambda x:f"safe_resolve={x}")
-    def test_unsafe_key(self, unsafe_key, safe_resolve):
+                             ids=lambda x: f"safe_resolve={x}")
+    def test_unsafe_key(self, unsafe_key, safe_resolve) -> None:
         """Test the conversion of FlagNameSpace containing unsafe key"""
         vals_enum = UNSAFE_KV[unsafe_key]
         
@@ -301,7 +319,7 @@ class TestNamespaceToDict:
             with pytest.raises(Exception):
                 namespace_to_dict(ns, safe_resolve=safe_resolve)
             
-    def test_nested_namespace(self):
+    def test_nested_namespace(self) -> None:
         """Test the conversion of nested FlagNameSpace"""
         ns = FlagNameSpace(
             nested_one=FlagNameSpace(
@@ -313,13 +331,13 @@ class TestNamespaceToDict:
             )
         )
 
-        def dfs_assert(res_dict, depth=0):
+        def dfs_assert(res_dict, depth=0) -> None:
             for k, v in res_dict.items():
                 if "__FLAG" in k:
                     continue
                 
                 if isinstance(v, dict):
-                    dfs_assert(v, depth+1)
+                    dfs_assert(v, depth + 1)
                     assert k.startswith("nested")
                 else:
                     assert k == "key"
@@ -330,7 +348,7 @@ class TestNamespaceToDict:
         
         dfs_assert(result)
 
-    def test_list(self):
+    def test_list(self) -> None:
         """Test the conversion of FlagNameSpace containing list"""
         nested_ns = FlagNameSpace(key1="value1")
         ns = FlagNameSpace(list=[nested_ns, "item2"])
@@ -340,7 +358,7 @@ class TestNamespaceToDict:
         assert result["list"][0]["key1"] == "value1"
         assert result["list"][1] == "item2"
 
-    def test_invalid_key(self):
+    def test_invalid_key(self) -> None:
         """Test the conversion of FlagNameSpace containing invalid key"""
         
         with pytest.raises(AttributeError):
@@ -349,8 +367,9 @@ class TestNamespaceToDict:
         with pytest.raises(AttributeError):
             FlagNameSpace(__flag_key="value")
 
+
 class TestCallbackList:
-    def test_init(self):
+    def test_init(self) -> None:
         """Test the initialization of callback list"""
         
         # verify default callback function
@@ -365,94 +384,94 @@ class TestCallbackList:
         assert clist == [4, 5, 6]
         assert clist._callback_func() == 42
     
-    def test_inheritance(self):
+    def test_inheritance(self) -> None:
         """Test whether the list type is maintained."""
         assert issubclass(CallbackList, list)
         assert isinstance(CallbackList(), list)
     
-    def test_append(self, clist):
+    def test_append(self, clist) -> None:
         """Test the append method of callback list"""
         clist.append(42)
-        assert clist == [1,2,3,2,42]
+        assert clist == [1, 2, 3, 2, 42]
         clist._callback_func.assert_called_once()
 
-    def test_extend(self, clist):
+    def test_extend(self, clist) -> None:
         """Test the extend method of callback list"""
         clist.extend([1, 2, 3])
-        assert clist == [1,2,3,2,1, 2, 3]
+        assert clist == [1, 2, 3, 2, 1, 2, 3]
         clist._callback_func.assert_called_once()
 
-    def test_insert(self, clist):
+    def test_insert(self, clist) -> None:
         """Test the insert method of callback list"""
         
         clist.insert(0, 10)
-        assert clist == [10,1,2,3,2]
+        assert clist == [10, 1, 2, 3, 2]
         assert clist._callback_func.call_count == 1
 
-    def test_pop(self, clist):
+    def test_pop(self, clist) -> None:
         """Test the pop method of callback list"""
         
         clist.pop()
-        assert clist == [1,2,3]
+        assert clist == [1, 2, 3]
         assert clist._callback_func.call_count == 1
 
-    def test_remove(self, clist):
+    def test_remove(self, clist) -> None:
         """Test the remove method of callback list"""
         
         clist.remove(2)
         assert clist == [1, 3, 2]
         assert clist._callback_func.call_count == 1
     
-    def test_clear(self, clist):
+    def test_clear(self, clist) -> None:
         """Test the clear method of callback list"""
         
         clist.clear()
         assert not len(clist)
         assert clist._callback_func.call_count == 1    
 
-    def test_reverse(self, clist):
+    def test_reverse(self, clist) -> None:
         """Test the reverse method of callback list"""
         
         clist.reverse()
         assert clist == [2, 3, 2, 1]
         assert clist._callback_func.call_count == 1
     
-    def test_sort(self, clist):
+    def test_sort(self, clist) -> None:
         """Test the sort method of callback list"""
         
         clist.sort()
         assert clist == [1, 2, 2, 3]
         assert clist._callback_func.call_count == 1
         
-    def test_setitem(self, clist):
+    def test_setitem(self, clist) -> None:
         """Test the setitem method of callback list"""
         
         clist[0] = 10
         assert clist == [10, 2, 3, 2]
         assert clist._callback_func.call_count == 1
 
-    def test_delitem(self, clist):
+    def test_delitem(self, clist) -> None:
         """Test the delitem method of callback list"""
         
         del clist[0]
         assert clist == [2, 3, 2]
         assert clist._callback_func.call_count == 1
     
-    def test_iadd(self, clist):
+    def test_iadd(self, clist) -> None:
         """Test the iadd method of callback list"""
         
         clist += [10, 20, 30]
         assert clist == [1, 2, 3, 2, 10, 20, 30]
         assert clist._callback_func.call_count == 1
     
-    def test_imul(self, clist):
+    def test_imul(self, clist) -> None:
         """Test the imul method of callback list"""
         
         clist *= 2
         assert clist == [1, 2, 3, 2, 1, 2, 3, 2]
         assert clist._callback_func.call_count == 1
     
-    def test_multi_calls(self, clist):
+    def test_multi_calls(self, clist) -> None:
         """Test whether the callback function is called correctly in multiple calls"""
         
         clist.append(10)
@@ -461,7 +480,7 @@ class TestCallbackList:
         assert clist == [1, 2, 3, 2, 10, 20, 30, 40]
         assert clist._callback_func.call_count == 3
 
-    def test_callback_trigger_order(self):
+    def test_callback_trigger_order(self) -> None:
         """Test callback function is triggered after origin api ends"""
         
         result = []
@@ -472,13 +491,13 @@ class TestCallbackList:
         cl.extend([20, 30])
         assert result == [1, 3] 
         
-    def test_edge_cases(self, clist):
+    def test_edge_cases(self, clist) -> None:
         """Test some edge usage cases"""
         
         # empty operation
         clist.append(None)
         clist.extend([])
-        assert clist == [1,2,3,2,None]
+        assert clist == [1, 2, 3, 2, None]
         assert clist._callback_func.call_count == 2
         clist._callback_func.reset_mock()
         
@@ -491,8 +510,9 @@ class TestCallbackList:
             clist.extend(1) 
         assert clist._callback_func.call_count == 0
 
+
 class TestCallbackSet:
-    def test_init(self):
+    def test_init(self) -> None:
         """Test the initialization of callback set"""
         
         # verify default callback function
@@ -507,110 +527,110 @@ class TestCallbackSet:
         assert cset == {4, 6}
         assert cset._callback_func() == 42
     
-    def test_inheritance(self):
+    def test_inheritance(self) -> None:
         """Test whether the set type is maintained."""
         assert issubclass(CallbackSet, set)
         assert isinstance(CallbackSet(), set)
     
-    def test_add(self, cset):
+    def test_add(self, cset) -> None:
         """Test the add method of callback set"""
         cset.add(42)
-        assert cset == {1,2,3,42}
+        assert cset == {1, 2, 3, 42}
         cset._callback_func.assert_called_once()
 
-    def test_update(self, cset):
+    def test_update(self, cset) -> None:
         """Test the update method of callback set"""
-        cset.update({10,6,8})
+        cset.update({10, 6, 8})
         assert cset == {1, 2, 3, 6, 8, 10}
         cset._callback_func.assert_called_once()
 
-    def test_difference_update(self, cset):
+    def test_difference_update(self, cset) -> None:
         """Test the difference_update method of callback set"""
         
         cset.difference_update({2, 3})
         assert cset == {1}
         assert cset._callback_func.call_count == 1
 
-    def test_intersection_update(self, cset):
+    def test_intersection_update(self, cset) -> None:
         """Test the intersection_update method of callback set"""
         
         cset.intersection_update({2})
         assert cset == {2}
         assert cset._callback_func.call_count == 1
 
-    def test_symmetric_difference_update(self, cset):
+    def test_symmetric_difference_update(self, cset) -> None:
         """Test the symmetric_difference_update method of callback set"""
         
         cset.symmetric_difference_update({2, 3, 4})
         assert cset == {1, 4}
         assert cset._callback_func.call_count == 1
     
-    def test_discard(self, cset):
+    def test_discard(self, cset) -> None:
         """Test the discard method of callback set"""
         
         cset.discard(1)
-        assert cset == {2,3}
+        assert cset == {2, 3}
         assert cset._callback_func.call_count == 1    
 
-    def test_pop(self, cset):
+    def test_pop(self, cset) -> None:
         """Test the pop method of callback set"""
         
         cset.pop()
-        assert cset == {2,3}
+        assert cset == {2, 3}
         assert cset._callback_func.call_count == 1
     
-    def test_remove(self, cset):
+    def test_remove(self, cset) -> None:
         """Test the remove method of callback set"""
         
         cset.remove(2)
         assert cset == {1, 3}
         assert cset._callback_func.call_count == 1
         
-    def test_clear(self, cset):
+    def test_clear(self, cset) -> None:
         """Test the clear method of callback set"""
         
         cset.clear()
         assert not len(cset)
         assert cset._callback_func.call_count == 1
 
-    def test_isub(self, cset):
+    def test_isub(self, cset) -> None:
         """Test the isub method of callback set"""
         
         cset -= {2}
         assert cset == {1, 3}
         assert cset._callback_func.call_count == 1
         
-    def test_iand(self, cset):
+    def test_iand(self, cset) -> None:
         """Test the iand method of callback set"""
         
         cset &= {3}
         assert cset == {3}
         assert cset._callback_func.call_count == 1
     
-    def test_ixor(self, cset):
+    def test_ixor(self, cset) -> None:
         """Test the iadd method of callback set"""
         
-        cset ^= {2,4}
-        assert cset == {1,3,4}
+        cset ^= {2, 4}
+        assert cset == {1, 3, 4}
         assert cset._callback_func.call_count == 1
     
-    def test_ior(self, cset):
+    def test_ior(self, cset) -> None:
         """Test the ior method of callback set"""
         
         cset |= {4, 5}
-        assert cset == {1,2,3,4,5}
+        assert cset == {1, 2, 3, 4, 5}
         assert cset._callback_func.call_count == 1
     
-    def test_multi_calls(self, cset):
+    def test_multi_calls(self, cset) -> None:
         """Test whether the callback function is called correctly in multiple calls"""
         
         cset.add(10)
         cset.update({20, 30})
         cset.add(40)
-        assert cset == {1,2,3,10,20,30,40}
+        assert cset == {1, 2, 3, 10, 20, 30, 40}
         assert cset._callback_func.call_count == 3
 
-    def test_callback_trigger_order(self):
+    def test_callback_trigger_order(self) -> None:
         """Test callback function is triggered after origin api ends"""
         
         result = []
@@ -621,13 +641,13 @@ class TestCallbackSet:
         cl.update({20, 30})
         assert result == [1, 3] 
         
-    def test_edge_cases(self, cset):
+    def test_edge_cases(self, cset) -> None:
         """Test the edge cases of callback set"""
         
         # empty operation
         cset.add(None)
         cset.update(set())
-        assert cset == {1,3,2,None}
+        assert cset == {1, 3, 2, None}
         assert cset._callback_func.call_count == 2
         cset._callback_func.reset_mock()
         
@@ -640,8 +660,9 @@ class TestCallbackSet:
             cset.remove(100) 
         assert cset._callback_func.call_count == 0
 
+
 class TestFlagNameSpace:
-    def test_init(self):
+    def test_init(self) -> None:
         flagns = FlagNameSpace(key1="value1", key2=123)
         assert hasattr(flagns, "key1")
         assert hasattr(flagns, "key2")
@@ -650,7 +671,7 @@ class TestFlagNameSpace:
         assert hasattr(flagns, "_FlagNameSpace__flag_key")
         assert not flagns.is_change()
 
-    def test_setattr(self, all_type_data):
+    def test_setattr(self, all_type_data) -> None:
         flagns = FlagNameSpace()
         flagns.key1 = all_type_data
         
@@ -678,7 +699,7 @@ class TestFlagNameSpace:
         with pytest.raises(AttributeError):
             setattr(flagns, "__flag_key", "new_value")
 
-    def test_delattr(self):
+    def test_delattr(self) -> None:
         flagns = FlagNameSpace(key1="value1")
         del flagns.key1
         assert not hasattr(flagns, "key1")
@@ -698,7 +719,7 @@ class TestFlagNameSpace:
         with pytest.raises(AttributeError):
             del flagns._FlagNameSpace__flag_key
 
-    def test_data_dict(self):
+    def test_data_dict(self) -> None:
         """Test the data_dict property is set and retrieved correctly"""
         
         flagns = FlagNameSpace(key1="value1", key2=123)
@@ -716,7 +737,7 @@ class TestFlagNameSpace:
         data_dict["key1"] = "value2"
         assert flagns.key1 == "value1"
 
-    def test_update(self):
+    def test_update(self) -> None:
         """Test the logic of update method"""
         
         flagns = FlagNameSpace(key1="value1", key2=123)
@@ -729,27 +750,27 @@ class TestFlagNameSpace:
         assert flagns.is_change() is False
         
         # add new key
-        ## with dict
+        # with dict
         assert "key3" not in flagns.__dict__
         flagns.update({"key3": 456})
         assert flagns.key3 == 456
         assert "key2" in flagns.__dict__
         assert flagns.is_change()
         
-        ## with FlagNameSpace
+        # with FlagNameSpace
         assert "key4" not in flagns.__dict__
         flagns.update(FlagNameSpace(key4=789))
         assert flagns.key4 == 789
         assert "key3" in flagns.__dict__
         
         # update existing key
-        ## with dict
+        # with dict
         assert flagns.key1 != "000"
         flagns.update({"key1": "000"})
         assert flagns.key1 == "000"
         assert "key4" in flagns.__dict__
         
-        ## with FlagNameSpace
+        # with FlagNameSpace
         assert flagns.key2 != "123"
         flagns.update(FlagNameSpace(key2="123"))
         assert flagns.key2 == "123"
@@ -770,9 +791,9 @@ class TestFlagNameSpace:
         assert flagns.data_dict == {"key5": 901}
         assert flagns.is_change()
 
-    def test_is_change(self):
+    def test_is_change(self) -> None:
         flagns = FlagNameSpace(key1='1', 
-                               key2=[2,[3, 3]],
+                               key2=[2, [3, 3]],
                                key3=FlagNameSpace(val3=4))
         assert not flagns.is_change() 
 
@@ -788,7 +809,7 @@ class TestFlagNameSpace:
         assert not flagns.is_change() 
         
         # modify list
-        ## modify common element
+        # modify common element
         flagns.key2[0] = 5
         assert flagns.is_change()
         flagns.mark_unchange()
@@ -804,7 +825,7 @@ class TestFlagNameSpace:
         flagns.mark_unchange()
         assert not flagns.is_change()
         
-        ## modify nested list
+        # modify nested list
         flagns.key2[0][0] = 7
         assert flagns.is_change()
         flagns.mark_unchange()
@@ -848,7 +869,7 @@ class TestFlagNameSpace:
         assert flagns.is_change()
         flagns.mark_unchange()
         
-    def test_mark_change_and_unchange(self):
+    def test_mark_change_and_unchange(self) -> None:
         flagns = FlagNameSpace(key=FlagNameSpace(subkey=1))
         assert not flagns.is_change()
         assert not flagns.key.is_change()
@@ -871,41 +892,42 @@ class TestFlagNameSpace:
         assert not flagns.is_change()
         assert not flagns.key.is_change()
 
+
 @pytest.mark.vital
 class TestGetConfig:
-    def teardown_method(self, method):
+    def teardown_method(self, method) -> None:
         cfg = Config()
         cfg.config_file = None
         
-    def test_get_default(self):
+    def test_get_default(self) -> None:
         with patch.dict(os.environ, {}, clear=True):  
             config = get_config()
             assert isinstance(config, Config)
-            assert config.config_file is None  
+            assert config.config_file is None 
             for field in DEFAULT_FIELDS:
                 assert hasattr(config, field)
 
-    def test_get_from_env(self, default_cfg_path):
+    def test_get_from_env(self, default_cfg_path) -> None:
         with patch.dict(os.environ, {"TORCHMETER_CONFIG": default_cfg_path}):
             config = get_config()
             assert isinstance(config, Config)
             assert config.config_file == default_cfg_path
 
-    def test_get_from_path(self, default_cfg_path):
+    def test_get_from_path(self, default_cfg_path) -> None:
         config = get_config(default_cfg_path)
         assert isinstance(config, Config)
         assert config.config_file == default_cfg_path
 
-    def test_config_file_not_exist(self):
+    def test_config_file_not_exist(self) -> None:
         fake_config_path = "/fake/path/to/nonexistent.yaml"
         with pytest.raises(FileNotFoundError):
             get_config(fake_config_path)
 
-    def test_get_invalid_file(self, invalid_cfg_path):
+    def test_get_invalid_file(self, invalid_cfg_path) -> None:
         with pytest.raises(ValueError):
             get_config(invalid_cfg_path)
 
-    def test_get_custom_file(self, custom_cfg_path):
+    def test_get_custom_file(self, custom_cfg_path) -> None:
         with pytest.warns(UserWarning) as w:
             config = get_config(custom_cfg_path)
             assert isinstance(config, Config)
@@ -913,13 +935,14 @@ class TestGetConfig:
             assert config.render_interval == 0.34
         assert len(w) == len(DEFAULT_FIELDS) - 1
 
+
 @pytest.mark.vital
 class TestConfig:
-    def teardown_method(self, method):
+    def teardown_method(self, method) -> None:
         cfg = Config()
         cfg.restore()
         
-    def test_init(self, custom_cfg_path):
+    def test_init(self, custom_cfg_path) -> None:
         # init with no config file
         config = Config()
         assert config.config_file is None
@@ -935,16 +958,16 @@ class TestConfig:
             assert config.config_file == custom_cfg_path
             assert config.render_interval == 0.34
         
-    def test_ban_delete_or_new_field(self):
+    def test_ban_delete_or_new_field(self) -> None:
         config = Config()
         with pytest.raises(AttributeError):
             config.new_attr = 123
         
-        for field in DEFAULT_FIELDS + ["config_file"]:
+        for field in [*DEFAULT_FIELDS, "config_file"]:
             with pytest.raises(RuntimeError):
                 delattr(config, field)
 
-    def test_config_file_property(self, invalid_cfg_path, custom_cfg_path):
+    def test_config_file_property(self, invalid_cfg_path, custom_cfg_path) -> None:
         """Test the property `config_file` getter and setter"""
         config = Config()
         assert config.config_file is None
@@ -960,7 +983,7 @@ class TestConfig:
 
         # custom config file specified is tested in TestGetConfig::test_get_custom_file
 
-    def test_setattr(self):
+    def test_setattr(self) -> None:
         """Test the logic of setattr"""
         
         config = Config()
@@ -980,7 +1003,7 @@ class TestConfig:
         
         # set attribute whose value is a FlagNameSpace
         # verify the action is actually a update
-        ## with dict
+        # with dict
         assert config.tree_repeat_block_args.title_align != "left"
         config.tree_repeat_block_args = {"title_align": "left"}
         assert config.tree_repeat_block_args.title_align == "left"
@@ -1005,7 +1028,7 @@ class TestConfig:
         assert isinstance(config.combine.new_field, FlagNameSpace)
         assert config.combine.new_field.data_dict == {"sub_field1": 1, "sub_field2": 2}
 
-        ## with another FlagNameSpace
+        # with another FlagNameSpace
         assert config.tree_repeat_block_args.title_align != "right"
         config.tree_repeat_block_args = FlagNameSpace(title_align="right")
         assert config.tree_repeat_block_args.title_align == "right"
@@ -1025,13 +1048,13 @@ class TestConfig:
         assert isinstance(config.combine.new_field, FlagNameSpace)
         assert config.combine.new_field3.data_dict == {"sub_field1": 1, "sub_field2": 2}
 
-    def test_delattr(self):
+    def test_delattr(self) -> None:
         config = Config()
-        for field in DEFAULT_FIELDS + ["config_file"]:
+        for field in [*DEFAULT_FIELDS, "config_file"]:
             with pytest.raises(RuntimeError):
                 delattr(config, field)
 
-    def test_restore(self):
+    def test_restore(self) -> None:
         default_settings = yaml.safe_load(DEFAULT_CFG)
         config = Config()
         
@@ -1043,14 +1066,14 @@ class TestConfig:
         config.restore()
         assert "2" not in config.tree_levels_args.__dict__
 
-    def test_check_integrity(self, custom_cfg_path):
+    def test_check_integrity(self, custom_cfg_path) -> None:
         config = Config()
         assert config.check_integrity() is None
         
         _ = TestGetConfig()
         _.test_get_custom_file(custom_cfg_path)     
 
-    def test_asdict(self):
+    def test_asdict(self) -> None:
         config = Config()
         
         safe_dict = config.asdict(safe_resolve=True)
@@ -1074,13 +1097,13 @@ class TestConfig:
         assert set(safe_dict.keys()) == set(DEFAULT_FIELDS)
         assert unsafe_dict == dfs_replace_unsafe_value(default_unsafe_dict)
 
-    def test_dump(self, custom_cfg_path):
+    def test_dump(self, custom_cfg_path) -> None:
         config = Config()
         config.dump(custom_cfg_path)
         assert os.path.exists(custom_cfg_path)
 
     @patch("torchmeter.config.Config.asdict")
-    def test_repr(self, mock_asdict):
+    def test_repr(self, mock_asdict) -> None:
         """Test the logic of `__repr__` method."""
         
         expected = (
@@ -1126,7 +1149,7 @@ class TestConfig:
         
             assert str(cfg).strip() == expected
 
-    def test_singleton(self, custom_cfg_path):
+    def test_singleton(self, custom_cfg_path) -> None:
         # verify same instance
         config1 = Config()
         config2 = Config()

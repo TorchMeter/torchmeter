@@ -1,31 +1,22 @@
 import os
+from typing import NoReturn
 from decimal import Decimal
-from datetime import datetime, date
+from datetime import date, datetime
 from unittest.mock import Mock, patch
 
-import pytest
 import numpy as np
 import polars as pl
-from rich.text import Text
+import pytest
 from torch import rand as torch_rand
+from rich.text import Text
 from numpy.random import rand as np_rand
 
-from torchmeter._stat_numeric import (
-    UpperLinkData,
-    MetricsData
-)
+from torchmeter.utils import Timer, Status, hasargs, data_repr, indent_str, resolve_savepath, match_polars_type
+from torchmeter._stat_numeric import MetricsData, UpperLinkData
 
-from torchmeter.utils import (
-    resolve_savepath,
-    hasargs,
-    indent_str, data_repr,
-    match_polars_type,
-    Status, Timer
-)
-
-def func_no_args(): ...
-def func_one_arg(a): ...
-def func_multi_args(a, b, c): ...
+def func_no_args() -> None: ...
+def func_one_arg(a) -> None: ...
+def func_multi_args(a, b, c) -> None: ...
 
 @pytest.fixture
 def chang_to_temp_dir(tmpdir):
@@ -38,6 +29,7 @@ def chang_to_temp_dir(tmpdir):
     if tmpdir.exists():
         tmpdir.remove(rec=1)
 
+
 @pytest.fixture
 def mock_status(monkeypatch):
     """To mock rich.status.Status.__enter__ and .__exit__"""
@@ -47,8 +39,9 @@ def mock_status(monkeypatch):
     monkeypatch.setattr(Status, "__exit__", mock_exit)
     return {"enter": mock_enter, "exit": mock_exit}
 
+
 @pytest.mark.parametrize(
-    argnames="func, given_args, will_error", 
+    argnames=("func", "given_args", "will_error"), 
     argvalues=[
         (func_no_args, [], False),
         (func_no_args, ["a"], True),
@@ -68,7 +61,7 @@ def mock_status(monkeypatch):
         (func_multi_args, ["a", "b", "d"], True),
         ]
 )
-def test_hasargs(func, given_args, will_error):
+def test_hasargs(func, given_args, will_error) -> None:
     if will_error:
         
         with pytest.raises(RuntimeError) as e:
@@ -78,9 +71,10 @@ def test_hasargs(func, given_args, will_error):
     else:
         hasargs(func, *given_args)  
 
+
 @pytest.mark.usefixtures("chang_to_temp_dir")
 class TestResolveSavePath:
-    def test_relative_filepath_input(self):
+    def test_relative_filepath_input(self) -> None:
         temp_dir = os.getcwd()
         
         file_dir = "relative_dir"
@@ -93,7 +87,7 @@ class TestResolveSavePath:
         assert save_file == file_path
         assert os.path.exists(save_dir)
     
-    def test_absolute_filepath_input(self):
+    def test_absolute_filepath_input(self) -> None:
         temp_dir = os.getcwd()
 
         file_dir = "absolute_dir"
@@ -106,7 +100,7 @@ class TestResolveSavePath:
         assert save_file == file_path
         assert os.path.exists(save_dir)
     
-    def test_relative_dirpath_input(self):
+    def test_relative_dirpath_input(self) -> None:
         temp_dir = os.getcwd()
 
         dir_name = "relative_dir"
@@ -123,7 +117,7 @@ class TestResolveSavePath:
                                          default_file_name + "." + defaule_file_ext)
         assert os.path.exists(save_dir)
     
-    def test_absolute_dirpath_input(self):
+    def test_absolute_dirpath_input(self) -> None:
         temp_dir = os.getcwd()
         
         dir_name = "absolute_dir"
@@ -140,15 +134,16 @@ class TestResolveSavePath:
                                          default_file_name + "." + defaule_file_ext)
         assert os.path.exists(save_dir)
 
+
 @pytest.mark.vital
 class TestIndentStr:
     # basic function test
-    def test_single_line(self):
+    def test_single_line(self) -> None:
         """Test single-line string with default args"""
         result = indent_str("hello")
-        assert result == " "*4 + "hello"
+        assert result == " " * 4 + "hello"
 
-    def test_multi_line(self):
+    def test_multi_line(self) -> None:
         """Test multi-line strings with default args"""
         input_str = "first\nsecond\nthird"
         expected = (
@@ -158,7 +153,7 @@ class TestIndentStr:
         )
         assert indent_str(input_str) == expected
 
-    def test_string_list_input(self):
+    def test_string_list_input(self) -> None:
         """Test string list input"""
         ipt_list = ["line1", "line2"]
         expected = (
@@ -179,7 +174,7 @@ class TestIndentStr:
             (4, "│   first\n└─  second")
         ]
     )
-    def test_indent_variations(self, indent, expected):
+    def test_indent_variations(self, indent, expected) -> None:
         """Test different indentation levels"""
         assert indent_str("first\nsecond", indent=indent) == expected
 
@@ -190,27 +185,27 @@ class TestIndentStr:
             (False, "    line1\n    line2")
         ]
     )
-    def test_guideline_toggle(self, guideline, expected):
+    def test_guideline_toggle(self, guideline, expected) -> None:
         """Test guideline activation"""
         assert indent_str("line1\nline2", guideline=guideline) == expected
 
-    def test_not_process_first(self):
+    def test_not_process_first(self) -> None:
         """Test not to indent first line"""
         result = indent_str("a\nb", process_first=False)
         assert result == "a\n└─  b"
 
     # boundary condition test
-    def test_empty_input(self):
+    def test_empty_input(self) -> None:
         """测试空字符串输入"""
         assert indent_str("") == "    "  # single line
         assert indent_str("\n") == "│   \n└─  "  # multi-line
 
-    def test_no_guideline_for_single_line(self):
+    def test_no_guideline_for_single_line(self) -> None:
         """Test single-line automatic disabling of guide lines"""
         assert indent_str("hello", guideline=True) == "    hello"
 
     # Special scenario testing
-    def test_mixed_lengths_input(self):
+    def test_mixed_lengths_input(self) -> None:
         """Test mixed input with different line lengths"""
         input_lines = "short\nvery long line\nmedium"
         result = indent_str(input_lines)
@@ -222,12 +217,12 @@ class TestIndentStr:
         assert result == expected
 
     # Error handling test
-    def test_invalid_indent_type(self):
+    def test_invalid_indent_type(self) -> None:
         """Test non-integer indent"""
         with pytest.raises(TypeError):
             indent_str("test", indent="4")  # type: ignore
 
-    def test_invalid_input_type(self):
+    def test_invalid_input_type(self) -> None:
         """Test non-str input"""
         with pytest.raises(TypeError):
             indent_str(123)
@@ -235,6 +230,7 @@ class TestIndentStr:
         with pytest.raises(TypeError):
             indent_str(["a", "b", 123]) 
         
+
 @pytest.mark.vital
 class TestDataRepr:
     @pytest.mark.parametrize(
@@ -247,9 +243,9 @@ class TestDataRepr:
             (None, "NoneType"),
         ]
     )
-    def test_simple_data(self, val, type):
+    def test_simple_data(self, val, type_repr) -> None:
         """Test repr of basic data types"""
-        assert data_repr(val) == f"[b green]{val}[/] [dim]<{type}>[/]"
+        assert data_repr(val) == f"[b green]{val}[/] [dim]<{type_repr}>[/]"
 
     @pytest.mark.parametrize(
         argnames=("val", "type"),
@@ -259,28 +255,28 @@ class TestDataRepr:
             (Mock(shape=(5, 5)), "Mock")
         ]
     )
-    def test_shape_objects(self, val, type):
+    def test_shape_objects(self, val, type_repr) -> None:
         """Test objects with shape attributes"""
-        assert data_repr(val) == f"[dim]Shape[/]([b green]{list(val.shape)}[/]) [dim]<{type}>[/]"
+        assert data_repr(val) == f"[dim]Shape[/]([b green]{list(val.shape)}[/]) [dim]<{type_repr}>[/]"
 
     @pytest.mark.parametrize(
         argnames=("val", "type", "inner_type"),
         argvalues=[
             ([1, 2, 3], "list", "int"),
-            ([np_rand(2,3), np_rand(3,4)], "list", "ndarray"),
+            ([np_rand(2, 3), np_rand(3, 4)], "list", "ndarray"),
 
             (("1", "2", "3"), "tuple", "str"),
-            ((torch_rand(1,2), torch_rand(3,4)), "tuple", "Tensor"),
+            ((torch_rand(1, 2), torch_rand(3, 4)), "tuple", "Tensor"),
 
             ({1., 2., 3.}, "set", "float"),
-            ({Mock(shape=(1,2)), Mock(shape=(3,4))}, "set", "Mock"),
+            ({Mock(shape=(1, 2)), Mock(shape=(3, 4))}, "set", "Mock"),
         ]
     )
-    def test_container_data(self, val, type, inner_type):
+    def test_container_data(self, val, type_repr, inner_type) -> None:
         actual = data_repr(val)
         
         # verify the overall structure
-        assert actual.startswith(f"[dim]{type}[/](")
+        assert actual.startswith(f"[dim]{type_repr}[/](")
         assert actual.endswith(")")
         
         # verify the repr of each item
@@ -293,7 +289,7 @@ class TestDataRepr:
         
         # verify indentation
         lines = actual.split("\n")
-        assert all(line.startswith("│" + " "*(len(f"{type}"))) for line in lines[1:-1])
+        assert all(line.startswith("│" + " " * (len(f"{type_repr}"))) for line in lines[1:-1])
     
     @pytest.mark.parametrize(
         argnames=("ipt", "key_type", "value_type"),
@@ -305,7 +301,7 @@ class TestDataRepr:
             ({None: None}, "NoneType", "NoneType")
         ]
     )
-    def test_simple_data_dict(self, ipt, key_type, value_type):
+    def test_simple_data_dict(self, ipt, key_type, value_type) -> None:
         actual = data_repr(ipt)
         
         # verify the overall structure
@@ -321,17 +317,17 @@ class TestDataRepr:
         
         # verify indentation
         lines = actual.split("\n")
-        assert all(line.startswith("│" + " "*4) for line in lines[1:-1])
+        assert all(line.startswith("│" + " " * 4) for line in lines[1:-1])
 
     @pytest.mark.parametrize(
         argnames=("ipt", "key_type", "value_type"),
         argvalues=[
-            ({"a": np_rand(2,3,4), "b": np_rand(5,6,7)}, "str", "ndarray"),
-            ({"a": torch_rand(2,3,4), "b": torch_rand(5,6,7)}, "str", "Tensor"),
-            ({"a": Mock(shape=(1,2,3,4)), "b": Mock(shape=(5,6,7,8))}, "str", "Mock")
+            ({"a": np_rand(2, 3, 4), "b": np_rand(5, 6, 7)}, "str", "ndarray"),
+            ({"a": torch_rand(2, 3, 4), "b": torch_rand(5, 6, 7)}, "str", "Tensor"),
+            ({"a": Mock(shape=(1, 2, 3, 4)), "b": Mock(shape=(5, 6, 7, 8))}, "str", "Mock")
         ]
     )
-    def test_shape_objects_dict(self, ipt, key_type, value_type):
+    def test_shape_objects_dict(self, ipt, key_type, value_type) -> None:
         actual = data_repr(ipt)
         
         # verify the overall structure
@@ -351,7 +347,7 @@ class TestDataRepr:
         
         # verify indentation
         lines = actual.split("\n")
-        assert all(line.startswith("│" + " "*4) for line in lines[1:-1])
+        assert all(line.startswith("│" + " " * 4) for line in lines[1:-1])
 
     @pytest.mark.parametrize(
         argnames=("ipt", "key_type", "container_type", "container_key_type", "container_val_type"),
@@ -362,7 +358,7 @@ class TestDataRepr:
             ({"a": {"1", "2", "3"}, "b": {"4", "5", "6"}}, "str", "set", None, "str"),
         ]
     )
-    def test_container_data_dict(self, ipt, key_type, container_type, container_key_type, container_val_type):
+    def test_container_data_dict(self, ipt, key_type, container_type, container_key_type, container_val_type) -> None:
         """Test dict made up of container, i.e. the nested situation"""
         actual = data_repr(ipt)
         
@@ -382,7 +378,7 @@ class TestDataRepr:
             assert value_segment in actual
             
             if isinstance(v, dict):
-                for ck,cv in v.items():
+                for ck, cv in v.items():
                     if hasattr(ck, "shape"):
                         ck_segment = f"[dim]Shape[/]([b green]{list(ck.shape)}[/]) [dim]<{container_key_type}>[/]"
                     else:
@@ -407,19 +403,19 @@ class TestDataRepr:
         lines = actual.split("\n")[1:]
         for idx, container in enumerate(ipt.values()):
             section_len = len(container)
-            assert all(line.startswith("│" + " "*len("dict(a <str>:") + "│") 
-                       for line in lines[:section_len-2])
-            if idx < len(ipt)-1:
-                assert lines[section_len-2].startswith("│" + " "*len("dict(a <str>:") + "└─")
+            assert all(line.startswith("│" + " " * len("dict(a <str>:") + "│") 
+                       for line in lines[:section_len - 2])
+            if idx < len(ipt) - 1:
+                assert lines[section_len - 2].startswith("│" + " " * len("dict(a <str>:") + "└─")
                 
-                lines = lines[section_len-1:]
-                assert lines[0].startswith("│" + " "*len("dict"))
+                lines = lines[section_len - 1:]
+                assert lines[0].startswith("│" + " " * len("dict"))
                 
                 lines.pop(0)
             else:
-                assert lines[section_len-2].startswith("└─" + " "*len("dict(a <str>") + "└─")
+                assert lines[section_len - 2].startswith("└─" + " " * len("dict(a <str>") + "└─")
 
-    def test_empty_container(self):
+    def test_empty_container(self) -> None:
         """Test empty container input"""
 
         assert data_repr([]) == "[b green][][/] [dim]<list>[/]"
@@ -429,7 +425,7 @@ class TestDataRepr:
             "└─   [b green]{}[/] [dim]<dict>[/])"
         )
 
-    def test_uncommon_input(self):
+    def test_uncommon_input(self) -> None:
         """Test uncommon input"""
         class CustomType: ...
         assert data_repr(CustomType()) == f"[b green]obj[/] [dim]<{CustomType.__module__}.CustomType>[/]"
@@ -439,6 +435,7 @@ class TestDataRepr:
         
         mock_obj = Mock(shape="invalid") # invalid shape
         assert data_repr(mock_obj) == "[b green]obj[/] [dim]<unittest.mock.Mock>[/]"
+
 
 @pytest.mark.vital
 class TestMatchPolarsType:
@@ -495,7 +492,7 @@ class TestMatchPolarsType:
             (MetricsData(), pl.Object)
         ]
     )
-    def test_type_inference(self, input_value, expected_type):
+    def test_type_inference(self, input_value, expected_type) -> None:
         """Test basic functionality"""
         
         assert self.is_same_type(input_value, expected_type) 
@@ -511,7 +508,7 @@ class TestMatchPolarsType:
             pl.Array(pl.Float64, 2)
         ]
     )
-    def test_pre_res_option(self, pre_res_value):
+    def test_pre_res_option(self, pre_res_value) -> None:
         """Test the logic of pre_res option(early return)"""
         
         result = match_polars_type(
@@ -521,7 +518,7 @@ class TestMatchPolarsType:
         )
         assert result.is_(pre_res_value)
 
-    def test_recheck_option(self):
+    def test_recheck_option(self) -> None:
         """Test the logic of recheck option(force recheck the type)"""
 
         result = match_polars_type(
@@ -532,7 +529,7 @@ class TestMatchPolarsType:
         
         assert result.is_(pl.Int64)
 
-    def test_edge_cases(self):
+    def test_edge_cases(self) -> None:
         """Test the edge use of the function"""
         
         # structured array
@@ -547,6 +544,7 @@ class TestMatchPolarsType:
         
         assert self.is_same_type(nested_ls, pl.List(pl.List(pl.Int64)))
 
+
 @pytest.mark.vital
 class TestTimer:
     # basic function test
@@ -560,14 +558,15 @@ class TestTimer:
                 "special_!@#$%^&*"   # special characters
             ]
         )
-    def test_basic_use(self, task, mock_status, capsys):
+    def test_basic_use(self, task, mock_status, capsys) -> None:
         from time import sleep
+
         from rich import get_console
 
         console = get_console()
         console_width = console.width
         if len(task) > console_width:
-            task = [task[i:i+console_width] for i in range(0, len(task), console_width)]
+            task = [task[i:i + console_width] for i in range(0, len(task), console_width)]
             task = "\n" + "\n".join(task)
 
         with Timer(task_desc=task):
@@ -582,7 +581,7 @@ class TestTimer:
         assert "seconds" in plain_text
 
     # boundary condition test
-    def test_short_time(self, capsys):
+    def test_short_time(self, capsys) -> None:
         with Timer("short task"):
             # quit immediately
             pass
@@ -590,7 +589,7 @@ class TestTimer:
         captured = capsys.readouterr()
         assert "0.0000" in captured.out
 
-    def test_long_time(self, capsys):
+    def test_long_time(self, capsys) -> None:
         with patch("torchmeter.utils.perf_counter") as mock_time:
             # Simulate a one-year time difference
             mock_time.side_effect = [0.0, 31536000.0] 
@@ -601,18 +600,17 @@ class TestTimer:
         assert "31536000.0000" in captured.out
 
     # Error handling test
-    def test_exception_handling(self, mock_status):
+    def test_exception_handling(self, mock_status) -> NoReturn:
         class CustomError(Exception): ...
 
-        with pytest.raises(CustomError):
-            with Timer("error task"):
-                raise CustomError("test error")
+        with pytest.raises(CustomError), Timer("error task"):
+            raise CustomError("test error")
         
         assert mock_status["enter"].assert_called_once
         assert mock_status["exit"].assert_called_once
 
     # verify time accuracy
-    def test_time_accuracy(self, capsys):
+    def test_time_accuracy(self, capsys) -> None:
         with patch("torchmeter.utils.perf_counter") as mock_time:
             mock_time.side_effect = [100.0, 100.1234]
             with Timer("precision test"):
