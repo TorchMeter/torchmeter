@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 
+green_output() {
+    echo -e "\033[32m$1\033[0m"
+}
+
+cyan_output() {
+    echo -e "\033[36m\033[0m"
+}
+
 find_dir() {
     local target_path=$1
     local current_path=$(realpath $(dirname $0))
@@ -46,43 +54,45 @@ do
     if [ -n "$env" ]; then
         cyan_output "$env selected."
 	conda activate "$env"
-	green_output "$env activated."
+	green_output "$env activated.\n"
         break
     else
         red_output "Invalid selection. Please try again."
     fi
 done
 
+# --------------------------------------------- Format -----------------------------------------------
+
+set +e
+ruff format \
+  --preview \
+  --target-version=py38
+exit_code=$?
+set -e
+
+if [[ $exit_code -eq 0 ]]; then
+  echo -e "✅ Formatting finish! 🎉\n"
+else
+  echo -e "❌ Formatting failed! Some code does not meet the format requirements!s" >&2
+  echo -e "❌ Ruff terminates abnormally due to invalid configuration, invalid CLI options, or an internal error" >&2
+  exit 1
+fi
+
 # ---------------------------------------------- Lint -----------------------------------------------
 
 set +e
 ruff check \
   --preview \
+  --fix \
+  --unsafe-fixes \
   --target-version=py38 \
   --output-format=grouped
 exit_code=$?
 set -e
 
 if [[ $exit_code -eq 0 ]]; then
-  echo -e "\n✅ Linting passed! Code quality check successful! 🎉"
+  echo -e "✅ Linting passed! Code quality check successful! 🎉\n"
 else
-  echo -e "\n❌ Linting failed! Some code does not meet the linting rules!" >&2
-  exit 1
-fi
-
-# --------------------------------------------- Format -----------------------------------------------
-
-set +e
-ruff format \
-  --diff \
-  --preview \
-  --target-version=py38
-exit_code=$?
-
-set -e
-if [[ $exit_code -eq 0 ]]; then
-  echo -e "\n✅ Formatting passed! All code is well-formated! 🎉"
-else
-  echo -e "\n❌ Formatting failed! Some code does not meet the format requirements!" >&2
+  echo -e "❌ Linting failed! Some code does not meet the linting rules!\n" >&2
   exit 1
 fi
