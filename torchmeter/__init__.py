@@ -15,25 +15,25 @@ An `all-in-one` tool for `Pytorch` model analysis, providing end-to-end measurem
 
 ------------------------------------------------------------------------------------------------------------
 Core Functionality:
-  1. Parameter Analysis 
+  1. Parameter Analysis
     - Total/trainable parameter quantification
     - Layer-wise parameter distribution analysis
     - Gradient state tracking (requires_grad flags)
-  
+
   2. Computational Profiling
     - FLOPs/MACs precision calculation
     - Operation-wise calculation distribution analysis
     - Dynamic input/output detection (number, type, shape, ...)
-  
-  3. Memory Diagnostics 
+
+  3. Memory Diagnostics
     - Input/output tensor memory awareness
     - Hierarchical memory consumption analysis
-  
+
   4. Performance Benchmarking
     - Auto warm-up phase execution (eliminates cold-start bias)
     - Device-specific high-precision timing
     - Inference latency  & Throughput Benchmarking
-  
+
   5. Visualization Engine
     - Centralized configuration management
     - Programmable tabular report
@@ -44,7 +44,7 @@ Core Functionality:
     - Rich-text hierarchical structure tree rendering
       1. Style customization and real-time rendering
       2. Smart module folding based on structural equivalence detection
-  
+
   6. Cross-Platform Support
     - Automatic model-data co-location
     - Seamless device transition (CPU/CUDA)
