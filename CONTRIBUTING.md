@@ -518,7 +518,7 @@ They'll help us keep things organized and make your contribution process as effi
 ##### C.b Lint, Format and Test your Code
 
 > [!TIP]  
-> For VS Code users, we recommend installing:
+> For VSCode users, we recommend installing:
 > - [Ruff extension](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff) 
 > - [Mypy extension](https://marketplace.visualstudio.com/items?itemName=ms-python.mypy-type-checker)
 
@@ -540,25 +540,9 @@ To ensure your code meets `torchmeter`'s standards, please complete these 3 crit
         ```
 
 2. Linting and Formatting
-    - `torchmeter` uses `ruff` for linting/formatting (already installed in step [B.e.3](#be-configure-python-environment)).
+    - `torchmeter` uses [`ruff`](https://docs.astral.sh/ruff) for linting/formatting (already installed in step [B.e.3](#be-configure-python-environment)).
     - Our style rules are defined in `ruff.toml`, please respect these configurations. If you find any rules unreasonable, please start a [Discussions](#💬-discussions--lets-collaborate--innovate)
-    - Ensure your changes comply with the project's code style by running the following linting commands:
-
-        ```bash
-        # pwd: path/to/your/working/directory/torchmeter-yourname
-            
-        # Replace `torchmeter-dev` with your virtual environment name
-        conda activate torchmeter-dev
-
-        ruff check \
-        --preview \
-        --target-version=py38 \
-        --output-format=grouped
-
-        # You should promise output is `All checks passed!`
-        ```
-
-    - If the code analysis passes, then ensure that the code format meets the project requirements.
+    - Ensure the code format of your changes meets the project requirements by running the following formating commands:
 
         ```bash
         # pwd: path/to/your/working/directory/torchmeter-yourname
@@ -567,14 +551,30 @@ To ensure your code meets `torchmeter`'s standards, please complete these 3 crit
         conda activate torchmeter-dev
 
         ruff format \
-        --diff \
+        --preview \
+        --target-version=py38 
+        
+        # You should promise the command ends successfully
+        ```
+
+    - After that, ensure your changes comply with the project's code style with the following commands:
+
+        ```bash
+        # pwd: path/to/your/working/directory/torchmeter-yourname
+            
+        # Replace `torchmeter-dev` with your virtual environment name
+        conda activate torchmeter-dev
+
+        ruff check \
+        --fix \
+        --unsafe-fixes \
         --preview \
         --target-version=py38
 
-        # You should promise output is only one line showing`<number-of-file> files already formatted`
+        # You should promise output is `All checks passed!` and no errors are reported.
         ```
 
-    - If any step fails, please modify the code according to the terminal output and re-execute the above steps until both steps are successful. If you are a VSCode user, we recommend using the `ruff` plugin to automatically perform code linting and formatting. This plugin uses underlines to highlight code snippets that do not conform to the predefined rules and allows you to automatically fix some common errors.
+    - If any step fails, please modify the code according to the terminal output and re-execute the above steps until both steps are successful. If you are a VSCode user, we recommend using the `ruff` [plugin](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff) to automatically perform code linting and formatting. This plugin uses underlines to highlight code snippets that do not conform to the predefined rules and allows you to automatically fix some common errors.
 
 > [!TIP]   
 > If you have a way to run the `shell` script (on Unix-like systems or `cygwin` on `windows`)), then: 
@@ -585,7 +585,7 @@ To ensure your code meets `torchmeter`'s standards, please complete these 3 crit
 > ```  
 > This runs all linting and formatting in one command.
 
-3. Testing
+1. Testing
     - `torchmeter` uses `pytest` for testing code. Yes, `pytest` and the related plugins have also been installed in step [B.e.3](#be-configure-python-environment).
     
     - `torchmeter` has written the `pytest` running configuration in the `pytest.ini` file at the root directory of the project. This file defines how the tests are run, including the test directory, test filters, test configuration, etc. Specifically, `pytest` will only discover tests in the `tests` directory at the root of the project, and requires a test coverage rate of **> 90%**. 
