@@ -249,7 +249,7 @@ class TestDataRepr:
         assert data_repr(val) == f"[b green]{val}[/] [dim]<{type_repr}>[/]"
 
     @pytest.mark.parametrize(
-        argnames=("val", "type"),
+        argnames=("val", "type_repr"),
         argvalues=[
             (np_rand(2, 3, 4), "ndarray"),
             (torch_rand(3, 224, 224), "Tensor"),
