@@ -9,14 +9,15 @@ if TYPE_CHECKING:
     import numpy as np
 
     FLOAT = Union[float, np.float_]
-    
-    UNITS = Union[Type["CountUnit"], 
-                  Type["BinaryUnit"], 
-                  Type["TimeUnit"], 
-                  Type["SpeedUnit"]]
 
-__all__ = ["CountUnit", "BinaryUnit", "TimeUnit", "SpeedUnit",
-           "auto_unit"]
+    UNITS = Union[
+        Type["CountUnit"],
+        Type["BinaryUnit"],
+        Type["TimeUnit"],
+        Type["SpeedUnit"],
+    ]
+
+__all__ = ["CountUnit", "BinaryUnit", "TimeUnit", "SpeedUnit", "auto_unit"]
 
 
 @unique
@@ -55,12 +56,10 @@ class SpeedUnit(Enum):
     IPS = 1e0
 
 
-def auto_unit(val: Union[int, FLOAT], 
-              unit_system: UNITS = CountUnit) -> str:
-    
+def auto_unit(val: Union[int, FLOAT], unit_system: UNITS = CountUnit) -> str:
     unit: Enum
-    
-    for unit in list(unit_system): # type: ignore
+
+    for unit in list(unit_system):  # type: ignore
         if val >= unit.value:
             if val % unit.value:
                 return f"{val / unit.value:.2f} {unit.name}"
