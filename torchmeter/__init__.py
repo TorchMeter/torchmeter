@@ -1,7 +1,5 @@
 # Copyright (C) 2024 TorchMeter, Ahzyuan. - All Rights Reserved
-#  * You may use, distribute and modify this code under the terms of the MIT license.
-#  * You should have received a copy of the MIT license with this file.
-#  * If not, please visit https://rem.mit-license.org/ for more information.
+# You may use, distribute and modify this code under the terms of the AGPL-3.0 license.
 
 """
 torchmeter 🚀
