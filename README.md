@@ -17,7 +17,7 @@
     <a href="https://www.python.org/"><img alt="Python-Badge" src="https://img.shields.io/badge/Python-%3E%3D3.8-white?logo=python&logoColor=%232EA9DF&color=%233776AB"></a>
     <a href="https://pytorch.org/"><img alt="Pytorch-Badge" src="https://img.shields.io/badge/Pytorch-%3E%3D1.7.0-white?logo=pytorch&logoColor=%23EB5F36&color=%23EB5F36"></a>
     <a href="https://github.com/astral-sh/ruff"><img alt="Ruff-Badge" src="https://img.shields.io/badge/Ruff-Lint_%26_Format-white?logo=ruff&color=%238B70BA"></a>
-    <a href="https://github.com/TorchMeter/torchmeter/blob/master/LICENSE"><img alt="Static Badge" src="https://img.shields.io/badge/License-MIT-green"></a>
+    <a href="https://github.com/TorchMeter/torchmeter/blob/master/LICENSE"><img alt="Static Badge" src="https://img.shields.io/badge/License-AGPL--3.0-green"></a>
 </p>
 
 <!-- simple introduction -->
@@ -353,4 +353,4 @@ Thanks again !
 
 ## ℱ. 𝐿𝒾𝒸𝑒𝓃𝓈𝑒
 
-`TorchMeter` is released under the **MIT License**, see the [LICENSE](LICENSE) file for the full text. Please carefully review the terms in the [LICENSE](LICENSE) file before using or distributing `TorchMeter`. Ensure compliance with the licensing conditions, especially when integrating this project into larger systems or proprietary software.
+`TorchMeter` is released under the **AGPL-3.0 License**, see the [LICENSE](LICENSE) file for the full text. Please carefully review the terms in the [LICENSE](LICENSE) file before using or distributing `TorchMeter`. Ensure compliance with the licensing conditions, especially when integrating this project into larger systems or proprietary software.
