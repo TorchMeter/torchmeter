@@ -288,7 +288,7 @@ print(model.mem) # mem for memory
 tb, data = model.profile('mem', no_tree=True)
 
 # Performance Benchmarking
-print(model.ittp) #ittp for inference time & throughput
+print(model.ittp) # ittp for inference time & throughput
 tb, data = model.profile('ittp', no_tree=True)
 ```
 
