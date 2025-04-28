@@ -98,3 +98,5 @@ ENV/
 .vscode/
 refers/
 *_cache/
+assets
+**/assets/
