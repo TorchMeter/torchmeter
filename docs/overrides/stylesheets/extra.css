@@ -5,24 +5,6 @@
     max-width: 1320px;
 }
 
-/* click to enlarge image */
-.shadow {
-  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
-}
-
-.zoom {
-  transition: transform ease-in-out 0.5s;
-  cursor: zoom-in;
-}
-
-.image-zoom-large {
-  transform: scale(1.9);
-  cursor: zoom-out;
-  box-shadow: 0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19);
-  z-index: 100;
-  position: relative;
-}
-
 /* Remove the `In` and `Out` block in rendered Jupyter notebooks */
 .jp-Cell-outputWrapper .jp-OutputPrompt.jp-OutputArea-prompt,
 .jp-Cell-inputWrapper .jp-InputPrompt.jp-InputArea-prompt {

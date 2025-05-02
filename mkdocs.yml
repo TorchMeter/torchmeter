@@ -143,13 +143,24 @@ markdown_extensions:
 
 plugins:
   - search
-  - exclude:
-      glob:
-        - "*.ipynb"
-        - "CONTRIBUTING.md"
-        - "repo_management.md"
-        - "pr_standard.md"
-        - "project_structure.md"
+
+  - glightbox:
+      touchNavigation: true
+      loop: false
+      effect: zoom
+      slide_effect: slide
+      width: auto
+      height: auto
+      zoomable: true
+      draggable: false
+      skip_classes:
+        - skip-lightbox
+      auto_caption: false
+      caption_position: bottom
+      background: white
+      shadow: true
+      manual: false
+
   # - i18n:
   #     docs_structure: folder
   #     languages:

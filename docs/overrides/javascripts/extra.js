@@ -1,10 +1,3 @@
-// click to enlarge image
-document.querySelectorAll('.zoom').forEach(item => {
-  item.addEventListener('click', function () {
-      this.classList.toggle('image-zoom-large');
-  })
-});
-
 // remove nav/toc for page that has enough width
 document$.subscribe(function() {
   const sidebar = document.querySelector("div.md-sidebar.md-sidebar--primary");
