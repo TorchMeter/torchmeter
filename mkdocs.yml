@@ -21,13 +21,18 @@ use_directory_urls: true # don't display 'index.html' in slugs
 nav: # relative to docs/src/en
   - Intros: index.md
   - Tutorials: demo.ipynb
-  - Contribute: CONTRIBUTING.md
   - API Reference:
-    - core.md
-  - Other:
-    - pr_standard.md
-    - project_structure.md
-    - repo_management.md
+    - api/core.md
+  - Contribute: 
+    - contribute/welcome_contributors.md
+    - contribute/discussions.md
+    - contribute/issues.md
+    - contribute/prs.md
+    - contribute/thanks_contributors.md
+  - Others:
+    - others/architecture.md
+    - others/conventions.md
+    - others/management.md
 
 theme:
   name: material

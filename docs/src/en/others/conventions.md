@@ -118,7 +118,7 @@ Clear commit message helps us:
 |:----------:|:------------------------------:|:--------------------------------------------------------:|
 |   `feat`   |          New feature           |  `feat(render): implement custom display of statistic`   |
 |   `fix`    |            Bug fix             | `fix(memory): resolve CUDA memory leak in measuring mem` |
-|   `doc`    |         Documentation          |               `doc: update API reference`                |
+|   `docs`   |         Documentation          |               `doc: update API reference`                |
 |   `test`   |          Test-related          |         `test(metrics): add edge cases for xxx`          |
 |    `ci`    |        Workflow-related        |   `ci(badge-update): revise the content to be updated`   |
 | `refactor` |        Code refactoring        |         `refactor: simplify module registration`         |
