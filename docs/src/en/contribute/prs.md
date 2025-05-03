@@ -386,11 +386,11 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
     git checkout -b <your-branch-name> upstream/master # (1)
     ```
 
-    1. :man_raising_hand: Replace `<your-branch-name>` with your branch name. When naming a branch, please follow our [branch naming conventions :material-link-variant:](../others/conventions.md#Branch-Name){ data-preview }.
+    1. :man_raising_hand: Replace `<your-branch-name>` with your branch name. When naming a branch, please follow our [branch naming conventions :material-link-variant:](conventions.md#Branch-Name){ data-preview }.
 
     !!! danger "Branch Name conventions"
 
-        When naming a branch, please follow our [branch naming conventions :material-link-variant:](../others/conventions.md#Branch-Name){ data-preview }.
+        When naming a branch, please follow our [branch naming conventions :material-link-variant:](conventions.md#Branch-Name){ data-preview }.
 
 3. Dive into the code
     1. You can start by reviewing the [annotated project tree :material-link-variant:](../others/architecture.md){ data-preview } for a quick understanding of the project layout.
@@ -770,7 +770,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
     !!! tip ""
 
         - We recommend describing **what** and **why** of the changes in the simplest possible way. If this commit is related to an `issue` or `PR`, please ensure that you have associated this commit with them by using `closes #<issue-number>`, `fixes #<issue-number>` or `refs: <PR-number>`etc. 
-        - Refer to our [commit message conventions :material-link-variant:](../others/conventions.md#Commit-Message){ data-preview } for specific requirements.
+        - Refer to our [commit message conventions :material-link-variant:](conventions.md#Commit-Message){ data-preview } for specific requirements.
 
 4. After editing, save and close the editor. Then the changes in the staging area will be committed to the local repository. You can use the following command to view your commit history. If you are a `VSCode` user, you can use the [`Git Graph` extension :material-link-variant:](https://marketplace.visualstudio.com/items?itemName=mhutchie.git-graph) to view the commit history more conveniently and intuitively.
 
@@ -817,7 +817,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
 2. If you have enabled the `Github Actions` for your `fork` repository, you can submit a PR to the `master` branch of the remote repository (i.e., **your `fork` repository**) to automatically trigger the compatibility test we've prepared for you:
     1. Open the page of your fork repository. Shortly after pushing your changes, you'll find a prominent `Compare & pull request` button. (1)([Illustration](https://docs.github.com/assets/cb-34097/mw-1440/images/help/pull_requests/pull-request-compare-pull-request.webp){ data-preview }) 
     2. Click this button. In the pop-up page, select the `base` branch as the `master` branch of **your fork repository**, and select the `head` branch as the `<remote-branch-name>` branch you just pushed. {++Please double-check that the `base` branch is the `master` branch of **your `fork` repository**, not the `master` branch of the official `torchmeter` repository.++}
-    3. Fill in the PR title. See [PR Title Convention :material-link-variant:](../others/conventions.md#Pull-Request-Title){ data-preview }.
+    3. Fill in the PR title. See [PR Title Convention :material-link-variant:](conventions.md#Pull-Request-Title){ data-preview }.
     4. Fill in the PR description. Since you are just testing, the description can be brief, no need to fill it in according to the predefined template. 
     5. Click the `Create Pull Request` button below, and you have created a PR targeting the `master` branch in your fork repository.
     6. Click on the `Actions` tab. You will see a task named `✅ Compatibility Test ❌` is running. It is the compatibility test workflow of the `torchmeter` project.
@@ -933,7 +933,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
     git rebase --continue
     ```
 
-7. Repeat step 6 ^^until the rebase is successful^^. After that, commit the changes to the local repository with a formatted commit message. Refer to our [commit message conventions :material-link-variant:](../others/conventions.md#Commit-Message){ data-preview }  for specific requirements. 
+7. Repeat step 6 ^^until the rebase is successful^^. After that, commit the changes to the local repository with a formatted commit message. Refer to our [commit message conventions :material-link-variant:](conventions.md#Commit-Message){ data-preview }  for specific requirements. 
 
     ```bash
     # pwd: path/to/your/local/copy/of/your/fork/
@@ -941,7 +941,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
     git commit # (1)
     ```
 
-    1. :man_raising_hand: This will open an editor to edit the commit message. Please follow our [commit message conventions :material-link-variant:](../others/conventions.md#Commit-Message){ data-preview } to format your writting. **Thank you !**
+    1. :man_raising_hand: This will open an editor to edit the commit message. Please follow our [commit message conventions :material-link-variant:](conventions.md#Commit-Message){ data-preview } to format your writting. **Thank you !**
 
 8. Execute the following commands to synchronize the changes to your fork repository[^4].
 
@@ -983,7 +983,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
 
     3. **Branch hygiene**:  
         - Your local changes are **not** on the master branch (`upstream/master` or `origin/master`). 
-        - The name of the branch to host your change follows our [branch naming conventions :material-link-variant:](../others/conventions.md#Branch-Name){ data-preview }. If not, rename it via: 
+        - The name of the branch to host your change follows our [branch naming conventions :material-link-variant:](conventions.md#Branch-Name){ data-preview }. If not, rename it via: 
        
         ```bash
         # pwd: path/to/your/local/copy/of/your/fork/
@@ -1014,7 +1014,7 @@ Once the requirements above are met, create your PR as follows:
 4. Review your changes down the page, so as to ensure complete/correct file modifications.
 
 5. Click the green `Create pull request` button, and complete PR details:
-    - **Title**: Follow our [PR title conventions :material-link-variant:](../others/conventions.md#Pull-Request-Title){ data-preview }.
+    - **Title**: Follow our [PR title conventions :material-link-variant:](conventions.md#Pull-Request-Title){ data-preview }.
     - **Description**: You can see that your "Add a description" field is not empty. That's because we've prepared a content template for you to guide your filling. You just need to use [`markdown` syntax :material-link-variant:](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax) to fill it out as completely as possible according to the requirements in the comments. That's all what you need to do. Finally, you can click `Preview` above the input box to preview the rendered content you've filled in.
 
 6. If everything looks good, {++please check the option `Allow edits and access to secrets by maintainers`.++} This permission is required to auto-update the `README.md` coverage badge before your PR is merged[^5].
@@ -1033,7 +1033,7 @@ Once your PR is created (whether draft or final), `torchmeter` uses automated wo
 
 ??? tip "PR Title Linting and Formatting"
 
-    Once a PR is created, a [workflow :material-link-variant:](https://github.com/TorchMeter/torchmeter/tree/master.github/workflows/pr_autolabel.yml) named `🤖 PR Auto-Labeler ⛳` will be automatically triggered. It will determine ^^whether the PR title complies with our [PR title conventions :material-link-variant:](../others/conventions.md#Pull-Request-Title)^^.
+    Once a PR is created, a [workflow :material-link-variant:](https://github.com/TorchMeter/torchmeter/tree/master.github/workflows/pr_autolabel.yml) named `🤖 PR Auto-Labeler ⛳` will be automatically triggered. It will determine ^^whether the PR title complies with our [PR title conventions :material-link-variant:](conventions.md#Pull-Request-Title)^^.
 
     - **If non-compliant**:  
         1. A red `PR-title-needs-formatting` label will be added  

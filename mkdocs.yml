@@ -28,10 +28,10 @@ nav: # relative to docs/src/en
     - contribute/discussions.md
     - contribute/issues.md
     - contribute/prs.md
+    - contribute/conventions.md
     - contribute/thanks_contributors.md
   - Others:
     - others/architecture.md
-    - others/conventions.md
     - others/management.md
 
 theme:
