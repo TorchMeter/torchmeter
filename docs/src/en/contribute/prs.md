@@ -97,7 +97,7 @@ title: Pull Requests (PRs)
 
 2. Verify Installation: Open your terminal and run the following command.
 
-```bash
+```bash linenums="0"
 git --version
 ```
 
@@ -143,7 +143,7 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
 
 3. Clone to your local system
 
-    ```bash
+    ```bash linenums="0"
     cd path/to/store/your/project
 
     git clone <paste-the-url-copied-in-last-step-here> torchmeter-yourname  # (1)
@@ -178,7 +178,7 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
 
 1. Set up upstream tracking to sync with the latest changes:
  
-    ```bash
+    ```bash linenums="0"
     # pwd: path/to/store/your/project
 
     cd torchmeter-yourname # (1)
@@ -195,7 +195,7 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
 2. Verify remote & upstream tracking:
 
 
-    ```bash
+    ```bash linenums="0"
     # pwd: path/to/your/working/directory
 
     git branch -a
@@ -252,7 +252,7 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
     
     - Verify installation:
      
-    ```bash
+    ```bash linenums="0"
     # pwd: anywhere
     conda --version  
     ```
@@ -265,7 +265,7 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
 
 2. Create virtual environment with `Python 3.8` (minimum required version):
    
-    ```bash
+    ```bash linenums="0"
     # pwd: anywhere
 
     conda create -n torchmeter-dev python=3.8 # (1)
@@ -275,7 +275,7 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
 
 3. Install `torchmeter` as well as its dependencies in **editable** mode:
 
-    ```bash
+    ```bash linenums="0"
     # pwd: path/to/your/working/directory
 
     conda activate torchmeter-dev # (1)
@@ -370,7 +370,7 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
 
 1. Fetch Latest Code of `torchmeter` 
 
-    ```bash
+    ```bash linenums="0"
     # pwd: path/to/your/local/copy/of/your/fork/
 
     git checkout master
@@ -379,7 +379,7 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
 
 2. Create Your Development Branch
 
-    ```bash
+    ```bash linenums="0"
     # pwd: path/to/your/local/copy/of/your/fork/
     
     # Replace `<your-branch-name>` with your branch name
@@ -409,7 +409,7 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
 5. You can verify your modifications through debugging or custom scripts, but we recommend using `IPython` for rapid testing:
     1. Install `Ipython`:
 
-        ```bash
+        ```bash linenums="0"
         # Replace `torchmeter-dev` with your virtual environment name
         conda activate torchmeter-dev
 
@@ -418,7 +418,7 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
 
     2. Open the terminal and type `ipython` to start the interactive    environment. You can then import and test your modified code directly. For example, if you added a new function `new_func()` in `torchmeter.core`: 
 
-        ```python
+        ```python linenums="0"
         from torchmeter.core import new_func
 
         # Test your implementation
@@ -460,7 +460,7 @@ To ensure your code meets `torchmeter`'s standards, please complete these 3 crit
 
     - After completing the type annotations, make sure to pass the following type checking commands:
 
-        ```bash
+        ```bash linenums="0"
         # pwd: path/to/your/local/copy/of/your/fork/
         
         conda activate torchmeter-dev # (1)
@@ -481,7 +481,7 @@ To ensure your code meets `torchmeter`'s standards, please complete these 3 crit
 
     - Ensure the code format of your changes meets the project requirements by running the following formating commands:
 
-        ```bash
+        ```bash linenums="0"
         # pwd: path/to/your/local/copy/of/your/fork/
             
         conda activate torchmeter-dev # (1)
@@ -499,7 +499,7 @@ To ensure your code meets `torchmeter`'s standards, please complete these 3 crit
 
     - After that, ensure your changes comply with the project's code style with the following commands:
 
-        ```bash
+        ```bash linenums="0"
         # pwd: path/to/your/local/copy/of/your/fork/
             
         conda activate torchmeter-dev # (1)
@@ -523,7 +523,7 @@ To ensure your code meets `torchmeter`'s standards, please complete these 3 crit
 
         If you have a way to run the `shell` script (on `Unix`-like systems or `cygwin` on `windows`), then: 
 
-        ```bash  
+        ```bash linenums="0"
         # pwd: path/to/your/local/copy/of/your/fork/  
 
         bash misc/lint_format.sh  
@@ -540,7 +540,7 @@ To ensure your code meets `torchmeter`'s standards, please complete these 3 crit
     
     - After you've completed the above steps (i.e. `type annotation`, `linting and formatting`), please make sure to run the following commands to ensure the logical correctness and stability of the code. 
 
-        ```bash
+        ```bash linenums="0"
         # pwd: path/to/your/local/copy/of/your/fork/
                     
         conda activate torchmeter-dev # (1)
@@ -591,7 +591,7 @@ To ensure your code meets `torchmeter`'s standards, please complete these 3 crit
     
     - Example:  
 
-        ```python
+        ```python linenums="0"
         def example_function(arg1: int, arg2: str) -> bool:
             """Short description of the function's purpose.
 
@@ -624,7 +624,7 @@ To ensure your code meets `torchmeter`'s standards, please complete these 3 crit
    
     - Example:
   
-        ```python
+        ```python linenums="0"
         class ExampleClass:
             """Class description and purpose.
 
@@ -681,7 +681,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
 1. Make sure you are on your development branch
     1. Check your current branch
 
-        ```bash
+        ```bash linenums="0"
         # pwd: path/to/your/local/copy/of/your/fork/
 
         git branch --show-current
@@ -689,7 +689,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
     
     2. You should ensure that the branch output by the above command is consistent with the branch set in [step C.a.2](#Ca-Understanding-Code--Getting-started){ data-preview }. Otherwise, use the following command to switch branches:
 
-        ```bash
+        ```bash linenums="0"
         # pwd: path/to/your/local/copy/of/your/fork/
 
         git checkout <branch_name> # (1)
@@ -700,7 +700,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
 2. Review Your Changes
     1. List modified files
 
-        ```bash
+        ```bash linenums="0"
         # pwd: path/to/your/local/copy/of/your/fork/
 
         git status
@@ -730,7 +730,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
     
     1. Please ensure that ^^all your changes appear^^ in the output of the above command. If there are ^^unexpected changes^^, you can execute the following command to view it:
 
-        ```bash
+        ```bash linenums="0"
         # pwd: path/to/your/local/copy/of/your/fork/
 
         git diff path/to/unexpected_changed_file
@@ -738,7 +738,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
 
     2. If there are ^^any changes you don't want^^, you can use the following command to undo them. Otherwise, you can skip this step.
 
-        ```bash
+        ```bash linenums="0"
         # pwd: path/to/your/local/copy/of/your/fork/
 
         # ⚠️ be careful, this command will discard all changes in the target file and it is irreversible
@@ -747,7 +747,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
 
 1. When all changes have been confirmed, you can optionally commit them to the staging area[^1].
 
-    ```bash
+    ```bash linenums="0"
     # pwd: path/to/your/local/copy/of/your/fork/
     
     # You can execute "git add" multiple times to ensure that all the changes you wish to commit have been added to the staging area
@@ -756,7 +756,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
 
 2. When all the changes you desire have been staged, you can use the following command to commit the staged changes to the local repository:
 
-    ```bash
+    ```bash linenums="0"
     # pwd: path/to/your/local/copy/of/your/fork/
     
     # Double-check staged files
@@ -774,7 +774,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
 
 4. After editing, save and close the editor. Then the changes in the staging area will be committed to the local repository. You can use the following command to view your commit history. If you are a `VSCode` user, you can use the [`Git Graph` extension :material-link-variant:](https://marketplace.visualstudio.com/items?itemName=mhutchie.git-graph) to view the commit history more conveniently and intuitively.
 
-    ```bash
+    ```bash linenums="0"
     git log --pretty=format:'%h %ad | %an | %s%d' --graph --date=short
     ```
 
@@ -805,7 +805,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
 
 1. When you believe you've completed all your changes or need to save your progress temporarily, you can push the current commit history of your local repository to the remote repository (i.e., your `fork` repository). Execute the following commands.
 
-    ```bash
+    ```bash linenums="0"
     # pwd: path/to/your/local/copy/of/your/fork/
 
     git push -u origin <your-branch-name>:<remote-branch-name> # (1) (2)
@@ -857,7 +857,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
 
 1. Check for upstream changes: 
 
-    ```bash
+    ```bash linenums="0"
     # pwd: path/to/your/local/copy/of/your/fork/
 
     git fetch upstream
@@ -871,7 +871,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
 
 3. If output `> 0`, it indicates that there are ahead commits in `upstream/master`. In this case, you need to resolve the merge conflicts through [`rebase` :material-link-variant:](https://git-scm.com/book/en/v2/Git-Branching-Rebasing):
 
-    ```bash
+    ```bash linenums="0"
     # pwd: path/to/your/local/copy/of/your/fork/
 
     git checkout <your-branch-name>
@@ -925,7 +925,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
 
 6. Once you have resolved all the conflicts, you need to execute the following commands to continue the `rebase` operation:
 
-    ```bash
+    ```bash linenums="0"
     # pwd: path/to/your/local/copy/of/your/fork/
 
     git status
@@ -935,7 +935,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
 
 7. Repeat step 6 ^^until the rebase is successful^^. After that, commit the changes to the local repository with a formatted commit message. Refer to our [commit message conventions :material-link-variant:](conventions.md#Commit-Message){ data-preview }  for specific requirements. 
 
-    ```bash
+    ```bash linenums="0"
     # pwd: path/to/your/local/copy/of/your/fork/
 
     git commit # (1)
@@ -945,7 +945,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
 
 8. Execute the following commands to synchronize the changes to your fork repository[^4].
 
-    ```bash
+    ```bash linenums="0"
     # pwd: path/to/your/local/copy/of/your/fork/
 
     git checkout <your-branch-name> # (1)
@@ -956,7 +956,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
 
 9.  Finally, delete the backup branch.
 
-    ```bash
+    ```bash linenums="0"
     # pwd: path/to/your/local/copy/of/your/fork/
 
     git branch -D <your-branch-name>-bak # (1)
@@ -985,7 +985,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
         - Your local changes are **not** on the master branch (`upstream/master` or `origin/master`). 
         - The name of the branch to host your change follows our [branch naming conventions :material-link-variant:](conventions.md#Branch-Name){ data-preview }. If not, rename it via: 
        
-        ```bash
+        ```bash linenums="0"
         # pwd: path/to/your/local/copy/of/your/fork/
 
         git checkout <your-branch-name>  # (1)
@@ -1093,7 +1093,7 @@ Once your PR is created (whether draft or final), `torchmeter` uses automated wo
 
     The merged changes will be visible on the `master` branch. To update locally:  
 
-    ```bash
+    ```bash linenums="0"
     # pwd: path/to/your/local/copy/of/your/fork/
 
     git checkout master
