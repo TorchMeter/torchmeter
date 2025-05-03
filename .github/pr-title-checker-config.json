@@ -4,7 +4,7 @@
         "color": "CE0000"
     },
     "CHECKS": {
-        "regexp": "^(depr|perf|feat|fix|doc|test|ci|chore|build|refactor|revert)(\\([^\\s]+\\))?\\!?\\s?\\: [A-Z].*[^\\.\\!\\?,… ]$",
+        "regexp": "^(depr|perf|feat|fix|docs|test|ci|chore|build|refactor|revert)(\\([^\\s]+\\))?\\!?\\s?\\: [A-Z].*[^\\.\\!\\?,… ]$",
         "ignoreLabels": ["skip-changelog"]
     },
     "MESSAGES": {
