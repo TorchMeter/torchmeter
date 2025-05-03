@@ -100,3 +100,4 @@ refers/
 *_cache/
 assets
 **/assets/
+.drawio*/

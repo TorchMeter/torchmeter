@@ -149,6 +149,14 @@ markdown_extensions:
 plugins:
   - search
 
+  - drawio-exporter:
+      cache_dir: '.drawio-exporter'
+      drawio_executable: null
+      drawio_args: ["--enable-plugins", "--embed-svg-images"]
+      format: svg
+      embed_format: '<object type="image/svg+xml" data="{img_src}"></object>'
+      sources: '*.drawio'
+
   - glightbox:
       touchNavigation: true
       loop: false
