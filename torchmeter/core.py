@@ -1853,7 +1853,7 @@ class Meter:
 
         Raises:
             UserWarning: If the model has no parameters, a warning is issued indicating that the model will be moved
-            to CPU for subsequent analysis.
+                         to CPU for subsequent analysis.
         """
 
         import warnings

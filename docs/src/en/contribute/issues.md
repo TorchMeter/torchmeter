@@ -41,7 +41,7 @@ title: Issues
 
         ![Illustration of filing an issue](../assets/contribute/create_issue_from_template.png)
 
-    - Further reading: [How maintainers manage issues :material-link-variant:](docs/repo_management.md#issue-management)
+    - Further reading: [How maintainers manage issues :material-link-variant:](../others/management.md#Issue-Management){ data-preview }
 
 ## **:material-numeric-3-circle-outline: Suggestions**
 

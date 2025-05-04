@@ -967,7 +967,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
 
 [^3]: Currently, IDEs have mature support for resolving merge conflicts. For example, you can refer to [Resolve conflicts in VsCode :material-link-variant:](https://dev.to/adiatiayu/how-to-resolve-merge-conflicts-using-the-merge-editor-feature-on-vs-code-pic) and [Resolve conflicts in PyCharm :material-link-variant:](https://www.jetbrains.com/help/pycharm/2023.3/resolve-conflicts.html).
 
-[^4]: If you have created a PR to the `master` branch of your fork repo in step [C.e](#ce-push-changes-to-your-fork-repository), you will see that the commit history of PR will be updated synchronously and the minimum test workflow will be automatically triggered to verify the correctness and robustness of your changes.
+[^4]: If you have created a PR to the `master` branch of your fork repo in  [step C.e](#Ce-Push-Changes-to-Your-Fork-Repository), you will see that the commit history of PR will be updated synchronously and the minimum test workflow will be automatically triggered to verify the correctness and robustness of your changes.
 
 ---
 
