@@ -42,76 +42,78 @@ class Meter:
     """A comprehensive instrumentation tool for PyTorch model performance analysis and visualization.
 
     The `Meter` class provides end-to-end measurement capabilities for neural networks, including
-    parameter statistics, computational cost analysis, memory usage tracking, inference time and
-    throughput analysis. It serves as a wrapper around PyTorch modules while maintaining full compatibility
+    **parameter statistics**, **computational cost analysis**, **memory usage tracking**, **inference time** and
+    **throughput analysis**. It serves as a wrapper around `PyTorch` modules while maintaining full compatibility
     with native model operations.
 
-    Key Features: `easy-to-use`, `comprehensive`, and `flexible`
-        1. **Zero-Intrusion Proxy**
-            - acts as drop-in decorator without any changes of the underlying model
-            - Seamlessly integrates with PyTorch modules while preserving full compatibility (attributes and methods)
+    **Key Features**:
 
-        2. **Full-Stack Model Analytics**: Holistic performance analytics across 5 dimensions:
-            - parameter distribution
-            - calculation cost: FLOPs/MACs
-            - memory access assessment
-            - inference latency
-            - throughput benchmarking
+    1. **Zero-Intrusion Proxy**
+        - acts as drop-in decorator without any changes of the underlying model
+        - Seamlessly integrates with PyTorch modules while preserving full compatibility (attributes and methods)
 
-        3. **Rich visualization**
-            - Programmable tabular reports with real-time rendering
-            - Hierarchical operation tree with smart folding of repeated blocks for model structure insights
+    2. **Full-Stack Model Analytics**: Holistic performance analytics across 5 dimensions:
+        - parameter distribution
+        - calculation cost: FLOPs/MACs
+        - memory access assessment
+        - inference latency
+        - throughput benchmarking
 
-        4. **Fine-Grained Customization**
-            - Real-time hot-reload rendering: Dynamic adjustment of rendering configuration for operation trees,
-                                            report tables and their nested components
-            - Progressive update: Namespace assignment + dictionary batch update
+    3. **Rich visualization**
+        - Programmable tabular reports with real-time rendering
+        - Hierarchical operation tree with smart folding of repeated blocks for model structure insights
 
-        5. **Config-Driven Runtime Management**
-            - Centralized control: Singleton-managed global configuration for dynamic behavior adjustment
-            - Portable presets: Export/import YAML profiles for runtime behaviors, eliminating repetitive setup
+    4. **Fine-Grained Customization**
+        - Real-time hot-reload rendering: Dynamic adjustment of rendering configuration for operation trees,
+                                        report tables and their nested components
+        - Progressive update: Namespace assignment + dictionary batch update
 
-        6. **Portability and Practicality**
-            - Decoupled pipeline: Separation of data collection and visualization
-            - Automatic device synchronization: Maintains production-ready status by keeping model and data co-located
-            - Dual-mode reporting with export flexibility:
-                * Measurement units mode vs. raw data mode
-                * Multi-format export (`CSV`/`Excel`) for analysis integration
+    5. **Config-Driven Runtime Management**
+        - Centralized control: Singleton-managed global configuration for dynamic behavior adjustment
+        - Portable presets: Export/import YAML profiles for runtime behaviors, eliminating repetitive setup
 
-    Core Functionality
-        1. Parameter Analysis
-            - Total/trainable parameter quantification
-            - Layer-wise parameter distribution analysis
-            - Gradient state tracking (requires_grad flags)
+    6. **Portability and Practicality**
+        - Decoupled pipeline: Separation of data collection and visualization
+        - Automatic device synchronization: Maintains production-ready status by keeping model and data co-located
+        - Dual-mode reporting with export flexibility:
+            * Measurement units mode vs. raw data mode
+            * Multi-format export (`CSV`/`Excel`) for analysis integration
 
-        2. Computational Profiling
-            - FLOPs/MACs precision calculation
-            - Operation-wise calculation distribution analysis
-            - Dynamic input/output detection (number, type, shape, ...)
+    **Core Functionality**:
 
-        3. Memory Diagnostics
-            - Input/output tensor memory awareness
-            - Hierarchical memory consumption analysis
+    1. Parameter Analysis
+        - Total/trainable parameter quantification
+        - Layer-wise parameter distribution analysis
+        - Gradient state tracking (requires_grad flags)
 
-        4. Performance Benchmarking
-            - Auto warm-up phase execution (eliminates cold-start bias)
-            - Device-specific high-precision timing
-            - Inference latency  & Throughput Benchmarking
+    2. Computational Profiling
+        - FLOPs/MACs precision calculation
+        - Operation-wise calculation distribution analysis
+        - Dynamic input/output detection (number, type, shape, ...)
 
-        5. Visualization Engine
-            - Centralized configuration management
-            - Programmable tabular report
-                1. Style customization and real-time rendering
-                2. Dynamic table structure adjustment
-                3. Real-time data analysis in programmable way
-                4. Multi-format data export
-            - Rich-text hierarchical structure tree rendering
-                1. Style customization and real-time rendering
-                2. Smart module folding based on structural equivalence detection
+    3. Memory Diagnostics
+        - Input/output tensor memory awareness
+        - Hierarchical memory consumption analysis
 
-        6. Cross-Platform Support
-            - Automatic model-data co-location
-            - Seamless device transition (CPU/CUDA)
+    4. Performance Benchmarking
+        - Auto warm-up phase execution (eliminates cold-start bias)
+        - Device-specific high-precision timing
+        - Inference latency  & Throughput Benchmarking
+
+    5. Visualization Engine
+        - Centralized configuration management
+        - Programmable tabular report
+            1. Style customization and real-time rendering
+            2. Dynamic table structure adjustment
+            3. Real-time data analysis in programmable way
+            4. Multi-format data export
+        - Rich-text hierarchical structure tree rendering
+            1. Style customization and real-time rendering
+            2. Smart module folding based on structural equivalence detection
+
+    6. Cross-Platform Support
+        - Automatic model-data co-location
+        - Seamless device transition (CPU/CUDA)
 
     Attributes:
         ipt (Dict[str, Any]): Input arguments for underlying model's `forward` method.
@@ -153,27 +155,30 @@ class Meter:
 
     Example:
         ```python
+        import torch
+        from rich import print
         from torchmeter import Meter, get_config
         from torchvision import models
 
         # prepare your torch model
-        model = models.resnet152()
+        underlying_model = models.resnet152()
 
         # wrap the model with Meter class
-        metered_model = Meter(model, device="cuda")
+        model = Meter(underlying_model)
 
         # Basic usage
-        input_tensor = torch.randn(1, 3, 224, 224).cuda()
-        output = meter(input_tensor)  # Standard model execution
+        input = torch.randn(1, 3, 224, 224)
+        output = model(input)  # Standard model execution
 
         # Performance analysis
-        print(meter.structure)  # Visualize model hierarchy
-        print(meter.param)  # Show parameter statistics
-        meter.profile("cal")  # Display computational cost table
+        print(model.structure)  # Visualize model hierarchy
+        print(model.param)  # Show parameter statistics
+        model.profile("cal")  # Display computational cost table
 
-        # Device management
-        meter.to("cpu")
-        meter(input_tensor.cpu())
+        # Automatic device synchronization
+        if torch.cuda.is_available():
+            model.to("cuda")
+            model(input)
         ```
     """
 
@@ -181,45 +186,47 @@ class Meter:
         """Initialize a Meter instance for model performance measurement and visualization.
 
         Args:
-            model (nn.Module): PyTorch model to be instrumented for measurement
+            model (nn.Module): `PyTorch` model to be instrumented for measurement
             device (Optional[Union[str, torch.device]]): Target device for model execution and measurement.
-                                                         Accepts either device string (e.g., 'cuda:0') or
-                                                         torch.device object. If None, automatically detects
+                                                         Accepts either device string (e.g., `cuda:0`) or
+                                                         `torch.device` object. If `None`, automatically detects
                                                          model's current device via its parameters.
 
         Raises:
-            TypeError: If provided model is not a nn.Module instance
-            UserWarning: When device is not specified and model contains no parameters (fallback to CPU)
+            TypeError: If provided model is not a `nn.Module` instance
+            UserWarning: When device is not specified and model contains no parameters (fallback to `CPU`)
 
         Notes:
-            Initialization performs following key operations:
-            1. Device configuration:
-                - Uses specified device or auto-detects via model parameters
-                - Moves model to target device
 
-            2. Measurement infrastructure setup:
-                - Initializes input capture dictionary (`_ipt`)
-                - Builds operation tree (`optree`) for model structure analysis
-                - Prepares renderers for visualization (`tree_renderer`, `table_renderer`)
+        Initialization performs following key operations:
 
-            3. Measurement state initialization:
-                - Resets measurement flags (`param`/`cal`/`mem`)
-                - Sets default benchmark parameters (`ittp_warmup`=50, `ittp_benchmark_time`=100)
-                - Initializes accuracy warning trackers (`_has_nocall_nodes`, `_has_not_support_nodes`)
+        1. Device configuration:
+            - Uses specified device or auto-detects via model parameters
+            - Moves model to target device
+
+        2. Measurement infrastructure setup:
+            - Initializes input capture dictionary (`_ipt`)
+            - Builds operation tree (`optree`) for model structure analysis
+            - Prepares renderers for visualization (`tree_renderer`, `table_renderer`)
+
+        3. Measurement state initialization:
+            - Resets measurement flags (`param`/`cal`/`mem`)
+            - Sets default benchmark parameters (`ittp_warmup`=50, `ittp_benchmark_time`=100)
+            - Initializes accuracy warning trackers (`_has_nocall_nodes`, `_has_not_support_nodes`)
 
         Example:
             ```python
             from torchmeter import Meter
             from torchvision import models
 
-            model = models.resnet18()
+            underlying_model = models.resnet18()
 
             # auto detect device
-            metered_model = Meter(model)
+            model = Meter(underlying_model)
 
             # init a gpu model
-            metered_model = Meter(model, device="cuda")
-            metered_model = Meter(model, device="cuda:1")
+            model = Meter(underlying_model, device="cuda")
+            model = Meter(underlying_model, device="cuda:1")
             ```
         """
 
@@ -253,6 +260,7 @@ class Meter:
         """Execute model inference while maintaining input and model device synchronization.
 
         This method performs three key operations in order:
+
         1. Captures input arguments of underlying model's `forward` method for measurement purposes
         2. Align the device where the input tensor is located with the device where the model on.
         3. Executes the underlying model's feed-forward inference
@@ -291,7 +299,6 @@ class Meter:
             import torch.nn as nn
             from torchmeter import Meter
 
-
             class MyModel(nn.Module):
                 def __init__(self):
                     super(MyModel, self).__init__()
@@ -300,15 +307,14 @@ class Meter:
                 def forward(self, x, y=1):
                     return self.conv(x) + y
 
-
-            model = MyModel()
-            metered_model = Meter(model, device="cuda:0")
+            underlying_model = MyModel()
+            model = Meter(underlying_model, device="cuda:0")
 
             # Standard invocation
-            output = metered_model(torch.randn(1, 3, 224, 224))
+            output = model(torch.randn(1, 3, 224, 224))
 
             # Mixed argument types
-            output = metered_model(torch.randn(1, 3, 224, 224), y=2)
+            output = model(torch.randn(1, 3, 224, 224), y=2)
             ```
         """
 
@@ -328,6 +334,7 @@ class Meter:
 
         This method enables seamless attribute access to the wrapped model while maintaining Meter's
         own attributes. It follows these resolution rules:
+
         1. Directly returns Meter's own attributes if they exist
         2. For attributes prefixed with "ORIGIN_", returns the underlying model's attribute with the prefix removed
         3. Otherwise, returns the corresponding attribute from the wrapped model
@@ -379,10 +386,7 @@ class Meter:
         Raises:
             AttributeError:
                 - When attempting to set non-modifiable Meter class attributes.
-                - When attribute assignment fails for both Meter instance and the underlying model
-
-                 For example, the attributes
-                  . All these attributes are
+                - When attribute assignment fails for both `Meter` instance and the underlying model
 
         Notes:
             - When encountering conflicting attribute names between Meter instance and the model:
@@ -426,6 +430,7 @@ class Meter:
         """Try to delete attributes from Meter instance first, fall back to underlying model if needed.
 
         This method ensures:
+
         1. Class attributes defined in `Meter` cannot be deleted
         2. Instance attributes are deleted along with corresponding model attributes (if exists)
         3. Attributes prefixed with "ORIGIN_" will delete the actual model attribute after removing prefix
@@ -476,8 +481,8 @@ class Meter:
             - This property is read-only and cannot be directly modified
 
             - Returned dictionary containing:
-                - 'args' (tuple): Positional arguments passed to the `forward()` of the underlying model.
-                - 'kwargs' (dict): Keyword arguments passed to the `forward()` of the underlying model
+                - `args` (`tuple`): Positional arguments passed to the `forward()` of the underlying model.
+                - `kwargs` (`dict`): Keyword arguments passed to the `forward()` of the underlying model
 
             - Input can only be set/updated through `Meter` instance calls
               (i.e., feed-forward inference of the origin model)
@@ -611,7 +616,7 @@ class Meter:
         """Sets rendering configuration for various levels of rendered tree structure via a dictionary.
 
         This property is bound to the `tree_levels_args` attribute of the internal `TreeRenderer` instance.
-        It allows users to batch configure the rendering configuration (e.g., label, guide_style) for tree
+        It allows users to batch configure the rendering configuration (e.g., `label`, `guide_style`) for tree
         structure generated through the `Meter.structure` property. The provided dictionary maps configuration
         names to their values for fine-grained control over table rendering.
 
@@ -668,7 +673,7 @@ class Meter:
         """Gets rendering configuration for repeated blocks of rendered tree structure.
 
         This property directly binds to `torchmeter.display.TreeRenderer.repeat_block_args`
-        to get rendering configuration (e.g., style, highlight) for repeated blocks of rendered
+        to get rendering configuration (e.g., `style`, `highlight`) for repeated blocks of rendered
         tree structure generated via `Meter.structure` property. The configuration persists across
         all subsequent tree renderings until explicitly modified.
 
@@ -887,19 +892,19 @@ class Meter:
             from torchmeter import Meter
             from torchvision import models
 
-            model = models.vit_b_16()
-            metered_model = Meter(model)
+            underlying_model = models.vit_b_16()
+            model = Meter(underlying_model)
 
             # use the default configuration
-            print(metered_model.structure)
+            print(model.structure)
 
             # reaccess the structure, will be quickly returned
-            print(metered_model.structure)
+            print(model.structure)
 
             # use a custom configuration
-            metered_model.tree_fold_repeat = False
-            metered_model.tree_levels_args = {"default": {"guide_style": "red"}}
-            print(metered_model.structure)
+            model.tree_fold_repeat = False
+            model.tree_levels_args = {"default": {"guide_style": "red"}}
+            print(model.structure)
             ```
         """
 
@@ -950,7 +955,7 @@ class Meter:
     def cal(self) -> CalMeter:
         """Measures the calculation cost of the model during inference.
 
-        This property calculates the computational cost (i.e., FLOPs and MACs) for each node in the
+        This property calculates the computational cost (i.e., `FLOPs` and `MACs`) for each node in the
         operation tree during a feed-forward inference pass.
 
         Returns:
@@ -1165,7 +1170,7 @@ class Meter:
         inspecting the tree structure.
 
         Returns:
-            List[str]: A list of strings, each formatted as `(node_id) node_name`, representing all nodes
+            A list of strings, each formatted as `(node_id) node_name`, representing all nodes
                        in the operation tree.
         """
         return [f"({node.node_id}) {node.name}" for node in self.optree.all_nodes]
@@ -1185,14 +1190,14 @@ class Meter:
             from torchmeter import Meter
             from torchvision import models
 
-            model = models.resnet18()
-            metered_model = Meter(model)
+            underlying_model = models.resnet18()
+            model = Meter(underlying_model)
 
             # move to cuda:0
-            metered_model.to("cuda:0")
+            model.to("cuda:0")
 
             # move to cpu
-            metered_model.to(torch.device("cpu"))
+            model.to(torch.device("cpu"))
             ```
         """
         self.device = new_device  # type: ignore
@@ -1223,11 +1228,11 @@ class Meter:
             from torchmeter import Meter
             from torchvision import models
 
-            model = models.resnet18()
-            metered_model = Meter(model)
+            underlying_model = models.resnet18()
+            model = Meter(underlying_model)
             rebased_model = metered_model.rebase("5")
 
-            print(metered_model)  # Meter(model=0 ResNet: ResNet, device=cpu)
+            print(model)  # Meter(model=0 ResNet: ResNet, device=cpu)
             print(rebased_model)  # Meter(model=0 Sequential: Sequential, device=cpu)
             ```
         """
@@ -1286,19 +1291,19 @@ class Meter:
 
             from rich import print
 
-            model = models.vit_b_16()
-            metered_model = Meter(model)
-            metered_model(randn(1, 3, 224, 224))
+            underlying_model = models.vit_b_16()
+            model = Meter(underlying_model)
+            _ = model(randn(1, 3, 224, 224))
 
             # using statistics name
-            print(metered_model.stat_info("param"))
+            print(model.stat_info("param"))
 
             # using statistics object
-            cal = metered_model.cal
-            print(metered_model.stat_info(cal))
+            cal = model.cal
+            print(model.stat_info(cal))
 
             # not show warnings
-            print(metered_model.stat_info("mem", show_warning=False))
+            print(model.stat_info("mem", show_warning=False))
             ```
         """
 
@@ -1391,16 +1396,16 @@ class Meter:
             from torchmeter import Meter
             from torchvision import models
 
-            model = models.resnet18()
-            metered_model = Meter(model)
-            metered_model(randn(1, 3, 224, 224))
+            underlying_model = models.resnet18()
+            model = Meter(underlying_model)
+            model(randn(1, 3, 224, 224))
 
             # overview all statistics (i.e. param, cal, mem, ittp)
-            metered_model.overview()
+            model.overview()
 
             # only overview `cal` and `param`
             # and the order is `cal` then `param`
-            metered_model.overview("cal", "param")
+            model.overview("cal", "param")
             ```
         """
 
@@ -1441,13 +1446,14 @@ class Meter:
             stat_name (str): The name of the statistics for which to retrieve the columns.
 
         Returns:
-            Tuple[str, ...]: A tuple of column names for the specified statistics backend dataframe.
+            A tuple of column names for the specified statistics backend dataframe.
 
         Raises:
             TypeError: If `stat_name` is not a string.
             KeyError: If `stat_name` is not found in the available statistics (i.e. `param`, `cal`, `mem`, `ittp`).
 
         Notes:
+
             default column names for each statistics:
                 - param: ("Operation_Id", "Operation_Name", "Operation_Type",
                           "Param_Name", "Requires_Grad", "Numeric_Num")
@@ -1466,10 +1472,10 @@ class Meter:
             from torchmeter import Meter
             from torchvision import models
 
-            model = models.resnet18()
-            metered_model = Meter(model)
+            underlying_model = models.resnet18()
+            model = Meter(underlying_model)
 
-            metered_model.table_cols("param")
+            model.table_cols("param")
             # ('Operation_Id',
             #  'Operation_Name',
             #  'Operation_Type',
@@ -1477,7 +1483,7 @@ class Meter:
             #  'Requires_Grad',
             #  'Numeric_Num')
 
-            metered_model.table_cols("cal")
+            model.table_cols("cal")
             # ('Operation_Id',
             #  'Operation_Name',
             #  'Operation_Type',
@@ -1523,26 +1529,26 @@ class Meter:
             no_tree (bool, optional): Not to display the rendered tree when set to True. Defaults to False.
 
             **tb_kwargs: Additional table customization options:
-                - raw_data (bool): Use raw numerical data instead of formatted values with unit.
-                                   Defaults to False.
-                - pick_cols (Sequence[str]): Whitelist of columns to display. Defaults to [].
-                - exclude_cols (Sequence[str]): Blacklist of columns to hide. Defaults to [].
-                - custom_cols (Dict[str, str]): Column rename mappings (original: new). Defaults to {}.
-                - keep_custom_name (bool): Whether to keep custom names after this call. Defaults to False.
-                - newcol_name (str): Name for new computed column. Defaults to ''.
-                - newcol_func (Callable[[DataFrame], ArrayLike]): Function to compute new column values.
-                                                                  Defaults to lambda df: [None]*len(df).
-                - newcol_type (Optional[PolarsDataType]): Explicit data type for new column. Defaults to None.
-                - newcol_idx (int): Insertion position for new column (-1=append). Defaults to -1.
-                - keep_new_col (bool): Retain new columns in backend dataframe and subsequent renders.
-                                       Defaults to False.
-                - save_to (Optional[str]): File path for data export, not None to trigger export. Defaults to None.
-                - save_format (Optional[str]): Export format, None to use the value in `save_to`.
-                                               Now we only support 'csv' or 'xlsx' file. Defaults to None.
+
+                - raw_data (`bool`): Use raw numerical data instead of formatted values with unit.
+                                     Defaults to `False`.
+                - pick_cols (`Sequence[str]`): Whitelist of columns to display. Defaults to `[]`.
+                - exclude_cols (`Sequence[str]`): Blacklist of columns to hide. Defaults to `[]`.
+                - custom_cols (`Dict[str, str]`): Column rename mappings (original: new). Defaults to `{}`.
+                - keep_custom_name (`bool`): Whether to keep custom names after this call. Defaults to `False`.
+                - newcol_name (`str`): Name for new computed column. Defaults to `''`.
+                - newcol_func (`Callable[[DataFrame], ArrayLike]`): Function to compute new column values.
+                                                                    Defaults to `lambda df: [None]*len(df)`.
+                - newcol_type (`Optional[PolarsDataType]`): Explicit data type for new column. Defaults to `None`.
+                - newcol_idx (`int`): Insertion position for new column (-1=append). Defaults to `-1`.
+                - keep_new_col (`bool`): Retain new columns in backend dataframe and subsequent renders.
+                                         Defaults to `False`.
+                - save_to (`Optional[str]`): File path for data export, not None to trigger export. Defaults to `None`.
+                - save_format (`Optional[str]`): Export format, `None` to use the value in `save_to`.
+                                                 Now we only support `csv` or `xlsx` file. Defaults to `None`.
 
         Returns:
-            Tuple[rich.table.Table, polars.DataFrame]: The rendered `rich.table.Table` object and
-                                                       underlying polars DataFrame.
+            The rendered `rich.table.Table` object and underlying polars DataFrame.
 
         Raises:
             RuntimeWarning: If your model has some modules defined but not explicitly called.
@@ -1656,26 +1662,24 @@ class Meter:
             from torchvision import models
 
             # wrap your model with Meter
-            model = models.alexnet()
-            metered_model = Meter(model)
+            underlying_model = models.alexnet()
+            model = Meter(underlying_model)
 
             # execute a forward inference (necessary, to provide input data)
             input = torch.randn(1, 3, 224, 224)
-            metered_model(input)
+            model(input)
 
             # check column names of cal tabel
-            print(metered_model.table_cols("cal"))
+            print(model.table_cols("cal"))
             # ('Operation_Id', 'Operation_Name', 'Operation_Type', 'Kernel_Size', 'Bias',
             # 'Input', 'Output', 'MACs', 'FLOPs')
-
 
             def newcol_logic(df):
                 flops_col = df["FLOPs"]
                 return flops_col.map_elements(lambda x: f"{100 * x / metered_model.cal.Flops:.4f} %")
 
-
             # Customized profile with column operations
-            metered_model.profile(
+            model.profile(
                 "cal",
                 # render and display immediately
                 show=True,
@@ -1873,6 +1877,7 @@ class Meter:
         """Determines if the new input differs from the current captured input.
 
         Compares both positional arguments (args) and keyword arguments (kwargs) between current and new input:
+
         - For Tensor arguments: Checks shape and dtype equivalence
         - For non-Tensor arguments: Performs value equality check
         - Verifies argument structure consistency (same length for args, same keys for kwargs)
@@ -1885,10 +1890,11 @@ class Meter:
 
         Returns:
             bool: `True` if any of following conditions met:
-                   1. Current input is empty (first-time input)
-                   2. Positional arguments differ in length/value type/shape (for Tensors)
-                   3. Keyword arguments have different keys or values
-                   4. Any argument value differs (non-Tensor) or tensor properties differ (Tensor)
+
+                1. Current input is empty (first-time input)
+                2. Positional arguments differ in length/value type/shape (for Tensors)
+                3. Keyword arguments have different keys or values
+                4. Any argument value differs (non-Tensor) or tensor properties differ (Tensor)
         """
 
         if self._is_ipt_empty():
