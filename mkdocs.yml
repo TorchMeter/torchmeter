@@ -21,6 +21,7 @@ use_directory_urls: true # don't display 'index.html' in slugs
 nav: # relative to docs/src/en
   - Intros: index.md
   - Tutorials: demo.ipynb
+  - Cheatsheet: cheatsheet.md
   - API Reference:
     - api/core.md
   - Contribute: 
@@ -227,6 +228,8 @@ extra_css:
 
 extra_javascript:
   - javascripts/extra.js
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
 
 copyright: <a href="https://github.com/TorchMeter" target="_blank">© 2025 TorchMeter</a> All rights reserved.
 extra:

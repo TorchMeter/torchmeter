@@ -5,6 +5,14 @@
     max-width: 1320px;
 }
 
+/* Full Width Tables */
+.md-typeset .md-typeset__table {
+  display: block;
+}
+.md-typeset__table table:not([class]) {
+  display: table;
+}
+
 /* Remove the `In` and `Out` block in rendered Jupyter notebooks */
 .jp-Cell-outputWrapper .jp-OutputPrompt.jp-OutputArea-prompt,
 .jp-Cell-inputWrapper .jp-InputPrompt.jp-InputArea-prompt {
