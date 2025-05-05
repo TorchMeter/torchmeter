@@ -1,12 +1,14 @@
 ---
 hide:
-  - toc
-  - navigation
+    - toc
+    - navigation
 ---
 
 <!-- logo -->
-![TorchMeter Banner](assets/banner/banner_black.png#only-light)
-![TorchMeter Banner](assets/banner/banner_white.png#only-dark)
+<figure markdown="span">
+    ![TorchMeter Banner](assets/banner/banner_black.png#only-light){ .off-glb }
+    ![TorchMeter Banner](assets/banner/banner_white.png#only-dark){ .off-glb }
+</figure>
 
 <!-- caption -->
 <p align="center">
@@ -86,7 +88,7 @@ hide:
 
     - [x] {++Automatic device synchronization++}: <br>Maintains production-ready status by keeping model and data co-located <br>
 
-    - [x] {++Dual-mode reporting++} with export flexibility: 
+    - [x] {++Dual-mode reporting with export flexibility++}: 
         - Measurement units mode vs. raw data mode
         - Multi-format export (`CSV`/`Excel`) for analysis integration
 
@@ -94,15 +96,19 @@ hide:
 
 ???+ example "𝙲𝚘𝚖𝚙𝚊𝚝𝚒𝚋𝚒𝚕𝚒𝚝𝚢"
 
-    - **OS**: `windows` / `linux` / `macOS`    
-    - **Python**: >= 3.8   
-    - **Pytorch**: >= 1.7.0
+    <div class="grid cards" markdown>
+
+    - :octicons-server-16:  __OS__: `windows` / `linux` / `macOS`
+    - :material-language-python:  __Python__: >= 3.8
+    - :simple-pytorch:  __Pytorch__: >= 1.7.0
+
+    </div>
 
 ??? abstract "𝚃𝚑𝚛𝚘𝚞𝚐𝚑 𝙿𝚢𝚝𝚑𝚘𝚗 𝙿𝚊𝚌𝚔𝚊𝚐𝚎 𝙼𝚊𝚗𝚊𝚐𝚎𝚛"
 
     > the most convenient way, suitable for installing the released **latest stable** version
 
-    ```{ .bash .no-copy title="" linenums="1" hl_lines="2 5 8 11" } 
+    ```{ .bash .no-copy title="" linenums="0" hl_lines="2 5 8 11" } 
     # pip series
     pip/pipx/pipenv install torchmeter
 
@@ -122,11 +128,11 @@ hide:
 
     > Suitable for installing released historical versions
 
-    1. Download `.whl` from [PyPI](https://pypi.org/project/torchmeter/#files) or [Github Releases](https://github.com/TorchMeter/torchmeter/releases).
+    1. Download `.whl` from [PyPI :material-link-variant:](https://pypi.org/project/torchmeter/#files) or [Github Releases :material-link-variant:](https://github.com/TorchMeter/torchmeter/releases).
 
     2. Install locally:
 
-        ```{.bash title=""}
+        ```bash title="" linenums="0"
         pip install torchmeter-x.x.x.whl # (1)
         ```
         
@@ -136,7 +142,7 @@ hide:
 
     > Suitable for who want to try out the upcoming features (may has unknown bugs).
 
-    ```{.bash  title=""}
+    ```bash  title="" linenums="0"
     git clone https://github.com/TorchMeter/torchmeter.git
     cd torchmeter
 
@@ -154,10 +160,18 @@ hide:
 ## 𝒞. 𝒢𝑒𝓉𝓉𝒾𝓃𝑔 𝓈𝓉𝒶𝓇𝓉𝑒𝒹
 
 <!-- screenshot / gif -->
-<p align="center">
-    <img src="assets/demo/demo.gif" alt="TorchMeter Demo">
-    <font color="gray">Refer to <a href="examples/demo.ipynb">demo notebook</a> for all scenarios</font>
-</p>
+
+<script 
+    src="https://asciinema.org/a/718060.js" 
+    id="asciicast-718060"
+    async="true"
+    data-autoplay="true"
+    data-preload="true"
+    data-loop="true"
+    data-cols="152"
+    data-rows="28"
+>
+</script>
 
 ??? success ":material-numeric-1-circle-outline: 𝙳𝚎𝚕𝚎𝚐𝚊𝚝𝚎 𝚢𝚘𝚞𝚛 𝚖𝚘𝚍𝚎𝚕 𝚝𝚘 𝚝𝚘𝚛𝚌𝚑𝚖𝚎𝚝𝚎𝚛"
 
@@ -208,25 +222,32 @@ hide:
     ```python
     import torch.nn as nn
     from torchmeter import Meter
+    from torch.cuda import is_available as is_cuda
 
-    # prepare your pytorch model
+    # 1️⃣ Prepare your pytorch model, here is a simple examples
     underlying_model = ExampleNet() # (1)
+
+    # Set an extra attribute to the model to show 
+    # how torchmeter acts as a zero-intrusion proxy later
     underlying_model.example_attr = "ABC"
 
-    # suppose that the backbone is freezed
-    for p in model.backbone.parameters():
-        p.requires_grad = False
-
-    # create a proxy for your model
+    # 2️⃣ Wrap your model with torchmeter
     model = Meter(underlying_model)
+
+    # 3️⃣ Validate the zero-intrusion proxy
+
+    # Get the model's attribute
+    print(model.example_attr)
+
+    # Get the model's method
+    # `_inner_net` is a method defined in the ExampleNet
+    print(hasattr(model, "_inner_net")) 
+
+    # Move the model to other device (now on cpu)
     print(model)
-
-    # move to gpu
-    model.to("cuda")
-
-    # validate the proxy
-    print(getattr(model, "example_attr"))
-    print(hasattr(model, "_inner_net"))
+    if is_cuda():
+        model.to("cuda")
+        print(model) # now on cuda
     ```
 
     1.    :man_raising_hand: see above for implementation of `ExampleNet`
@@ -243,10 +264,12 @@ hide:
 
     ```python
     # Parameter Analysis
+    # Suppose that the `backbone` part of ExampleNet is frozen
+    _ = model.backbone.requires_grad_(False)
     print(model.param)
     tb, data = model.profile('param', no_tree=True)
 
-    # before measuring calculation you should first execute a feed-forward
+    # Before measuring calculation you should first execute a feed-forward
     import torch
     input = torch.randn(1, 3, 32, 32)
     output = model(input) # (1)
@@ -262,9 +285,12 @@ hide:
     # Performance Benchmarking
     print(model.ittp) # (4)
     tb, data = model.profile('ittp', no_tree=True)
+
+    # Overall Analytics
+    print(model.overview())
     ```
 
-    1.    :man_raising_hand: you do **not** need to concern about the device mismatch, just feed the model
+    1.    :man_raising_hand: you do **not** need to concern about the device mismatch, just feed the model with the input.
     2.    :man_raising_hand: `cal` for calculation
     3.    :man_raising_hand: `mem` for memory
     4.    :man_raising_hand: `ittp` for inference time & throughput
@@ -273,27 +299,28 @@ hide:
 
     ```python
     # export to csv
-    model.profile('param', show=False, save_to="params.csv")
+    tb, data = model.profile('param', show=False, save_to="params.csv")
 
     # export to excel
-    model.profile('cal', show=False, save_to="calculation.xlsx")
+    tb, data = model.profile('cal', show=False, save_to="../calculation.xlsx")
     ```
 
 ??? success ":material-numeric-5-circle-outline: 𝙰𝚍𝚟𝚊𝚗𝚌𝚎𝚍 𝚞𝚜𝚊𝚐𝚎"
 
-    1. [Attributes/methods access of underlying model]()
-    2. [Automatic device synchronization]()
-    3. [Performance gallery]()
-    4. [Detailed inspection]()
+    1. [Attributes/methods access of underlying model :material-link-variant:](demo.ipynb#b-zero-intrusion-proxy)
+    2. [Automatic device synchronization :material-link-variant:](demo.ipynb#c-automatic-device-synchronization)
+    3. [Smart module folding :material-link-variant:](demo.ipynb#d-model-structure-analysis)
+    4. [Performance gallery :material-link-variant:](demo.ipynb#eb-overall-report)
     5. Customized visulization 
-        - [for operation trees]()
-        - [for tabular reports]()
-        - [combination of tree and report]()
+        - [for statistics overview :material-link-variant:](demo.ipynb#fa-customization-of-statistics-overview)
+        - [for operation tree :material-link-variant:](demo.ipynb#fb-customization-of-rich-text-operation-tree)
+        - [for tabular report :material-link-variant:](demo.ipynb#fc-customization-of-tabular-report)
     6. Best practice of programmable tabular report
-        - [Real-time structure adjustment]()   
-        - [Real-time data analysis]()
-    7. [Tabular report export and post-export]()
-    8. [Centralized configuration management]()
+        - [Real-time structure adjustment :material-link-variant:](demo.ipynb#fc3-customize-tabular-report-structure)   
+        - [Real-time data analysis :material-link-variant:](demo.ipynb#fc34-add-a-new-column)
+    7. [Instant export and postponed export :material-link-variant:](demo.ipynb#gb-postponed-export)
+    8. [Centralized configuration management :material-link-variant:](demo.ipynb#h-centralized-configuration-management)
+    9. [Submodule exploration :material-link-variant:](demo.ipynb#i4-submodule-explore)
 
 ## 𝒟. 𝒞𝑜𝓃𝓉𝓇𝒾𝒷𝓊𝓉𝑒
 
@@ -301,17 +328,17 @@ Thank you for wanting to make `TorchMeter` even better!
 
 There are several ways to make a contribution:
 
-- 💬 [Start/join discussions]()
-- 🚨 [Report issues]()
-- 👨‍💻 [Create pull requests (PRs)]()
+- [:octicons-comment-discussion-16: **Asking questions** :material-link-variant:](contribute/discussions.md){ data-preview }
+- [:octicons-issue-opened-16: **Reporting bugs** :material-link-variant:](contribute/issues.md){ data-preview }
+- [:octicons-git-pull-request-16: **Contributing code** :material-link-variant:](contribute/prs.md){ data-preview }
 
-Before jumping in, let's ensure smooth collaboration by reviewing our 📋 [**contribution guidelines**]() first. 
+Before jumping in, let's ensure smooth collaboration by reviewing our 📋 [**contribution guidelines** :material-link-variant:](contribute/welcome_contributors.md){ data-preview } first. 
 
 Thanks again !
 
 ## ℰ. 𝒞𝑜𝒹𝑒 𝑜𝒻 𝒞𝑜𝓃𝒹𝓊𝒸𝓉
 
-> Refer to official [code-of-conduct file](https://github.com/TorchMeter/torchmeter/blob/master/CODE_OF_CONDUCT.md) for more details.
+> Refer to official [code-of-conduct file :material-link-variant:](https://github.com/TorchMeter/torchmeter/blob/master/CODE_OF_CONDUCT.md) for more details.
 
 - `TorchMeter` is an open-source project built by developers worldwide. We're committed to fostering a **friendly, safe, and inclusive** environment for all participants. 
 
@@ -319,6 +346,6 @@ Thanks again !
 
 ## ℱ. 𝐿𝒾𝒸𝑒𝓃𝓈𝑒
 
-- `TorchMeter` is released under the **AGPL-3.0 License**, see the [LICENSE](https://github.com/TorchMeter/torchmeter/blob/master/LICENSE) file for the full text. 
-- Please carefully review the terms in the [LICENSE](https://github.com/TorchMeter/torchmeter/blob/master/LICENSE) file before using or distributing `TorchMeter`. 
+- `TorchMeter` is released under the **AGPL-3.0 License**, see the [LICENSE :material-link-variant:](https://github.com/TorchMeter/torchmeter/blob/master/LICENSE) file for the full text. 
+- Please carefully review the terms in the [LICENSE :material-link-variant:](https://github.com/TorchMeter/torchmeter/blob/master/LICENSE) file before using or distributing `TorchMeter`. 
 - Ensure compliance with the licensing conditions, especially when integrating this project into larger systems or proprietary software.

@@ -253,7 +253,7 @@ extra:
       name: Community
 
     - icon: fontawesome/brands/github
-      link: https://github.com/TorchMeter
+      link: https://github.com/TorchMeter/torchmeter
       name: GitHub
 
     - icon: fontawesome/brands/python
