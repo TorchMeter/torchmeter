@@ -299,6 +299,7 @@ class Meter:
             import torch.nn as nn
             from torchmeter import Meter
 
+
             class MyModel(nn.Module):
                 def __init__(self):
                     super(MyModel, self).__init__()
@@ -306,6 +307,7 @@ class Meter:
 
                 def forward(self, x, y=1):
                     return self.conv(x) + y
+
 
             underlying_model = MyModel()
             model = Meter(underlying_model, device="cuda:0")
@@ -1674,9 +1676,11 @@ class Meter:
             # ('Operation_Id', 'Operation_Name', 'Operation_Type', 'Kernel_Size', 'Bias',
             # 'Input', 'Output', 'MACs', 'FLOPs')
 
+
             def newcol_logic(df):
                 flops_col = df["FLOPs"]
                 return flops_col.map_elements(lambda x: f"{100 * x / metered_model.cal.Flops:.4f} %")
+
 
             # Customized profile with column operations
             model.profile(

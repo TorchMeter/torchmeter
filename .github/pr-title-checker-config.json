@@ -9,7 +9,7 @@
     },
     "MESSAGES": {
         "success": "🎉 PR title format is valid. Thank you!",
-        "failure": "❌ PR title format is invalid! Please update according to the [PR title convention](https://github.com/TorchMeter/torchmeter/blob/master/docs/pr_standard.md#pull-request-title).",
+        "failure": "❌ PR title format is invalid! Please update according to the [PR Title Conventions](https://torchmeter.github.io/docs/vers/latest/contribute/conventions/#Pull-Request-Title).",
         "notice": ""
     }
 }

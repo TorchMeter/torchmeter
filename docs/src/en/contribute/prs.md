@@ -149,7 +149,7 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
     git clone <paste-the-url-copied-in-last-step-here> torchmeter-yourname  # (1)
     ```
 
-    1. :man_raising_hand: Replace `torchmeter-yourname` with any string you want. This will be the directory name for the local copy of your fork repository.
+    1. 🙋‍♂️ Replace `torchmeter-yourname` with any string you want. This will be the directory name for the local copy of your fork repository.
 
 4. Verify: A new directory `torchmeter-yourname` will be created containing:
     - {++Working directory++}: Your local copy of the project files
@@ -190,7 +190,7 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
     git fetch upstream
     ```
 
-    1. :man_raising_hand: Replace `torchmeter-yourname` with the directory name you set in [step B.c.3](#Bc-Clone-Your-Fork-to-Local-Machine){ data-preview }.
+    1. 🙋‍♂️ Replace `torchmeter-yourname` with the directory name you set in [step B.c.3](#Bc-Clone-Your-Fork-to-Local-Machine){ data-preview }.
 
 2. Verify remote & upstream tracking:
 
@@ -206,8 +206,8 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
     **Ensure the output contains the highlighted lines below**. If you uncheck "Copy the master branch only" (1) when forking, you might see info of additional branches like `v0.1.x` (2) - these can be safely ignored as we ultimately create PRs against the master branch.
     { .annotate }
 
-    1. :man_raising_hand: refer to [step B.b.3](#Bb-Create-a-Fork-Repository){ data-preview }.
-    2.    :man_raising_hand: lines 7-8
+    1. 🙋‍♂️ refer to [step B.b.3](#Bb-Create-a-Fork-Repository){ data-preview }.
+    2.    🙋‍♂️ lines 7-8
 
     ```txt linenums="1" title="Expected output" hl_lines="1-5"
     * master
@@ -271,7 +271,7 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
     conda create -n torchmeter-dev python=3.8 # (1)
     ```
 
-    1. :man_raising_hand: `torchmeter-dev` is customizable, is the virtual environment name
+    1. 🙋‍♂️ `torchmeter-dev` is customizable, is the virtual environment name
 
 3. Install `torchmeter` as well as its dependencies in **editable** mode:
 
@@ -282,8 +282,8 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
     pip install -e ".[test]" # (2)
     ```
 
-    1. :man_raising_hand: Replace `torchmeter-dev` with your virtual environment name.
-    2.    :man_raising_hand: The `-e` flag is required to enable coverage tracking in testing. Omitting it may cause coverage calculation errors.
+    1. 🙋‍♂️ Replace `torchmeter-dev` with your virtual environment name.
+    2.    🙋‍♂️ The `-e` flag is required to enable coverage tracking in testing. Omitting it may cause coverage calculation errors.
 
 ??? warning "For Windows Users with NVIDIA GPUs"
 
@@ -299,7 +299,7 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
         python -c "import torch; print(torch.cuda.is_available())"  
         ```
 
-        1. :man_raising_hand: Replace `torchmeter-dev` with your virtual environment name
+        1. 🙋‍♂️ Replace `torchmeter-dev` with your virtual environment name
 
 
         !!! tip ""
@@ -319,7 +319,7 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
             nvidia-smi | findstr "CUDA Version"  # (1)
             ```
 
-            1. :man_raising_hand: Check the version number, e.g. `CUDA Version: 12.4`
+            1. 🙋‍♂️ Check the version number, e.g. `CUDA Version: 12.4`
 
         2. Download appropriate `Pytorch` wheel:
             - `Pytorch` binaries → https://download.pytorch.org/whl/torch. Note that `torchmeter` supports `Pytorch` versions ≥ `1.7.0`.
@@ -335,7 +335,7 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
             pip install path/to/downloaded/torch.whl
             ```
 
-            1. :man_raising_hand: Replace `torchmeter-dev` with your virtual environment name
+            1. 🙋‍♂️ Replace `torchmeter-dev` with your virtual environment name
         
     3. Validate `GPU` support: re-execute the command in `step 1` to confirm `GPU` support.
 
@@ -386,7 +386,7 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
     git checkout -b <your-branch-name> upstream/master # (1)
     ```
 
-    1. :man_raising_hand: Replace `<your-branch-name>` with your branch name. When naming a branch, please follow our [branch naming conventions :material-link-variant:](conventions.md#Branch-Name){ data-preview }.
+    1. 🙋‍♂️ Replace `<your-branch-name>` with your branch name. When naming a branch, please follow our [branch naming conventions :material-link-variant:](conventions.md#Branch-Name){ data-preview }.
 
     !!! danger "Branch Name conventions"
 
@@ -468,7 +468,7 @@ To ensure your code meets `torchmeter`'s standards, please complete these 3 crit
         mypy ./torchmeter
         ```
 
-        1. :man_raising_hand: Replace `torchmeter-dev` with your virtual environment name.
+        1. 🙋‍♂️ Replace `torchmeter-dev` with your virtual environment name.
    
     !!! danger ""
 
@@ -491,7 +491,7 @@ To ensure your code meets `torchmeter`'s standards, please complete these 3 crit
         --target-version=py38 
         ```
 
-        1. :man_raising_hand: Replace `torchmeter-dev` with your virtual environment name.
+        1. 🙋‍♂️ Replace `torchmeter-dev` with your virtual environment name.
 
         !!! danger ""
 
@@ -511,7 +511,7 @@ To ensure your code meets `torchmeter`'s standards, please complete these 3 crit
         --target-version=py38
         ```
 
-        1. :man_raising_hand: Replace `torchmeter-dev` with your virtual environment name.
+        1. 🙋‍♂️ Replace `torchmeter-dev` with your virtual environment name.
 
         !!! danger ""
 
@@ -548,7 +548,7 @@ To ensure your code meets `torchmeter`'s standards, please complete these 3 crit
         pytest -q
         ```
 
-        1. :man_raising_hand: Replace `torchmeter-dev` with your virtual environment name
+        1. 🙋‍♂️ Replace `torchmeter-dev` with your virtual environment name
 
     !!! danger ""
 
@@ -695,7 +695,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
         git checkout <branch_name> # (1)
         ```
 
-        1. :man_raising_hand: Replace `<branch_name>` with your development branch name set in [step C.a.2](#Ca-Understanding-Code--Getting-started){ data-preview }.
+        1. 🙋‍♂️ Replace `<branch_name>` with your development branch name set in [step C.a.2](#Ca-Understanding-Code--Getting-started){ data-preview }.
 
 2. Review Your Changes
     1. List modified files
@@ -811,8 +811,8 @@ Once you feel that your changes have made phased progress, you can incorporate t
     git push -u origin <your-branch-name>:<remote-branch-name> # (1) (2)
     ```
 
-    1. :man_raising_hand: You need to replace `<your-branch-name>` with the branch name created in [step C.a.2](#Ca-Understanding-Code--Getting-started){ data-preview }. You also need to replace `<remote-branch-name>` with one that will receive the changes in remote repository. Generally, we keep it the same as `<your-branch-name>`.
-    2. :man_raising_hand: The `-u` parameter indicates that the `<your-branch-name>` branch in local repository will track the `<remote-branch-name>` branch in remote repository. Thus, when you make new commits on `<your-branch-name>` in local repository, you can easily push them to the `<remote-branch-name>` branch in remote repository with a simple `git push` command, no need to re-type the remote repository's target branch name. 
+    1. 🙋‍♂️ You need to replace `<your-branch-name>` with the branch name created in [step C.a.2](#Ca-Understanding-Code--Getting-started){ data-preview }. You also need to replace `<remote-branch-name>` with one that will receive the changes in remote repository. Generally, we keep it the same as `<your-branch-name>`.
+    2. 🙋‍♂️ The `-u` parameter indicates that the `<your-branch-name>` branch in local repository will track the `<remote-branch-name>` branch in remote repository. Thus, when you make new commits on `<your-branch-name>` in local repository, you can easily push them to the `<remote-branch-name>` branch in remote repository with a simple `git push` command, no need to re-type the remote repository's target branch name. 
 
 2. If you have enabled the `Github Actions` for your `fork` repository, you can submit a PR to the `master` branch of the remote repository (i.e., **your `fork` repository**) to automatically trigger the compatibility test we've prepared for you:
     1. Open the page of your fork repository. Shortly after pushing your changes, you'll find a prominent `Compare & pull request` button. (1)([Illustration](https://docs.github.com/assets/cb-34097/mw-1440/images/help/pull_requests/pull-request-compare-pull-request.webp){ data-preview }) 
@@ -865,7 +865,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
     git rev-list --count <your-branch-name>..upstream/master # (1)
     ```
 
-    1. :man_raising_hand: You need to replace `<your-branch-name>` with the branch name created in [step C.a.2](#Ca-Understanding-Code--Getting-started){ data-preview }.
+    1. 🙋‍♂️ You need to replace `<your-branch-name>` with the branch name created in [step C.a.2](#Ca-Understanding-Code--Getting-started){ data-preview }.
 
 2. If output is `0`, it indicates that there are **no** leading commits in `upstream/master`. In this case, proceed to [step D.b](#Db-Create-a-Pull-Request-to-torchmeter){ data-preview }.
 
@@ -880,8 +880,8 @@ Once you feel that your changes have made phased progress, you can incorporate t
     git rebase upstream/master # (2)
     ```
 
-    1. :man_raising_hand: Back up the new branch, you need to replace `<your-branch-name>` with the branch name created in [step C.a.2](#Ca-Understanding-Code--Getting-started){ data-preview }.
-    2. :man_raising_hand: Rebase the new branch onto the latest commit of the target branch in `torchmeter` official repo.
+    1. 🙋‍♂️ Back up the new branch, you need to replace `<your-branch-name>` with the branch name created in [step C.a.2](#Ca-Understanding-Code--Getting-started){ data-preview }.
+    2. 🙋‍♂️ Rebase the new branch onto the latest commit of the target branch in `torchmeter` official repo.
 
 4. The above command will attempt to rebase your branch `<your-branch-name>` onto the latest commit of the `master` branch of official `torchmeter` repo (i.e. the `upstream/master` in your local repo). Two scenarios may occur:
     - Your changes **do not** conflict with the latest commit of the target branch. The rebase was **successful**, and you will see the following output. In this case, you're ready to proceed to step `9` below to delete the backup branch.
@@ -941,7 +941,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
     git commit # (1)
     ```
 
-    1. :man_raising_hand: This will open an editor to edit the commit message. Please follow our [commit message conventions :material-link-variant:](conventions.md#Commit-Message){ data-preview } to format your writting. **Thank you !**
+    1. 🙋‍♂️ This will open an editor to edit the commit message. Please follow our [commit message conventions :material-link-variant:](conventions.md#Commit-Message){ data-preview } to format your writting. **Thank you !**
 
 8. Execute the following commands to synchronize the changes to your fork repository[^4].
 
@@ -952,7 +952,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
     git push 
     ```
 
-    1. :man_raising_hand: You need to replace `<your-branch-name>` with the branch name created in [step C.a.2](#Ca-Understanding-Code--Getting-started){ data-preview }.
+    1. 🙋‍♂️ You need to replace `<your-branch-name>` with the branch name created in [step C.a.2](#Ca-Understanding-Code--Getting-started){ data-preview }.
 
 9.  Finally, delete the backup branch.
 
@@ -962,7 +962,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
     git branch -D <your-branch-name>-bak # (1)
     ```
 
-    1. :man_raising_hand: you need to replace `<your-branch-name>` with the branch name created in [step C.a.2](#Ca-Understanding-Code--Getting-started){ data-preview }.
+    1. 🙋‍♂️ you need to replace `<your-branch-name>` with the branch name created in [step C.a.2](#Ca-Understanding-Code--Getting-started){ data-preview }.
 
 
 [^3]: Currently, IDEs have mature support for resolving merge conflicts. For example, you can refer to [Resolve conflicts in VsCode :material-link-variant:](https://dev.to/adiatiayu/how-to-resolve-merge-conflicts-using-the-merge-editor-feature-on-vs-code-pic) and [Resolve conflicts in PyCharm :material-link-variant:](https://www.jetbrains.com/help/pycharm/2023.3/resolve-conflicts.html).
@@ -992,7 +992,7 @@ Once you feel that your changes have made phased progress, you can incorporate t
         git branch -m <new-branch-name>
         ```
 
-        1. :man_raising_hand: You need to replace `<your-branch-name>` with the branch name created in [step C.a.2](#Ca-Understanding-Code--Getting-started){ data-preview }.
+        1. 🙋‍♂️ You need to replace `<your-branch-name>` with the branch name created in [step C.a.2](#Ca-Understanding-Code--Getting-started){ data-preview }.
 
     4. **Sync status**:  
         - Your branch has been rebased onto the latest `upstream/master` (see step [D.a](#Da-Avoiding-Protential-Merge-Conflicts){ data-preview })  

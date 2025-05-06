@@ -346,13 +346,13 @@ Thank you for wanting to make `TorchMeter` even better!
 
 There are several ways to make a contribution:
 
-- 💬 [Start/join discussions](CONTRIBUTING.md#-discussions--lets-collaborate--innovate)
-- 🚨 [Report issues](CONTRIBUTING.md#-issues--lets-report--enhance)
-- 👨‍💻 [Create pull requests (PRs)](CONTRIBUTING.md#-pull-requests--lets-squash-bugs--build-features)
+- [**Asking questions**](https://torchmeter.github.io/docs/vers/latest/contribute/discussions)
+- [**Reporting bugs**](https://torchmeter.github.io/docs/vers/latest/contribute/issues)
+- [**Contributing code**](https://torchmeter.github.io/docs/vers/latest/contribute/prs)
 
-Before jumping in, let's ensure smooth collaboration by reviewing our 📋 [**contribution guidelines**](CONTRIBUTING.md) first. 
+Before jumping in, let's ensure smooth collaboration by reviewing our 📋 [**contribution guidelines**](https://torchmeter.github.io/docs/vers/latest/contribute/welcome_contributors) first. 
 
-Thanks again !
+**Thanks again !**
 
 > [!NOTE]
 > `@Ahzyuan`: I'd like to say sorry in advance. Due to my master's studies and job search, I may be too busy in the coming year to address contributions promptly. I'll do my best to handle them as soon as possible. Thanks a lot for your understanding and patience!

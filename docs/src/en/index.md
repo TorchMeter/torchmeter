@@ -136,7 +136,7 @@ hide:
         pip install torchmeter-x.x.x.whl # (1)
         ```
         
-        1.    :man_raising_hand: Replace `x.x.x` with actual version
+        1.    🙋‍♂️ Replace `x.x.x` with actual version
 
 ??? abstract "𝚃𝚑𝚛𝚘𝚞𝚐𝚑 𝚂𝚘𝚞𝚛𝚌𝚎 𝙲𝚘𝚍𝚎"
 
@@ -155,7 +155,7 @@ hide:
     pip install .
     ```
 
-    1.    :man_raising_hand: Don't forget to eplace `x.x.x` with actual version. You can check all available versions with `git tag -l`
+    1.    🙋‍♂️ Don't forget to eplace `x.x.x` with actual version. You can check all available versions with `git tag -l`
 
 ## 𝒞. 𝒢𝑒𝓉𝓉𝒾𝓃𝑔 𝓈𝓉𝒶𝓇𝓉𝑒𝒹
 
@@ -250,7 +250,7 @@ hide:
         print(model) # now on cuda
     ```
 
-    1.    :man_raising_hand: see above for implementation of `ExampleNet`
+    1.    🙋‍♂️ see above for implementation of `ExampleNet`
 
 ??? success ":material-numeric-2-circle-outline: 𝙶𝚎𝚝 𝚒𝚗𝚜𝚒𝚐𝚑𝚝𝚜 𝚒𝚗𝚝𝚘 𝚝𝚑𝚎 𝚖𝚘𝚍𝚎𝚕 𝚜𝚝𝚛𝚞𝚌𝚝𝚞𝚛𝚎"
 
@@ -290,10 +290,10 @@ hide:
     print(model.overview())
     ```
 
-    1.    :man_raising_hand: you do **not** need to concern about the device mismatch, just feed the model with the input.
-    2.    :man_raising_hand: `cal` for calculation
-    3.    :man_raising_hand: `mem` for memory
-    4.    :man_raising_hand: `ittp` for inference time & throughput
+    1.    🙋‍♂️ you do **not** need to concern about the device mismatch, just feed the model with the input.
+    2.    🙋‍♂️ `cal` for calculation
+    3.    🙋‍♂️ `mem` for memory
+    4.    🙋‍♂️ `ittp` for inference time & throughput
 
 ??? success ":material-numeric-4-circle-outline: 𝙴𝚡𝚙𝚘𝚛𝚝 𝚛𝚎𝚜𝚞𝚕𝚝𝚜 𝚏𝚘𝚛 𝚏𝚞𝚛𝚝𝚑𝚎𝚛 𝚊𝚗𝚊𝚕𝚢𝚜𝚒𝚜"
 

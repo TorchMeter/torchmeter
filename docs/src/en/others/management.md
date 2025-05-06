@@ -26,8 +26,8 @@ To streamline collaboration and enable rapid iteration, `torchmeter` employs a s
 - **Purpose**: Always represents the latest stable state, incorporating validated features and fixes.
 - **Lifecycle**: Permanent
 - **Branch Protection Rules**:
-    1. :lock: Branch deletion forbidden
-    2. :bangbang: Direct commits prohibited. All changes must be proposed via Pull Requests (PRs) and approved through code review.
+    1. :material-lock: Branch deletion forbidden
+    2. :fontawesome-solid-ban: Direct commits prohibited. All changes must be proposed via Pull Requests (PRs) and approved through code review.
     3. :octicons-git-merge-16: PR Requirements before Merging:
         - All comments must be resolved.
         - Pass PR title checks and code compatibility tests.
@@ -86,7 +86,7 @@ When proposing new features or fixes, please follow our [Contribution Guide :mat
         git cherry-pick <hash-of-commit-on-master> # (1)
         ```
 
-        1. :man_raising_hand: Usually should resolve merge conflicts according to [steps :material-link-variant:](../contribute/prs.md#Da-Avoiding-Protential-Merge-Conflicts){ data-preview }.
+        1. 🙋‍♂️ Usually should resolve merge conflicts according to [steps :material-link-variant:](../contribute/prs.md#Da-Avoiding-Protential-Merge-Conflicts){ data-preview }.
 
     3. **Test locally**
 
@@ -101,7 +101,7 @@ When proposing new features or fixes, please follow our [Contribution Guide :mat
         git push origin bugfix/<PR-number>-<short-description> # (1)
         ```
 
-        1. :man_raising_hand: If it the work can't be finished at the moment, consider to enable the `-u` flag to track the upstream branch.
+        1. 🙋‍♂️ If it the work can't be finished at the moment, consider to enable the `-u` flag to track the upstream branch.
 
     5. **Merge to codebase**
         
