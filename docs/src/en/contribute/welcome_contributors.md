@@ -1,5 +1,8 @@
 ---
 title: Welcome, Contributors!
+hide:
+    - navigation
+    - toc
 ---
 
 # ✨ Welcome to TorchMeter Contributors' Hub!

@@ -1,5 +1,7 @@
 ---
 title: Acknowledgement
+hide:
+    - toc
 ---
 
 # 🤝 Acknowledgement 
