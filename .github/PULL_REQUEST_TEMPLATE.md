@@ -11,13 +11,13 @@ To ensure efficient review, please complete the following sections
 <!-- Note: Use `[x]` to check the boxes -->
 
 - [ ] 🔍 I've checked for duplicate PRs ([click to check](https://github.com/TorchMeter/torchmeter/pulls?q=))
-- [ ] 📜 I've followed [contribution guidelines](../CONTRIBUTING.md) 
-  - [ ] ✨ I've linted and formatted my code ([how?](../CONTRIBUTING.md#cb-lint-format-and-test-your-code))
-  - [ ] 🔧 I've formatted the PR title appropriately ([how?](../docs/pr_standard.md#pull-request-title))
-  - [ ] 🎯 I've targeted the `master` branch ([how?](../assets/target_master_branch.jpg))
-  - [ ] 👐 I've allowed maintainer edits on my branch ([how?](../assets/allow_maintainer_edit.jpg), [why](../CONTRIBUTING.md#db-create-a-pull-request-to-torchmeter))
-- [ ] 🛡️ I've added/updated tests to cover my changes if prossible ([how?](../CONTRIBUTING.md#cb-lint-format-and-test-your-code))
-- [ ] 📝 I've added/updated the documentation for any new logic introduced ([how?](../CONTRIBUTING.md#cc-add-documentation-for-your-code))
+- [ ] 📜 I've followed [contribution guidelines](https://torchmeter.github.io/docs/vers/latest/contribute/prs/) 
+  - [ ] ✨ I've linted and formatted my code ([how?](https://torchmeter.github.io/docs/vers/latest/contribute/prs/#Cb-Lint-Format-and-Test-your-Code))
+  - [ ] 🔧 I've formatted the PR title appropriately ([how?](https://torchmeter.github.io/docs/vers/latest/contribute/conventions/#Pull-Request-Title))
+  - [ ] 🎯 I've targeted the `master` branch ([how?](https://raw.githubusercontent.com/TorchMeter/assets/refs/heads/master/others/target_master_branch.jpg))
+  - [ ] 👐 I've allowed maintainer edits on my branch ([how?](https://torchmeter.github.io/docs/vers/latest/contribute/prs/#Db-Create-a-Pull-Request-to-torchmeter) → See `step 6`)
+- [ ] 🛡️ I've added/updated tests to cover my changes if prossible ([how?](https://torchmeter.github.io/docs/vers/latest/contribute/prs/#Cb-Lint-Format-and-Test-your-Code))
+- [ ] 📝 I've added/updated the documentation for any new logic introduced ([how?](https://torchmeter.github.io/docs/vers/latest/contribute/prs/#Cc-Add-Documentation-for-Your-Code))
 - [ ] ⏳ I understand @Ahzyuan has been busy lately and may need time to review. (we appreciate your patience!)
 
 ## Type of changes
