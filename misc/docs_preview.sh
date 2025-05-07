@@ -184,4 +184,5 @@ while netstat -tuln | grep -q $PORT; do
     PORT=$((PORT+1))
 done
 cyan_output "\nDeploying docs on port $PORT..."
-xvfb-run -a mkdocs serve --dirtyreload -a "127.0.0.1:$PORT"
+# xvfb-run -a mkdocs serve --dirtyreload -a "127.0.0.1:$PORT"
+mkdocs serve --dirtyreload -a "127.0.0.1:$PORT"

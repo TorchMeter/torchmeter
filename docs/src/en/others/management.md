@@ -6,7 +6,7 @@
 ## **:material-numeric-1-circle-outline: Branching Strategy**
 
 <figure markdown="span">
-    ![branching-strategy](../assets/others/branch_strategy.drawio)
+    ![branching-strategy](../assets/others/branch_strategy.svg){ .off-glb }
 </figure>
 
 To streamline collaboration and enable rapid iteration, `torchmeter` employs a simplified branching strategy inspired by `Git Flow` and practices from mature OSS projects. Our workflow(visualized above) balances stability with agility through two core branch types, i.e. the `master` branch and the version branches(`vA.B.x`).
