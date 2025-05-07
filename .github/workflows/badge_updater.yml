@@ -49,9 +49,9 @@ jobs:
       - name: Update README
         run: |
           perl -0777 -i -pe '
-            BEGIN { $coverage = shift }
-            s|<!-- Coverage Badge:Begin -->.*?<!-- Coverage Badge:End -->|<!-- Coverage Badge:Begin -->![coverage-badge]($coverage)<!-- Coverage Badge:End -->|sg
-          ' "${{ github.event.inputs.coverage_badge_link }}" README.md
+            BEGIN { $coverage = shift; $pr_num = shift }
+            s|<!-- Coverage Badge:Begin -->.*?<!-- Coverage Badge:End -->|<!-- Coverage Badge:Begin --><a href="https://github.com/TorchMeter/torchmeter/pull/$pr_num"><img alt="Coverage-Badge" src="$coverage"></a><!-- Coverage-Badge:End -->|sg
+          ' "${{ github.event.inputs.coverage_badge_link }}" "${{ github.event.inputs.pr_number }}" README.md
 
       - name: Commit & Push Changes
         run: |
