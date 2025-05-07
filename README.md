@@ -22,7 +22,7 @@
 
 <!-- simple introduction -->
 
-- **Docs**: https://docs.torchmeter.top/latest/
+- **Docs**: https://docs.torchmeter.top ([Backup link](https://torchmeter.github.io/latest) 🔗)
 - **Intro**: Provides comprehensive measurement of Pytorch model's `Parameters`, `FLOPs/MACs`, `Memory-Cost`, `Inference-Time` and `Throughput` with highly customizable result display ✨
 
 ## 𝒜. 𝐻𝒾𝑔𝒽𝓁𝒾𝑔𝒽𝓉𝓈
