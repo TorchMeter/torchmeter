@@ -1,8 +1,8 @@
 <!-- logo -->
 <p align="center">
     <picture>
-        <source media="(prefers-color-scheme: dark)" srcset="assets/banner_dark.png">
-        <img src="assets/banner_light.png" alt="TorchMeter Banner">
+        <source media="(prefers-color-scheme: dark)" srcset="https://github.com/TorchMeter/assets/blob/master/banner/banner_white.png?raw=true">
+        <img src="https://github.com/TorchMeter/assets/blob/master/banner/banner_black.png?raw=true" alt="TorchMeter Banner">
     </picture>
 </p>
 
@@ -22,7 +22,7 @@
 
 <!-- simple introduction -->
 
-- **Docs**: https://torchmeter.readthedocs.io/en/latest/
+- **Docs**: https://docs.torchmeter.top ([Backup link](https://torchmeter.github.io/latest) 🔗)
 - **Intro**: Provides comprehensive measurement of Pytorch model's `Parameters`, `FLOPs/MACs`, `Memory-Cost`, `Inference-Time` and `Throughput` with highly customizable result display ✨
 
 ## 𝒜. 𝐻𝒾𝑔𝒽𝓁𝒾𝑔𝒽𝓉𝓈
@@ -174,8 +174,8 @@ pip install .
 
 <!-- screenshot / gif -->
 <p align="center">
-    <img src="assets/demo.gif" alt="TorchMeter Demo">
-    <font color="gray">Refer to <a href="examples/demo.ipynb">demo notebook</a> for all scenarios</font>
+    <img src="https://github.com/TorchMeter/assets/blob/master/demo/demo.gif?raw=true" alt="TorchMeter Demo">
+    <font color="gray">Refer to <a href="https://docs.torchmeter.top/latest/demo">tutorials</a> for all scenarios</font>
 </p>
 
 <details>
@@ -231,25 +231,32 @@ pip install .
 ```python
 import torch.nn as nn
 from torchmeter import Meter
+from torch.cuda import is_available as is_cuda
 
-# prepare your pytorch model
-underlying_model = ExampleNet() # see above for implementation of ExampleNet
+# 1️⃣ Prepare your pytorch model, here is a simple examples
+underlying_model = ExampleNet() # see above for implementation of `ExampleNet`
+
+# Set an extra attribute to the model to show 
+# how torchmeter acts as a zero-intrusion proxy later
 underlying_model.example_attr = "ABC"
 
-# suppose that the backbone is freezed
-for p in model.backbone.parameters():
-    p.requires_grad = False
-
-# create a proxy for your model
+# 2️⃣ Wrap your model with torchmeter
 model = Meter(underlying_model)
+
+# 3️⃣ Validate the zero-intrusion proxy
+
+# Get the model's attribute
+print(model.example_attr)
+
+# Get the model's method
+# `_inner_net` is a method defined in the ExampleNet
+print(hasattr(model, "_inner_net")) 
+
+# Move the model to other device (now on cpu)
 print(model)
-
-# move to gpu
-model.to("cuda")
-
-# validate the proxy
-print(getattr(model, "example_attr"))
-print(hasattr(model, "_inner_net"))
+if is_cuda():
+    model.to("cuda")
+    print(model) # now on cuda
 ```
 
 </details>
@@ -270,26 +277,32 @@ print(model.structure)
 
 ```python
 # Parameter Analysis
+# Suppose that the `backbone` part of ExampleNet is frozen
+_ = model.backbone.requires_grad_(False)
 print(model.param)
 tb, data = model.profile('param', no_tree=True)
 
-# before measuring calculation you should first execute a feed-forward
-# note that you do not need to concern about the device mismatch, just feed the model
+# Before measuring calculation you should first execute a feed-forward
+# you do **not** need to concern about the device mismatch, 
+# just feed the model with the input.
 import torch
 input = torch.randn(1, 3, 32, 32)
-output = model(input)
+output = model(input) 
 
 # Computational Profiling
-print(model.cal) # cal for calculation
+print(model.cal) # `cal` for calculation
 tb, data = model.profile('cal', no_tree=True)
 
 # Memory Diagnostics
-print(model.mem) # mem for memory
+print(model.mem) # `mem` for memory
 tb, data = model.profile('mem', no_tree=True)
 
 # Performance Benchmarking
-print(model.ittp) #ittp for inference time & throughput
+print(model.ittp) # `ittp` for inference time & throughput
 tb, data = model.profile('ittp', no_tree=True)
+
+# Overall Analytics
+print(model.overview())
 ```
 
 </details>
@@ -302,7 +315,7 @@ tb, data = model.profile('ittp', no_tree=True)
 model.profile('param', show=False, save_to="params.csv")
 
 # export to excel
-model.profile('cal', show=False, save_to="calculation.xlsx")
+model.profile('cal', show=False, save_to="../calculation.xlsx")
 ```
 
 </details>
@@ -310,19 +323,20 @@ model.profile('cal', show=False, save_to="calculation.xlsx")
 <details>
 <summary>⑤ 𝑨𝒅𝒗𝒂𝒏𝒄𝒆𝒅 𝒖𝒔𝒂𝒈𝒆</summary>
 
-1. [Attributes/methods access of underlying model]()
-2. [Automatic device synchronization]()
-3. [Performance gallery]()
-4. [Detailed inspection]()
+1. [Attributes/methods access of underlying model](https://docs.torchmeter.top/latest/demo/#b-zero-intrusion-proxy)
+2. [Automatic device synchronization](https://docs.torchmeter.top/latest/demo/#c-automatic-device-synchronization)
+3. [Smart module folding](https://docs.torchmeter.top/latest/demo/#d-model-structure-analysis)
+4. [Performance gallery](https://docs.torchmeter.top/latest/demo/#eb-overall-report)
 5. Customized visulization 
-    - [for operation trees]()
-    - [for tabular reports]()
-    - [combination of tree and report]()
+    - [for statistics overview](https://docs.torchmeter.top/latest/demo/#fa-customization-of-statistics-overview)
+    - [for operation tree](https://docs.torchmeter.top/latest/demo/#fb-customization-of-rich-text-operation-tree)
+    - [for tabular report](https://docs.torchmeter.top/latest/demo/#fc-customization-of-tabular-report)
 6. Best practice of programmable tabular report
-    - [Real-time structure adjustment]()   
-    - [Real-time data analysis]()
-7. [Tabular report export and post-export]()
-8. [Centralized configuration management]()
+    - [Real-time structure adjustment](https://docs.torchmeter.top/latest/demo/#fc3-customize-tabular-report-structure)   
+    - [Real-time data analysis](https://docs.torchmeter.top/latest/demo/#fc34-add-a-new-column)
+7. [Instant export and postponed export](https://docs.torchmeter.top/latest/demo/#gb-postponed-export)
+8. [Centralized configuration management](https://docs.torchmeter.top/latest/demo/#h-centralized-configuration-management)
+9. [Submodule exploration](https://docs.torchmeter.top/latest/demo/#i4-submodule-explore)
 
 </details>
 
@@ -332,13 +346,13 @@ Thank you for wanting to make `TorchMeter` even better!
 
 There are several ways to make a contribution:
 
-- 💬 [Start/join discussions](CONTRIBUTING.md#-discussions--lets-collaborate--innovate)
-- 🚨 [Report issues](CONTRIBUTING.md#-issues--lets-report--enhance)
-- 👨‍💻 [Create pull requests (PRs)](CONTRIBUTING.md#-pull-requests--lets-squash-bugs--build-features)
+- [**Asking questions**](https://docs.torchmeter.top/latest/contribute/discussions)
+- [**Reporting bugs**](https://docs.torchmeter.top/latest/contribute/issues)
+- [**Contributing code**](https://docs.torchmeter.top/latest/contribute/prs)
 
-Before jumping in, let's ensure smooth collaboration by reviewing our 📋 [**contribution guidelines**](CONTRIBUTING.md) first. 
+Before jumping in, let's ensure smooth collaboration by reviewing our 📋 [**contribution guidelines**](https://docs.torchmeter.top/latest/contribute/welcome_contributors) first. 
 
-Thanks again !
+**Thanks again !**
 
 > [!NOTE]
 > `@Ahzyuan`: I'd like to say sorry in advance. Due to my master's studies and job search, I may be too busy in the coming year to address contributions promptly. I'll do my best to handle them as soon as possible. Thanks a lot for your understanding and patience!

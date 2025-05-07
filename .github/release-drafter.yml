@@ -30,7 +30,7 @@ version-resolver:
       - misc
       - tests
       - ci
-      # - doc
+      # - docs
 
   default: patch
 
@@ -44,7 +44,7 @@ tag-template: 'v$RESOLVED_VERSION'
 ## global limitations
 replacers:
   ## Remove conventional commits from titles
-  - search: '/- (depr|perf|feat|fix|doc|test|ci|chore|build|refactor|revert)(\([^\s]+\))?(\!)?(\s)?\: /g'
+  - search: '/- (depr|perf|feat|fix|docs|test|ci|chore|build|refactor|revert)(\([^\s]+\))?(\!)?(\s)?\: /g'
     replace: '- '
 
 ## change list related
@@ -122,7 +122,7 @@ categories:
 autolabeler:
   - label: breaking
     title:
-      - '/^(break|breaking|depr|perf|feat|fix|doc|test|ci|chore|build|refactor|revert)(\([^\s]+\))?\!\s?\: /i' # Example: feat!: ...
+      - '/^(break|breaking|depr|perf|feat|fix|docs|test|ci|chore|build|refactor|revert)(\([^\s]+\))?\!\s?\: /i' # Example: feat!: ...
 
   - label: deprecation
     title:
@@ -142,7 +142,7 @@ autolabeler:
 
   - label: docs
     title:
-      - '/^doc/i'
+      - '/^docs/i'
   
   - label: tests
     title:
@@ -170,7 +170,7 @@ autolabeler:
   
   - label: misc
     title:
-      - '/^(?!break|breaking|depr|perf|feat|fix|doc|test|ci|chore|build|refactor|revert).+/i'
+      - '/^(?!break|breaking|depr|perf|feat|fix|docs|test|ci|chore|build|refactor|revert).+/i'
 
 ## layout
 template: |

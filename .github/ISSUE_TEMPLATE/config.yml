@@ -4,6 +4,6 @@ contact_links:
     url: https://github.com/TorchMeter/torchmeter/discussions
     about: Please ask and answer questions here.
   
-  # - name: GitHub Security Bug Bounty
-  #   url: https://bounty.github.com/
-  #   about: Please report security vulnerabilities here.
+  - name: TorchMeter Documentation
+    url: https://docs.torchmeter.top/latest
+    about: Please check the documentation here.

@@ -1,0 +1,267 @@
+# TorchMeter AGPL-3.0 License
+# Author: Ahzyuan
+# Repo: https://github.com/TorchMeter/torchmeter
+
+# Site metadata
+site_name: TorchMeter Docs
+site_author: Ahzyuan
+site_url: https://docs.torchmeter.top
+site_description: 'Torchmeter ⏲️:  Your all-in-one tool for Pytorch model analysis, measuring Params, FLOPs/MACs(aka. MACC or MADD), Memory cost, Inference time and Throughput 🚀'
+
+repo_name: TorchMeter/torchmeter
+remote_branch: gh-pages
+remote_name: https://github.com/TorchMeter/torchmeter.github.io
+repo_url: https://github.com/TorchMeter/torchmeter
+edit_uri: https://github.com/TorchMeter/torchmeter/tree/master/docs/src/en/
+
+docs_dir: "docs/src/en/" # where to find the markdown files
+site_dir: "site/" # where to publish to
+use_directory_urls: true # don't display 'index.html' in slugs
+
+nav: # relative to docs/src/en
+  - Intros: index.md
+  - Tutorials: demo.ipynb
+  - Cheatsheet: cheatsheet.md
+  - API Reference:
+    - api/core.md
+  - Contribute: 
+    - contribute/welcome_contributors.md
+    - contribute/discussions.md
+    - contribute/issues.md
+    - contribute/prs.md
+    - contribute/conventions.md
+    - contribute/thanks_contributors.md
+  - Others:
+    - others/architecture.md
+    - others/management.md
+
+theme:
+  name: material
+  language: en
+
+  custom_dir: docs/overrides/
+    
+  logo: assets/banner/banner_noeffect.png
+  favicon: assets/logo/logo_black.png
+  icon:
+    repo: fontawesome/brands/github
+    font: false
+
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: red
+      accent: indigo
+      toggle:
+          icon: material/weather-night
+          name: Switch to dark mode
+
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+          icon: material/brightness-7
+          name: Switch to light mode
+
+  features:
+    - content.action.view
+    - content.code.annotate
+    - content.code.copy
+    - content.code.annotate
+    - content.tooltips
+    - content.tabs.link # all code tabs change simultaneously
+    - search.share
+    - search.suggest
+    - search.highlight
+    - toc.follow
+    # - toc.integrate
+    - navigation.top
+    - navigation.tabs
+    - navigation.path
+    - navigation.tabs.sticky
+    - navigation.prune
+    # - navigation.footer
+    # - navigation.expand
+    - navigation.tracking
+    - navigation.instant
+    - navigation.instant.preview
+    - navigation.instant.progress
+    - navigation.indexes
+    - navigation.sections 
+
+markdown_extensions:
+  - admonition
+  - def_list
+  - footnotes
+  - abbr
+  - pymdownx.caret
+  - pymdownx.mark
+  - pymdownx.tilde
+  - md_in_html
+  - pymdownx.arithmatex: # latex support
+      generic: true
+  - toc:
+      permalink: true 
+      toc_depth: 5
+      slugify: !!python/object/apply:pymdownx.slugs.slugify
+        kwds:
+          case: none
+  - pymdownx.highlight: # code highlight
+      anchor_linenums: true
+      linenums: true 
+      auto_title: true # show language name
+      use_pygments: true
+      pygments_lang_class: true
+      linenums_style: pymdownx-inline 
+  - pymdownx.betterem 
+  - pymdownx.caret 
+  - pymdownx.mark 
+  - pymdownx.tilde 
+  - pymdownx.keys 
+  - pymdownx.critic
+  - pymdownx.details
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.magiclink 
+  - pymdownx.smartsymbols
+  - pymdownx.snippets 
+  - pymdownx.tasklist:
+      custom_checkbox: true 
+  - attr_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.superfences: # Mermaid support
+      custom_fences: 
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+        alternate_style: true
+        combine_header_slug: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+      clickable_checkbox: true
+  - meta 
+  - tables
+
+plugins:
+  - search
+
+  - inline-select-svg
+
+  # - drawio-exporter: # add dependency `mkdocs-drawio-exporter`
+  #     cache_dir: '.drawio-exporter'
+  #     drawio_executable: null
+  #     drawio_args: ["--enable-plugins", "--embed-svg-images"]
+  #     format: svg
+  #     embed_format: '<object type="image/svg+xml" data="{img_src}"></object>'
+  #     sources: '*.drawio'
+
+  - glightbox:
+      touchNavigation: true
+      loop: false
+      effect: zoom
+      slide_effect: slide
+      width: auto
+      height: auto
+      zoomable: true
+      draggable: false
+      skip_classes:
+        - skip-lightbox
+      auto_caption: false
+      caption_position: bottom
+      background: white
+      shadow: true
+      manual: false
+
+  # - i18n:
+  #     docs_structure: folder
+  #     languages:
+  #       - locale: en
+  #         name: English
+  #         build: true
+  #         default: true
+  #       - locale: zh
+  #         name: 中文
+  #         build: true
+
+  - mike:
+      alias_type: redirect
+      redirect_template: null
+      deploy_prefix: ""
+      canonical_version: latest
+      version_selector: true
+      css_dir: css
+      javascript_dir: js
+
+  - mkdocs-jupyter:
+      ignore_h1_titles: true
+      execute: false
+      no_input: false
+      include_source: true
+      remove_tag_config:
+          remove_input_tags:
+              - hide
+
+  - mkdocstrings:
+      enabled: true
+      default_handler: python
+      handlers:
+        python:
+          options:
+            docstring_options:
+              ignore_init_summary: true
+            merge_init_into_class: true
+            docstring_style: google
+            show_root_heading: true
+            show_source: true
+            separate_signature: true
+            line_length: 120
+            show_signature_annotations: true
+            show_symbol_type_heading: true # insiders
+            show_symbol_type_toc: true # insiders
+            show_inheritance_diagram: true # insiders
+
+extra_css:
+  - stylesheets/extra.css
+
+extra_javascript:
+  - javascripts/extra.js
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+copyright: <a href="https://github.com/TorchMeter" target="_blank">© 2025 TorchMeter</a> All rights reserved.
+extra:
+  # alternate:
+  #   - name: English
+  #     link: en
+  #     lang: en
+  #   - name: 中文
+  #     link: zh
+  #     lang: zh
+
+  version:
+    alias: true
+    provider: mike
+    
+  generator: false
+
+  social:
+    - icon: fontawesome/solid/comments
+      link: https://github.com/TorchMeter/torchmeter/discussions
+      name: Community
+
+    - icon: fontawesome/brands/github
+      link: https://github.com/TorchMeter/torchmeter
+      name: GitHub
+
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/torchmeter/
+      name: PyPI
+
+    - icon: fontawesome/solid/scale-balanced
+      link: https://github.com/TorchMeter/torchmeter/blob/master/LICENSE
+      name: License

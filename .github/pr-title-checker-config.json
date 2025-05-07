@@ -4,12 +4,12 @@
         "color": "CE0000"
     },
     "CHECKS": {
-        "regexp": "^(depr|perf|feat|fix|doc|test|ci|chore|build|refactor|revert)(\\([^\\s]+\\))?\\!?\\s?\\: [A-Z].*[^\\.\\!\\?,… ]$",
+        "regexp": "^(depr|perf|feat|fix|docs|test|ci|chore|build|refactor|revert)(\\([^\\s]+\\))?\\!?\\s?\\: [A-Z].*[^\\.\\!\\?,… ]$",
         "ignoreLabels": ["skip-changelog"]
     },
     "MESSAGES": {
         "success": "🎉 PR title format is valid. Thank you!",
-        "failure": "❌ PR title format is invalid! Please update according to the [PR title convention](https://github.com/TorchMeter/torchmeter/blob/master/docs/pr_standard.md#pull-request-title).",
+        "failure": "❌ PR title format is invalid! Please update according to the [PR Title Conventions](https://docs.torchmeter.top/latest/contribute/conventions/#Pull-Request-Title).",
         "notice": ""
     }
 }

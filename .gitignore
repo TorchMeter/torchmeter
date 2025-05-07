@@ -98,3 +98,7 @@ ENV/
 .vscode/
 refers/
 *_cache/
+site/
+assets
+**/assets/
+.drawio*/
