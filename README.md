@@ -16,8 +16,8 @@
     <a href="https://pypi.org/project/torchmeter/"><img alt="PyPI-Version" src="https://img.shields.io/pypi/v/torchmeter?logo=pypi&logoColor=%23ffffff&label=PyPI&color=%230C7EBF"></a>
     <a href="https://www.python.org/"><img alt="Python-Badge" src="https://img.shields.io/badge/Python-%3E%3D3.8-white?logo=python&logoColor=%232EA9DF&color=%233776AB"></a>
     <a href="https://pytorch.org/"><img alt="Pytorch-Badge" src="https://img.shields.io/badge/Pytorch-%3E%3D1.7.0-white?logo=pytorch&logoColor=%23EB5F36&color=%23EB5F36"></a>
+    <!-- Coverage Badge:Begin --><a href="https://github.com/TorchMeter/torchmeter/pull/26"><img alt="Coverage-Badge" src="https://camo.github.com/08cd77da844505e65c874afb1b64f03ee582110369eacfad48a146631d288279/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f436f7665726167652d39372532352d627269676874677265656e2e737667"></a><!-- Coverage Badge:End -->
     <a href="https://github.com/astral-sh/ruff"><img alt="Ruff-Badge" src="https://img.shields.io/badge/Ruff-Lint_%26_Format-white?logo=ruff&color=%238B70BA"></a>
-    <!-- Coverage Badge:Begin --><!-- Coverage Badge:End -->
     <a href="https://github.com/TorchMeter/torchmeter/blob/master/LICENSE"><img alt="License-Badge" src="https://img.shields.io/badge/License-AGPL--3.0-green"></a>
 </p>
 
