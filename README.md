@@ -22,7 +22,7 @@
 
 <!-- simple introduction -->
 
-- **Docs**: https://torchmeter.github.io/docs/vers/latest/
+- **Docs**: https://docs.torchmeter.top/latest/
 - **Intro**: Provides comprehensive measurement of Pytorch model's `Parameters`, `FLOPs/MACs`, `Memory-Cost`, `Inference-Time` and `Throughput` with highly customizable result display ✨
 
 ## 𝒜. 𝐻𝒾𝑔𝒽𝓁𝒾𝑔𝒽𝓉𝓈
@@ -175,7 +175,7 @@ pip install .
 <!-- screenshot / gif -->
 <p align="center">
     <img src="https://github.com/TorchMeter/assets/blob/master/demo/demo.gif?raw=true" alt="TorchMeter Demo">
-    <font color="gray">Refer to <a href="https://torchmeter.github.io/docs/vers/latest/demo">tutorials</a> for all scenarios</font>
+    <font color="gray">Refer to <a href="https://docs.torchmeter.top/latest/demo">tutorials</a> for all scenarios</font>
 </p>
 
 <details>
@@ -323,20 +323,20 @@ model.profile('cal', show=False, save_to="../calculation.xlsx")
 <details>
 <summary>⑤ 𝑨𝒅𝒗𝒂𝒏𝒄𝒆𝒅 𝒖𝒔𝒂𝒈𝒆</summary>
 
-1. [Attributes/methods access of underlying model](https://torchmeter.github.io/docs/vers/latest/demo/#b-zero-intrusion-proxy)
-2. [Automatic device synchronization](https://torchmeter.github.io/docs/vers/latest/demo/#c-automatic-device-synchronization)
-3. [Smart module folding](https://torchmeter.github.io/docs/vers/latest/demo/#d-model-structure-analysis)
-4. [Performance gallery](https://torchmeter.github.io/docs/vers/latest/demo/#eb-overall-report)
+1. [Attributes/methods access of underlying model](https://docs.torchmeter.top/latest/demo/#b-zero-intrusion-proxy)
+2. [Automatic device synchronization](https://docs.torchmeter.top/latest/demo/#c-automatic-device-synchronization)
+3. [Smart module folding](https://docs.torchmeter.top/latest/demo/#d-model-structure-analysis)
+4. [Performance gallery](https://docs.torchmeter.top/latest/demo/#eb-overall-report)
 5. Customized visulization 
-    - [for statistics overview](https://torchmeter.github.io/docs/vers/latest/demo/#fa-customization-of-statistics-overview)
-    - [for operation tree](https://torchmeter.github.io/docs/vers/latest/demo/#fb-customization-of-rich-text-operation-tree)
-    - [for tabular report](https://torchmeter.github.io/docs/vers/latest/demo/#fc-customization-of-tabular-report)
+    - [for statistics overview](https://docs.torchmeter.top/latest/demo/#fa-customization-of-statistics-overview)
+    - [for operation tree](https://docs.torchmeter.top/latest/demo/#fb-customization-of-rich-text-operation-tree)
+    - [for tabular report](https://docs.torchmeter.top/latest/demo/#fc-customization-of-tabular-report)
 6. Best practice of programmable tabular report
-    - [Real-time structure adjustment](https://torchmeter.github.io/docs/vers/latest/demo/#fc3-customize-tabular-report-structure)   
-    - [Real-time data analysis](https://torchmeter.github.io/docs/vers/latest/demo/#fc34-add-a-new-column)
-7. [Instant export and postponed export](https://torchmeter.github.io/docs/vers/latest/demo/#gb-postponed-export)
-8. [Centralized configuration management](https://torchmeter.github.io/docs/vers/latest/demo/#h-centralized-configuration-management)
-9. [Submodule exploration](https://torchmeter.github.io/docs/vers/latest/demo/#i4-submodule-explore)
+    - [Real-time structure adjustment](https://docs.torchmeter.top/latest/demo/#fc3-customize-tabular-report-structure)   
+    - [Real-time data analysis](https://docs.torchmeter.top/latest/demo/#fc34-add-a-new-column)
+7. [Instant export and postponed export](https://docs.torchmeter.top/latest/demo/#gb-postponed-export)
+8. [Centralized configuration management](https://docs.torchmeter.top/latest/demo/#h-centralized-configuration-management)
+9. [Submodule exploration](https://docs.torchmeter.top/latest/demo/#i4-submodule-explore)
 
 </details>
 
@@ -346,11 +346,11 @@ Thank you for wanting to make `TorchMeter` even better!
 
 There are several ways to make a contribution:
 
-- [**Asking questions**](https://torchmeter.github.io/docs/vers/latest/contribute/discussions)
-- [**Reporting bugs**](https://torchmeter.github.io/docs/vers/latest/contribute/issues)
-- [**Contributing code**](https://torchmeter.github.io/docs/vers/latest/contribute/prs)
+- [**Asking questions**](https://docs.torchmeter.top/latest/contribute/discussions)
+- [**Reporting bugs**](https://docs.torchmeter.top/latest/contribute/issues)
+- [**Contributing code**](https://docs.torchmeter.top/latest/contribute/prs)
 
-Before jumping in, let's ensure smooth collaboration by reviewing our 📋 [**contribution guidelines**](https://torchmeter.github.io/docs/vers/latest/contribute/welcome_contributors) first. 
+Before jumping in, let's ensure smooth collaboration by reviewing our 📋 [**contribution guidelines**](https://docs.torchmeter.top/latest/contribute/welcome_contributors) first. 
 
 **Thanks again !**
 

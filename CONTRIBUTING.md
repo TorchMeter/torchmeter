@@ -4,10 +4,10 @@ Thank you for wanting to make `TorchMeter` even better!
 
 There are several ways to make a contribution:
 
-- [**Asking questions**](https://torchmeter.github.io/docs/vers/latest/contribute/discussions)
-- [**Reporting bugs**](https://torchmeter.github.io/docs/vers/latest/contribute/issues)
-- [**Contributing code**](https://torchmeter.github.io/docs/vers/latest/contribute/prs)
+- [**Asking questions**](https://docs.torchmeter.top/latest/contribute/discussions)
+- [**Reporting bugs**](https://docs.torchmeter.top/latest/contribute/issues)
+- [**Contributing code**](https://docs.torchmeter.top/latest/contribute/prs)
 
-Before jumping in, let's ensure smooth collaboration by reviewing our 📋 [**contribution guidelines**](https://torchmeter.github.io/docs/vers/latest/contribute/welcome_contributors) first. 
+Before jumping in, let's ensure smooth collaboration by reviewing our 📋 [**contribution guidelines**](https://docs.torchmeter.top/latest/contribute/welcome_contributors) first. 
 
 **Thanks again !**

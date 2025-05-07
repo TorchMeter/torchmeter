@@ -5,7 +5,7 @@
 # Site metadata
 site_name: TorchMeter Docs
 site_author: Ahzyuan
-site_url: https://torchmeter.github.io/
+site_url: https://docs.torchmeter.top
 site_description: 'Torchmeter ⏲️:  Your all-in-one tool for Pytorch model analysis, measuring Params, FLOPs/MACs(aka. MACC or MADD), Memory cost, Inference time and Throughput 🚀'
 
 repo_name: TorchMeter/torchmeter
