@@ -5,12 +5,12 @@
 # Site metadata
 site_name: TorchMeter Docs
 site_author: Ahzyuan
-site_url: https://torchmeter.github.io/vers
+site_url: https://torchmeter.github.io/
 site_description: 'Torchmeter ⏲️:  Your all-in-one tool for Pytorch model analysis, measuring Params, FLOPs/MACs(aka. MACC or MADD), Memory cost, Inference time and Throughput 🚀'
 
 repo_name: TorchMeter/torchmeter
 remote_branch: gh-pages
-remote_name: https://github.com/TorchMeter/docs
+remote_name: https://github.com/TorchMeter/torchmeter.github.io
 repo_url: https://github.com/TorchMeter/torchmeter
 edit_uri: https://github.com/TorchMeter/torchmeter/tree/master/docs/src/en/
 
@@ -187,9 +187,9 @@ plugins:
   #         build: true
 
   - mike:
-      alias_type: symlink
+      alias_type: redirect
       redirect_template: null
-      deploy_prefix: vers
+      deploy_prefix: ""
       canonical_version: latest
       version_selector: true
       css_dir: css
