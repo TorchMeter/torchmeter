@@ -1,47 +1,84 @@
-## 📋 Summary
+<!-- 
+🍻 **Contributions make open-source thrive!**  
+Thank you for taking the time to improve torchmeter.
+To ensure efficient review, please complete the following sections
+-->
 
-> [!IMPORTANT]
-> - [ ] This PR fixes an issue. [Link]() <!--Link to related issues if applicable -->    
-> - [ ] This PR adds something new.
-> - [ ] This PR is **not** a code change (e.g. `README`, typos, ...)
-> - [ ] This PR has been tested.
+## Prep Steps  
 
-<!-- What is this pull request for? Does it fix any issues? -->
+> Before we dive in, let's confirm you've unlocked all these steps       
 
-## 📝 Changes
+<!-- Note: Use `[x]` to check the boxes -->
 
-<!-- Describe what you change and what the purpose in this pull request. -->
+- [ ] 🔍 I've checked for duplicate PRs ([click to check](https://github.com/TorchMeter/torchmeter/pulls?q=))
+- [ ] 📜 I've followed [contribution guidelines](https://docs.torchmeter.top/latest/contribute/prs/) 
+  - [ ] ✨ I've linted and formatted my code ([how?](https://docs.torchmeter.top/latest/contribute/prs/#Cb-Lint-Format-and-Test-your-Code))
+  - [ ] 🔧 I've formatted the PR title appropriately ([how?](https://docs.torchmeter.top/latest/contribute/conventions/#Pull-Request-Title))
+  - [ ] 🎯 I've targeted the `master` branch ([how?](https://raw.githubusercontent.com/TorchMeter/assets/refs/heads/master/others/target_master_branch.jpg))
+  - [ ] 👐 I've allowed maintainer edits on my branch ([how?](https://docs.torchmeter.top/latest/contribute/prs/#Db-Create-a-Pull-Request-to-torchmeter) → See `step 6`)
+- [ ] 🛡️ I've added/updated tests to cover my changes if prossible ([how?](https://docs.torchmeter.top/latest/contribute/prs/#Cb-Lint-Format-and-Test-your-Code))
+- [ ] 📝 I've added/updated the documentation for any new logic introduced ([how?](https://docs.torchmeter.top/latest/contribute/prs/#Cc-Add-Documentation-for-Your-Code))
+- [ ] ⏳ I understand @Ahzyuan has been busy lately and may need time to review. (we appreciate your patience!)
 
-<details>
-<summary>Details</summary>
+## Type of changes
+
+<!-- What is this pull request for? -->
+
+- [ ] 🐞 Bug fix
+- [ ] 🌟 New feature
+- [ ] 🧪 Tests
+- [ ] 🏗 Refactoring
+- [ ] ⚡ Performance improvement
+- [ ] 📖 Documentation / docstrings
+- [ ] ↩️ Revert
+- [ ] 🧩 Other
+
+## Description
+
+#### Purpose
+
+<!-- Describe the purpose of this pull request here -->
+
+This PR is to ...
+
+#### Changes:
+
+<!-- 
+Describe the changes you've made here.
+- We strongly recommend adding tests/docs to cover your changes.
+- If you introduce new features, please explain their functionality. And it's best to provide usage demos in `Appendix` section below. 
+-->
 
 - `file1`: modify xxx, in order to achieve a xxx result.
 - `file2`: add xxx, in order to fix xxx.
 
-</details>
+## Related
 
-## 🛠️ How to test
+<!-- Use `#` to link to issues, discussions or PRs. -->
 
-<!-- Describe your testing approach and results. Replace the example below-->
+- issues: 
+
+- Discussions:
+
+- PRs: 
+
+## Appendix
+
+<!-- 
+Provide supplementary info if needed, for example:
+- alteration effect (before/after screenshot, gif, video if available)
+  usage demo for new features
+- performance metrics
+
+Please highlight any potential issues introduced by this PR, if there are any. 
+
+If there is no supplementary info needed, please remove the content below and keep this section empty.
+-->
 
 <details>
-<summary>Example</summary>
+<summary>Details</summary>
 
-For manual testing:
-- Install the library in a fresh virtual environment.
-- Import main library functions/classes and perform basic operations.
-- Test configuration options by setting different values and verify library behavior changes.
-- If library interacts with external services, mock them and ensure it handles errors gracefully.
-
-For automated testing:
-- We use `pytest` for testing. Test suite has unit tests for functions and methods in library. 
-- Integration tests are in place to check interaction between library components.
-- We run tests on `GitHub Actions`. Ensures every commit triggers test suite, reports failures immediately.
-- Performance tests are conducted periodically to measure the efficiency of critical functions. 
+1. `quickly`: finish in 10s before and 1s after
+2. `stable`: compatible in all os
 
 </details>
-
-
-## 📷 Screenshots/Examples (if needed):
-
-<!-- Add screenshots or examples to illustrate the changes if needed. -->

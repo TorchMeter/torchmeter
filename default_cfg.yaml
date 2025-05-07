@@ -1,11 +1,11 @@
-# time interval in outputing rendered object(include tree and table)
+# time interval in displaying profile
 render_interval: 0.15         # unit: second
 
 # Whether to fold the repeat part in rendering model structure tree
 tree_fold_repeat: True 
 
 # Display settings for repeat blocks in the model structure tree
-# It actually is a rich.panel.Panel object, refer to https://rich.readthedocs.io/en/latest/panel.html 
+# It actually is a rich.panel.Panel object, refer to https://rich.readthedocs.io/en/latest/reference/panel.html#rich.panel.Panel 
 tree_repeat_block_args:
   title: '[i]Repeat [[b]<repeat_time>[/b]] Times[/]' # Title of the repeat block, accept rich styling
   title_align: center         # Title alignment, left, center, right
@@ -26,7 +26,7 @@ tree_repeat_block_args:
 
 
 # Fine-grained display settings for each level in the model structure tree
-# It actually is a rich.tree.Tree object, refer to https://rich.readthedocs.io/en/latest/tree.html
+# It actually is a rich.tree.Tree object, refer to https://rich.readthedocs.io/en/latest/reference/tree.html#rich.tree.Tree
 # the `level` field is necessary!!!! It indicates that the following settings will be applied to that layer.
 # level 0 indicates the root node(i.e. the model itself), level 1 indicates the first layer of model children, and so on.
 tree_levels_args:
@@ -45,17 +45,17 @@ tree_levels_args:
 
 
 # Display settings for each column in the profile table
-# It actually is a rich.table.Column object, refer to https://rich.readthedocs.io/en/latest/columns.html
+# It actually is a rich.table.Column object, refer to https://rich.readthedocs.io/en/latest/reference/table.html#rich.table.Column
 table_column_args:
   style: none       # Style of the column, execute `python -m rich.theme` to get more
   justify: center   # Justify of the column, left, center, right
   vertical: middle  # Vertical align of the column, top, middle, bottom
   overflow: fold    # Overflow of the column, fold, crop, ellipsis, see https://rich.readthedocs.io/en/latest/console.html?highlight=overflow#overflow
-  no_warp: false    # Prevent wrapping of text within the column.
+  no_wrap: false    # Prevent wrapping of text within the column.
 
 
 # Display settings for the profile table
-# It actually is a rich.table.Table object, refer to https://rich.readthedocs.io/en/latest/tables.html
+# It actually is a rich.table.Table object, refer to https://rich.readthedocs.io/en/latest/reference/table.html#rich.table.Table
 table_display_args:
   style: spring_green4        # Style of the table, execute `python -m rich.theme` to get more
   highlight: true             # Whether to highlight the value (number, string...)

@@ -1,48 +1,125 @@
-# See https://docs.astral.sh/ruff/settings for help
+# TorchMeter, AGPL-3.0 license
+# Author: Ahzyuan
+# Repo: https://github.com/TorchMeter/torchmeter
 
-target-version = "py37" # Always generate Python 3.6-compatible code.
-line-length = 250 # Allow lines to be as long as 120.
+include = [
+    "torchmeter/**/*.py", 
+    "tests/**/*.py",
+    "examples/**/*.py",
+    "examples/*/*.ipynb"
+]
+extend-exclude = [
+    "refers/**/*"
+]
 
-[format]
-docstring-code-format = true # Enable reformatting of code snippets in docstrings.
+src=[".", "torchmeter/*"]
+preview = true
+line-length = 120 # Allow lines to be as long as 120.
+target-version = "py38" # Always generate Python 3.8-compatible code.
+output-format = "grouped"
+required-version = ">=0.6.0" # ruff version 
 
+# =========================================== Linter ===========================================
 [lint]
+select = [
+    # flake8-builtins
+    "A",
+    # flake8-annotations
+    "ANN",
+    # flake8-unused-arguments 
+    "ARG",
+    # mccabe 
+    "C90",
+    # pycodestyle
+    "E",
+    # Pyflakes
+    "F",
+    # isort
+    "I",
+    # flake8-no-pep420 
+    "INP",
+    # flake8-implicit-str-concat 
+    # "ISC",
+    # flake8-pie 
+    "PIE",
+    # flake8-pytest-style 
+    "PT",
+    # Error 
+    "PLE",
+    # ruff-specific rules 
+    "RUF",
+    # flake8-simplify 
+    "SIM",
+    # flake8-2020
+    "YTT"
+]
+extend-select = [
+    "ISC001", # Implicitly concatenated string literals on one line
+    "Q004",   # Unnecessary escape on inner quote character
+    "DOC201", # return is not documented in docstring
+    "DOC402", # yield is not documented in docstring
+    "DOC403", # Docstring has a "Yields" section but the function doesn't yield anything
+    "DOC501", # Raised exception {id} missing from docstring
+]
+
 # Skip unused variable rules
 ignore = [
-    "ANN101",  # Missing type annotation for `self` in method
-    "ANN102",  # Missing type annotation for `cls` in classmethod
-    "ANN401",  # Dynamically typed expressions (typing.Any) are disallowed
-    "C901",    # function is too complex (12 > 10)
-    "COM812",  # Trailing comma missing
-    "D",       # Docstring rules
-    "EM101",   # Exception must not use a string literal, assign to variable first
-    "EM102",   # Exception must not use an f-string literal, assign to variable first
-    "ERA001",  # Found commented-out code
-    "FBT001",  # Boolean positional arg in function definition
-    "FBT002",  # Boolean default value in function definition
-    "FBT003",  # Boolean positional value in function call
-    "FIX002",  # Line contains TODO
-    "ISC001",  # Isort
-    "PLR0911", # Too many return statements (11 > 6)
-    "PLR2004", # Magic value used in comparison, consider replacing 2 with a constant variable
-    "PLR0912", # Too many branches
-    "PLR0913", # Too many arguments to function call
-    "PLR0915", # Too many statements
-    "S101",    # Use of `assert` detected
-    "S311",    # Standard pseudo-random generators are not suitable for cryptographic purposes
-    "T201",    # print() found
-    "T203",    # pprint() found
-    "TD002",  # Missing author in TODO; try: `# TODO(<author_name>): ...`
-    "TD003",  # Missing issue link on the line following this TODO
-    "TD005",  # Missing issue description after `TODO`
-    "TRY003", # Avoid specifying long messages outside the exception class
-    "PLW2901", # `for` loop variable `name` overwritten by assignment target
-    "SLF001",  # Private member accessed: `_modules`
+    "ANN002",  # Missing type annotation for *{name}
+    "ANN003",  # Missing type annotation for **{name}
+    "ANN401",  # Dynamically typed expressions (typing.Any) are disallowed in {name}
+    "E111",    # Indentation is not a multiple of {indent_width}
+    "E114",    # Indentation is not a multiple of {indent_width} (comment)
+    "E117",    # Over-indented (comment)
+    "E261",    # Insert at least two spaces before an inline comment
+    "E731",    # Allow lambda expressions
+    "FA102",   # Missing from __future__ import annotations, but uses {reason}
+    "PIE790",  # Unnecessary pass statement
+    "PIE794",  # Class field {name} is defined multiple times
+    "PIE810",  # Call {attr} once with a tuple
+    "PLE0101", # Explicit return in __init__
+    "PT007",   # Wrong values type in pytest.mark.parametrize expected {values} of {row}
+    "PT008",   # Use return_value= instead of patching with lambda
+    "PT009",   # Use a regular assert instead of unittest-style {assertion}
+    "PT011",   # pytest.raises({exception}) is too broad, set the match parameter or use a more specific exception
+    "PT012",   # pytest.raises() block should contain a single simple statement
+    "PT019",   # Fixture {name} without value is injected as parameter, use @pytest.mark.usefixtures instead
+    "PT021",   # Use yield instead of request.addfinalizer
+    "PT023",   # Use @pytest.mark.{mark_name}{expected_parens} over @pytest.mark.{mark_name}{actual_parens}
+    "RUF022",  # __all__ is not sorted
+    "RUF023",  # {}.__slots__ is not sorted 
+    "RUF031",  # Use parentheses for tuples in subscripts
+    "RUF034",  # Useless if-else condition
+    "RUF052",  # Local dummy variable {} is accessed
+    "SIM105",  # Use contextlib.suppress({exception}) instead of try-except-pass
+    "SIM107",  # Don't use return in try-except and finally
+    "SIM910",  # Use {expected} instead of {actual}
+    "W191",    # Indentation contains tabs
 ]
+
+unfixable = ["E501"] # long lines should be wrapped manually
+
+[lint.per-file-ignores]
+"*.ipynb" = ["E402"] # Module level import not at top of cell
+"tests/**/*.py" = [
+    "ANN001",  # Missing type annotation for function argument {name}
+    "ANN201",  # Missing return type annotation for public function {name}
+    "ANN202",  # Missing return type annotation for private function {name}
+    "ARG002",  # Unused method argument: {name}
+    "ARG005",  # Unused lambda argument: {name}
+    "PT030",   # pytest.warns({warning}) is too broad, set the match parameter or use a more specific warning
+    "PT031",   # pytest.warns() block should contain a single simple statement
+    "DOC"      # pydoclint
+]
+
+[lint.flake8-implicit-str-concat]
+allow-multiline = true
 
 [lint.isort]
 length-sort = true # sort imports by their string length
-combine-as-imports = true
 known-first-party = ["torchmeter"]
-lines-after-imports = 1 # Use a single line after each import block.
-single-line-exclusions = ["os", "json", "re"]
+
+# =========================================== Formatter ===========================================
+
+[format]
+quote-style = "double"
+docstring-code-format = true # Enable reformatting of code snippets in docstrings.
