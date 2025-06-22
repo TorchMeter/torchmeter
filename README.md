@@ -147,7 +147,7 @@ poetry add torchmeter
 
     ```bash
     # Replace x.x.x with actual version
-    pip install torchmeter-x.x.x.whl  
+    pip install torchmeter-x.x.x-py3-none-any.whl  
     ```
 
 </details>
@@ -162,7 +162,8 @@ git clone https://github.com/TorchMeter/torchmeter.git
 cd torchmeter
 
 # If you want to install the released stable version, use this: 
-# Don't forget to eplace x.x.x with actual version
+# Don't forget to replace x.x.x with actual version
+# All released stable versions can be reached by `git tag -l`
 git checkout vx.x.x  # Stable
 
 # If you want to try the latest development version(alpha/beta), use this:
