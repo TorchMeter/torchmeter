@@ -310,9 +310,11 @@ Clear commit message helps us:
 
 ### **Structure**
 
-```title="" linenums="0"
-<type>[optional scope][optional !]: <subject>
+```bash title="" linenums="0"
+<type>[optional scope][optional !]: <subject> # (1)
 ```
+
+1. Note: there is **one space** between the `:` and the subject❗️
 
 ??? abstract "Type Prefixes"
 
@@ -320,7 +322,7 @@ Clear commit message helps us:
 
     !!! danger "Limitations"
         
-        Type prefix **must be one** in the following table, otherwise the PR will be rejected!
+        Type prefix **must be one** in the following table, otherwise the PR will be **rejected**!
 
         |  PR Type   |         When to Use         |          Example           |
         |:----------:|:---------------------------:|:--------------------------:|
@@ -359,12 +361,12 @@ Clear commit message helps us:
 
     # 👎 Avoid
     fix( ): Memory leak
-    fix( core): memory leak
+    fix( core): Memory leak
     ```
 
 ??? warning "Exclamation Mark (`!`, Optional)"
 
-    A `!` indicates a breaking change, which means that the PR will {++bring a major version bump++}. Therefore, please use it with caution. The PRs denoted by `!` will undergo a more rigorous review procedure.
+    A `!` indicates a **breaking change**, which means that the PR will {++bring a major version bump++}. Therefore, please use it ^^with caution^^. The PRs denoted by `!` will ^^undergo a more rigorous review procedure^^.
 
 ??? abstract "Subject"
 
@@ -378,10 +380,10 @@ Clear commit message helps us:
 
     ```title="" linenums="0"
     # 👍 Good
-    fix: memory leak described in #456
+    fix: Memory leak described in #456
 
     # 👎 Avoid
-    fix: #456 memory leak
+    fix: #456 Memory leak
     ```
 
 ---
