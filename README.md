@@ -33,6 +33,8 @@
 <details>
 <summary>① 𝒁𝒆𝒓𝒐-𝑰𝒏𝒕𝒓𝒖𝒔𝒊𝒐𝒏 𝑷𝒓𝒐𝒙𝒚</summary>
 
+> [demo for zero-intrusion proxy](https://docs.torchmeter.top/latest/demo/#b-zero-intrusion-proxy)
+
 - Acts as drop-in decorator **without** any changes of the underlying model
 - Seamlessly integrates with `Pytorch` modules while preserving **full** compatibility (attributes and methods)
 
@@ -42,6 +44,8 @@
 <summary>② 𝑭𝒖𝒍𝒍-𝑺𝒕𝒂𝒄𝒌 𝑴𝒐𝒅𝒆𝒍 𝑨𝒏𝒂𝒍𝒚𝒕𝒊𝒄𝒔</summary>
 
 Holistic performance analytics across **5** dimensions: 
+
+> [demo for full-stack model analytics](https://docs.torchmeter.top/latest/demo/#e-full-stack-model-analytics)
 
 1. **Parameter Analysis**
     - Total/trainable parameter quantification
@@ -67,6 +71,8 @@ Holistic performance analytics across **5** dimensions:
 <details>
 <summary>③ 𝑹𝒊𝒄𝒉 𝒗𝒊𝒔𝒖𝒂𝒍𝒊𝒛𝒂𝒕𝒊𝒐𝒏</summary>
 
+> demo for [hierarchical operation tree](https://docs.torchmeter.top/latest/demo/#d-model-structure-analysis) & [tabular report](https://docs.torchmeter.top/latest/demo/#ec-layer-wise-profile)
+
 1. **Programmable tabular report**
     - Dynamic table structure adjustment
     - Style customization and real-time rendering
@@ -81,7 +87,10 @@ Holistic performance analytics across **5** dimensions:
 <details>
 <summary>④ 𝑭𝒊𝒏𝒆-𝑮𝒓𝒂𝒊𝒏𝒆𝒅 𝑪𝒖𝒔𝒕𝒐𝒎𝒊𝒛𝒂𝒕𝒊𝒐𝒏</summary>
 
+> [demo for fine grained customization](https://docs.torchmeter.top/latest/demo/#f-fine-grained-customization)
+
 - **Real-time hot-reload rendering**: Dynamic adjustment of rendering configuration for operation trees, report tables and their nested components
+
 - **Progressive update**: Namespace assignment + dictionary batch update
 
 </details>  
@@ -89,7 +98,10 @@ Holistic performance analytics across **5** dimensions:
 <details>
 <summary>⑤ 𝑪𝒐𝒏𝒇𝒊𝒈-𝑫𝒓𝒊𝒗𝒆𝒏 𝑹𝒖𝒏𝒕𝒊𝒎𝒆 𝑴𝒂𝒏𝒂𝒈𝒆𝒎𝒆𝒏𝒕</summary>
 
+> [demo for config-driven runtime management](https://docs.torchmeter.top/latest/demo/#h-centralized-configuration-management)
+
 - **Centralized control**: Singleton-managed global configuration for dynamic behavior adjustment
+
 - **Portable presets**: Export/import YAML profiles for runtime behaviors, eliminating repetitive setup
 
 </details>
@@ -98,10 +110,12 @@ Holistic performance analytics across **5** dimensions:
 <summary>⑥ 𝑷𝒐𝒓𝒕𝒂𝒃𝒊𝒍𝒊𝒕𝒚 𝒂𝒏𝒅 𝑷𝒓𝒂𝒄𝒕𝒊𝒄𝒂𝒍𝒊𝒕𝒚</summary>
 
 - **Decoupled pipeline**: Separation of data collection and visualization
-- **Automatic device synchronization**: Maintains production-ready status by keeping model and data co-located
+
+- **Automatic device synchronization**: Maintains production-ready status by keeping model and data co-located. [[demo](https://docs.torchmeter.top/latest/demo/#c-automatic-device-synchronization)]
+
 - **Dual-mode reporting** with export flexibility: 
-    * Measurement units mode vs. raw data mode
-    * Multi-format export (`CSV`/`Excel`) for analysis integration
+    * Measurement units mode vs. raw data mode. [[demo](https://docs.torchmeter.top/latest/demo/#i1-raw-data-mode)]
+    * Multi-format export (`CSV`/`Excel`) for analysis integration. [[demo](https://docs.torchmeter.top/latest/demo/#g-tabular-report-export)]
 
 </details>
 
