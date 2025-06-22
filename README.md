@@ -13,12 +13,14 @@
 
 <!-- badge -->
 <p align="center">
-    <a href="https://pypi.org/project/torchmeter/"><img alt="PyPI-Version" src="https://img.shields.io/pypi/v/torchmeter?logo=pypi&logoColor=%23ffffff&label=PyPI&color=%230C7EBF"></a>
     <a href="https://www.python.org/"><img alt="Python-Badge" src="https://img.shields.io/badge/Python-%3E%3D3.8-white?logo=python&logoColor=%232EA9DF&color=%233776AB"></a>
     <a href="https://pytorch.org/"><img alt="Pytorch-Badge" src="https://img.shields.io/badge/Pytorch-%3E%3D1.7.0-white?logo=pytorch&logoColor=%23EB5F36&color=%23EB5F36"></a>
-    <!-- Coverage Badge:Begin --><a href="https://github.com/TorchMeter/torchmeter/pull/26"><img alt="Coverage-Badge" src="https://camo.githubusercontent.com/08cd77da844505e65c874afb1b64f03ee582110369eacfad48a146631d288279/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f436f7665726167652d39372532352d627269676874677265656e2e737667"></a><!-- Coverage Badge:End -->
     <a href="https://github.com/astral-sh/ruff"><img alt="Ruff-Badge" src="https://img.shields.io/badge/Ruff-Lint_%26_Format-white?logo=ruff&color=%238B70BA"></a>
     <a href="https://github.com/TorchMeter/torchmeter/blob/master/LICENSE"><img alt="License-Badge" src="https://img.shields.io/badge/License-AGPL--3.0-green"></a>
+    </br>
+    <a href="https://pypi.org/project/torchmeter/"><img alt="PyPI-Version" src="https://img.shields.io/pypi/v/torchmeter?logo=pypi&logoColor=%23ffffff&label=PyPI&color=%230C7EBF"></a>
+    <a href="https://pepy.tech/projects/torchmeter"><img src="https://static.pepy.tech/badge/torchmeter" alt="PyPI Downloads"></a>
+    <!-- Coverage Badge:Begin --><a href="https://github.com/TorchMeter/torchmeter/pull/26"><img alt="Coverage-Badge" src="https://camo.githubusercontent.com/08cd77da844505e65c874afb1b64f03ee582110369eacfad48a146631d288279/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f436f7665726167652d39372532352d627269676874677265656e2e737667"></a><!-- Coverage Badge:End -->
 </p>
 
 <!-- simple introduction -->
@@ -31,6 +33,8 @@
 <details>
 <summary>① 𝒁𝒆𝒓𝒐-𝑰𝒏𝒕𝒓𝒖𝒔𝒊𝒐𝒏 𝑷𝒓𝒐𝒙𝒚</summary>
 
+> [demo for zero-intrusion proxy](https://docs.torchmeter.top/latest/demo/#b-zero-intrusion-proxy)
+
 - Acts as drop-in decorator **without** any changes of the underlying model
 - Seamlessly integrates with `Pytorch` modules while preserving **full** compatibility (attributes and methods)
 
@@ -40,6 +44,8 @@
 <summary>② 𝑭𝒖𝒍𝒍-𝑺𝒕𝒂𝒄𝒌 𝑴𝒐𝒅𝒆𝒍 𝑨𝒏𝒂𝒍𝒚𝒕𝒊𝒄𝒔</summary>
 
 Holistic performance analytics across **5** dimensions: 
+
+> [demo for full-stack model analytics](https://docs.torchmeter.top/latest/demo/#e-full-stack-model-analytics)
 
 1. **Parameter Analysis**
     - Total/trainable parameter quantification
@@ -65,6 +71,8 @@ Holistic performance analytics across **5** dimensions:
 <details>
 <summary>③ 𝑹𝒊𝒄𝒉 𝒗𝒊𝒔𝒖𝒂𝒍𝒊𝒛𝒂𝒕𝒊𝒐𝒏</summary>
 
+> demo for [hierarchical operation tree](https://docs.torchmeter.top/latest/demo/#d-model-structure-analysis) & [tabular report](https://docs.torchmeter.top/latest/demo/#ec-layer-wise-profile)
+
 1. **Programmable tabular report**
     - Dynamic table structure adjustment
     - Style customization and real-time rendering
@@ -79,7 +87,10 @@ Holistic performance analytics across **5** dimensions:
 <details>
 <summary>④ 𝑭𝒊𝒏𝒆-𝑮𝒓𝒂𝒊𝒏𝒆𝒅 𝑪𝒖𝒔𝒕𝒐𝒎𝒊𝒛𝒂𝒕𝒊𝒐𝒏</summary>
 
+> [demo for fine grained customization](https://docs.torchmeter.top/latest/demo/#f-fine-grained-customization)
+
 - **Real-time hot-reload rendering**: Dynamic adjustment of rendering configuration for operation trees, report tables and their nested components
+
 - **Progressive update**: Namespace assignment + dictionary batch update
 
 </details>  
@@ -87,7 +98,10 @@ Holistic performance analytics across **5** dimensions:
 <details>
 <summary>⑤ 𝑪𝒐𝒏𝒇𝒊𝒈-𝑫𝒓𝒊𝒗𝒆𝒏 𝑹𝒖𝒏𝒕𝒊𝒎𝒆 𝑴𝒂𝒏𝒂𝒈𝒆𝒎𝒆𝒏𝒕</summary>
 
+> [demo for config-driven runtime management](https://docs.torchmeter.top/latest/demo/#h-centralized-configuration-management)
+
 - **Centralized control**: Singleton-managed global configuration for dynamic behavior adjustment
+
 - **Portable presets**: Export/import YAML profiles for runtime behaviors, eliminating repetitive setup
 
 </details>
@@ -96,10 +110,12 @@ Holistic performance analytics across **5** dimensions:
 <summary>⑥ 𝑷𝒐𝒓𝒕𝒂𝒃𝒊𝒍𝒊𝒕𝒚 𝒂𝒏𝒅 𝑷𝒓𝒂𝒄𝒕𝒊𝒄𝒂𝒍𝒊𝒕𝒚</summary>
 
 - **Decoupled pipeline**: Separation of data collection and visualization
-- **Automatic device synchronization**: Maintains production-ready status by keeping model and data co-located
+
+- **Automatic device synchronization**: Maintains production-ready status by keeping model and data co-located. [[demo](https://docs.torchmeter.top/latest/demo/#c-automatic-device-synchronization)]
+
 - **Dual-mode reporting** with export flexibility: 
-    * Measurement units mode vs. raw data mode
-    * Multi-format export (`CSV`/`Excel`) for analysis integration
+    * Measurement units mode vs. raw data mode. [[demo](https://docs.torchmeter.top/latest/demo/#i1-raw-data-mode)]
+    * Multi-format export (`CSV`/`Excel`) for analysis integration. [[demo](https://docs.torchmeter.top/latest/demo/#g-tabular-report-export)]
 
 </details>
 
@@ -145,7 +161,7 @@ poetry add torchmeter
 
     ```bash
     # Replace x.x.x with actual version
-    pip install torchmeter-x.x.x.whl  
+    pip install torchmeter-x.x.x-py3-none-any.whl  
     ```
 
 </details>
@@ -160,7 +176,8 @@ git clone https://github.com/TorchMeter/torchmeter.git
 cd torchmeter
 
 # If you want to install the released stable version, use this: 
-# Don't forget to eplace x.x.x with actual version
+# Don't forget to replace x.x.x with actual version
+# All released stable versions can be reached by `git tag -l`
 git checkout vx.x.x  # Stable
 
 # If you want to try the latest development version(alpha/beta), use this:
@@ -362,9 +379,9 @@ Before jumping in, let's ensure smooth collaboration by reviewing our 📋 [**co
 
 > Refer to official [code-of-conduct file](CODE_OF_CONDUCT.md) for more details.
 
-- `TorchMeter` is an open-source project built by developers worldwide. We're committed to fostering a **friendly, safe, and inclusive** environment for all participants. 
+- `TorchMeter` is an open-source project shared by developers worldwide. We're committed to fostering a **friendly, safe, and inclusive** environment for all participants. 
 
-- This code applies to all community spaces including but not limited to GitHub repositories, community forums, etc.
+- The provisions stipulated in our [Code - of - Conduct file](CODE_OF_CONDUCT.md) are applicable to all community platforms, which include, but are not limited to, GitHub repositories, community forums, and similar ones. 
 
 ## ℱ. 𝐿𝒾𝒸𝑒𝓃𝓈𝑒
 
