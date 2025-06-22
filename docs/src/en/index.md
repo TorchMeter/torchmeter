@@ -133,7 +133,7 @@ hide:
     2. Install locally:
 
         ```bash title="" linenums="0"
-        pip install torchmeter-x.x.x.whl # (1)
+        pip install torchmeter-x.x.x-py3-none-any.whl # (1)
         ```
         
         1.    🙋‍♂️ Replace `x.x.x` with actual version
@@ -342,7 +342,7 @@ Thanks again !
 
 - `TorchMeter` is an open-source project built by developers worldwide. We're committed to fostering a **friendly, safe, and inclusive** environment for all participants. 
 
-- This code applies to all community spaces including but not limited to GitHub repositories, community forums, etc.
+- The provisions stipulated in our [Code-of-Conduct file :material-link-variant:](https://github.com/TorchMeter/torchmeter/blob/master/CODE_OF_CONDUCT.md) are applicable to all community platforms, which include, but are not limited to, `GitHub` repositories, community forums, and similar ones. 
 
 ## ℱ. 𝐿𝒾𝒸𝑒𝓃𝓈𝑒
 
