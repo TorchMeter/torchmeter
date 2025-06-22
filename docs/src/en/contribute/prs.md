@@ -7,7 +7,7 @@ title: Pull Requests (PRs)
 ???+ note
 
     <figure markdown> 
-        ![TorchMeter Pull Requests](../assets/contribute/pr_tab.png)
+        ![TorchMeter Pull Requests](../assets/contribute/pr_tab.png){ loading=lazy }
         <figcaption>[Access to `Pull Requests(PRs)` :material-link-variant:](https://github.com/TorchMeter/torchmeter/pulls)</figcaption>
     </figure>
 
@@ -129,7 +129,7 @@ A successful installation will display the `Git` version (e.g., `git version 2.4
 
 ??? example "Illustration of forking torchmeter"
 
-    ![Fork TorchMeter](../assets/contribute/fork_torchmeter.png)
+    ![Fork TorchMeter](../assets/contribute/fork_torchmeter.png){ loading=lazy }
 
 ---
 

@@ -7,7 +7,7 @@ title: Issues
 ???+ note
 
     <figure markdown> 
-        ![TorchMeter Issues](../assets/contribute/issue_tab.png)
+        ![TorchMeter Issues](../assets/contribute/issue_tab.png){ loading=lazy }
         <figcaption>[Access to `Issues` :material-link-variant:](https://github.com/TorchMeter/torchmeter/issues)</figcaption>
     </figure>
 
@@ -39,7 +39,7 @@ title: Issues
 
     ??? example "Illustration of filing an issue"
 
-        ![Illustration of filing an issue](../assets/contribute/create_issue_from_template.png)
+        ![Illustration of filing an issue](../assets/contribute/create_issue_from_template.png){ loading=lazy }
 
     - Further reading: [How maintainers manage issues :material-link-variant:](../others/management.md#Issue-Management){ data-preview }
 

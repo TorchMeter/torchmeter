@@ -7,7 +7,7 @@ title: Discussions
 ???+ note
 
     <figure markdown> 
-        ![TorchMeter Discussions](../assets/contribute/discussion_tab.png)
+        ![TorchMeter Discussions](../assets/contribute/discussion_tab.png){ loading=lazy }
         <figcaption>[Access to `Discussions` :material-link-variant:](https://github.com/TorchMeter/torchmeter/discussions)</figcaption>
     </figure>
 
