@@ -17,4 +17,6 @@ Whether you're:
 
 Your input is pretty valuable to our community! 
 
-Before jumping in, let's ensure smooth collaboration by reviewing these guidelines first.  They'll help us keep things organized and make your contribution process as efficient as possible! 
+Before jumping in, let's ensure smooth collaboration by reviewing these guidelines first 👆.
+
+They'll help us keep things organized and make your contribution process as efficient as possible! 

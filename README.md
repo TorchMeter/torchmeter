@@ -26,7 +26,7 @@
 <!-- simple introduction -->
 
 - **Docs**: https://docs.torchmeter.top ([Backup link](https://torchmeter.github.io/latest) 🔗)
-- **Intro**: Provides comprehensive measurement of Pytorch model's `Parameters`, `FLOPs/MACs`, `Memory-Cost`, `Inference-Time` and `Throughput` with highly customizable result display ✨
+- **Intro**: Provides comprehensive measurement of Pytorch model's `Parameters`, `FLOPs/MACs`, `Memory-Cost`, `Inference-Time` and `Throughput` with **highly customizable result display** ✨
 
 ## 𝒜. 𝐻𝒾𝑔𝒽𝓁𝒾𝑔𝒽𝓉𝓈
 
@@ -381,7 +381,7 @@ Before jumping in, let's ensure smooth collaboration by reviewing our 📋 [**co
 
 - `TorchMeter` is an open-source project shared by developers worldwide. We're committed to fostering a **friendly, safe, and inclusive** environment for all participants. 
 
-- The provisions stipulated in our [Code - of - Conduct file](CODE_OF_CONDUCT.md) are applicable to all community platforms, which include, but are not limited to, GitHub repositories, community forums, and similar ones. 
+- The provisions stipulated in our [Code-of-Conduct file](CODE_OF_CONDUCT.md) are applicable to all community platforms, which include, but are not limited to, GitHub repositories, community forums, and similar ones. 
 
 ## ℱ. 𝐿𝒾𝒸𝑒𝓃𝓈𝑒
 

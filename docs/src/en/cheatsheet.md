@@ -29,7 +29,9 @@ hide:
 
 As the name implies, it is the hierarchical index of a operation tree. 
 
-Actually, the level index of a tree node equals to `len(tree_node.node_id.split('.'))`
+Figuratively, within the model operation tree, ^^each guide line represents a level^^. The level index value commences from **0** and increments from left to right.
+
+Additionally, the level index at which a tree node is mounted is equal to `len(tree_node.node_id.split('.'))`. For instance, the node `(1.1.6.2) 1 BatchNorm2d` below is mounted at level 4.
 
 ```title="" linenums="0"
 AnyNet
@@ -54,7 +56,7 @@ AnyNet
 
 ↑   ↑   ↑   ↑
 
-0   1   2   3
+0   1   2   3  (level index, each pointing to a guide line)
 ```
 
 ### **:material-numeric-3-box: How to use the tree level index?**
@@ -62,11 +64,11 @@ AnyNet
 A valid level index empowers you to customize the operation tree with meticulous precision.
 `torchmeter` regards the following value as a valid tree level index:
 
-1. A non-negative integer (e.g. `0`, `1`, `2`, ...): The configurations under a specific index apply only to the corresponding level.
-2. `default`: The configurations under this index will be applied to all undefined levels.
-3. `all`: The configurations under this index will be applied to all levels.
+1. **A non-negative integer (e.g. `0`, `1`, `2`, ...)**: The configurations under a specific index apply only to the corresponding level.
+2. **`default`**: The configurations under this index will be applied to all undefined levels.
+3. **`all`**: The configurations under this index will be applied to all levels.
 
-Please refer to [Customize the Hierarchical Display](demo.ipynb##fb1-customize-the-hierarchical-display){ .md-button } for specific usage scenarios.
+Please refer to [Customize the Hierarchical Display](https://docs.torchmeter.top/latest/demo/#fb1-customize-the-hierarchical-display){ .md-button } for specific usage scenarios.
 
 ---
 
@@ -202,7 +204,7 @@ All the attributes that are available, as defined below, are intended to:
 |  `operation`   |  `torch.nn.Module`  |  The underlying pytorch module  |
 |     `type`     |  `str`  |   The operation type. If the operation is a pytorch module, use the name of its class   |
 |     `name`     |  `str`  |   The module name defined in the underlying pytorch model  |
-|   `node_id`    |  `str`  |   A globally unique module identifier, <br>formatted as `<parent-node-identifier>.<current-level-index>`. <br>The index commences from `1`, cause the root is denoted as `0` |
+|   `node_id`    |  `str`  |   A globally unique module identifier, <br>formatted as `<parent-node-id>.<node-number-in-current-level>`. <br>The index commences from `1`, cause the root is denoted as `0` |
 |   `is_leaf`    |  `bool` |   Whether the node is a leaf node (no child nodes)   |
 | `module_repr`  |  `str` | The text representation of the current operation. <br>For non-leaf nodes, it's the ndoe type. <br>Conversely, it is the return of `__repr__()` method |
 |    `parent`    |  `torchmeter.engine.OperationNode` |  The parent node of this node. Each node has only one parent |
@@ -238,7 +240,7 @@ There are four types of units in `torchmeter`, listed as follows:
 
 !!! note ""
 
-    The `raw-data` tag in the subsequent content indicates that the unit marked with this tag is used in the `raw data` mode
+    The `raw-data` tag in the subsequent content indicates that the unit marked with this tag is used in the [`raw data` mode :material-link-variant:](https://docs.torchmeter.top/latest/demo/#i1-raw-data-mode)
 
 === ":material-counter: Counting Units"
 
@@ -284,7 +286,7 @@ There are four types of units in `torchmeter`, listed as follows:
     |  unit  |   explanation    |    tag     | example                                                 |
     |:------:|:----------------:|:----------:|:------------------------------------------------------- |
     | `IPS`  | Input Per Second | `raw-data` | `5 IPS`: process `5` inputs per second                  |
-    | `KIPS` |    $10^3$ IPS    |            | `5 KIPS`: process `5,000` inputs per second             |
-    | `MIPS` |    $10^6$ IPS    |            | `5 MIPS`: process `5,000,000` inputs per second         |
-    | `GIPS` |    $10^9$ IPS    |            | `5 GIPS`: process `5,000,000,000` inputs per second     |
-    | `TIPS` |  $10^{12}$ IPS   |            | `5 TIPS`: process `5,000,000,000,000` inputs per second | 
+    | `KIPS` |    $10^3$ `IPS`    |            | `5 KIPS`: process `5,000` inputs per second             |
+    | `MIPS` |    $10^6$ `IPS`    |            | `5 MIPS`: process `5,000,000` inputs per second         |
+    | `GIPS` |    $10^9$ `IPS`    |            | `5 GIPS`: process `5,000,000,000` inputs per second     |
+    | `TIPS` |  $10^{12}$ `IPS`   |            | `5 TIPS`: process `5,000,000,000,000` inputs per second | 

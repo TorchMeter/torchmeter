@@ -18,7 +18,7 @@ To streamline collaboration and enable rapid iteration, `torchmeter` employs a s
     | Branch Name |    Name  |  Purpose  |  Maintainer  |  Contributor Permissions   |
     |:-----------:|:-------------:|:------------:|:-----------------:|:--    -------:|
     |   `master`  | Primary Development Branch | Receives latest stable code, accepts new features, optimizations, and general bug fixes | All (with review) |      **Allowed** to submit PRs       |
-    |  `vA.B.x`   | Version Maintenance Branch |             **Only accepts** bug fixes for this version, **no new features**               |     Core Team     | **Forbidden** to submit PRs directly |
+    |  `vA.B.x`   | Version Maintenance Branch |             **Only accepts** bug fixes for a minor version, **no new features**               |     Core Team     | **Forbidden** to submit PRs directly |
 
 #### **:material-numeric-1-box: Master Branch**
 
@@ -39,7 +39,7 @@ To streamline collaboration and enable rapid iteration, `torchmeter` employs a s
 - **Purpose**: Exclusive bugfix channel for specific releases
 - **Lifecycle**:
     1. Created when incrementing major/minor versions
-    2. Archived when superseded by newer version branch (e.g., `v1.3.x`).
+    2. Archived when superseded by newer version branch (e.g., a new branch named `v1.3.x` will supersede `v1.2.x`).
 - **Branch Protection Rules**: Inherits `master` branch's rules
 
 [^1]: It should be noted that the `PATCH` number is represented by the letter `x`, which refers to a series of revisions to be updated in the future.
