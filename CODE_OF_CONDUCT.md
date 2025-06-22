@@ -1,6 +1,6 @@
 # Code of Conduct
 
-`TorchMeter` is an open-source project built by developers worldwide. We're committed to fostering a **friendly, safe, and inclusive** environment for all participants. This code applies to all community spaces including but not limited to GitHub repositories, community forums, etc.
+`TorchMeter` is an open-source project shared by developers worldwide. We're committed to fostering a **friendly, safe, and inclusive** environment for all participants. This code applies to all community spaces including but not limited to GitHub repositories, community forums, etc.
 
 ## A. Expected Behavior
 

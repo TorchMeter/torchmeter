@@ -365,9 +365,9 @@ Before jumping in, let's ensure smooth collaboration by reviewing our 📋 [**co
 
 > Refer to official [code-of-conduct file](CODE_OF_CONDUCT.md) for more details.
 
-- `TorchMeter` is an open-source project built by developers worldwide. We're committed to fostering a **friendly, safe, and inclusive** environment for all participants. 
+- `TorchMeter` is an open-source project shared by developers worldwide. We're committed to fostering a **friendly, safe, and inclusive** environment for all participants. 
 
-- This code applies to all community spaces including but not limited to GitHub repositories, community forums, etc.
+- The provisions stipulated in our [Code - of - Conduct file](CODE_OF_CONDUCT.md) are applicable to all community platforms, which include, but are not limited to, GitHub repositories, community forums, and similar ones. 
 
 ## ℱ. 𝐿𝒾𝒸𝑒𝓃𝓈𝑒
 
