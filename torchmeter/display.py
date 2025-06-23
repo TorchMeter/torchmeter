@@ -648,6 +648,8 @@ class TabularRenderer:
         self.col_args.mark_change()
 
     def df2tb(self, df: DataFrame, show_raw: bool = False) -> Table:
+        from polars import Null as pl_null
+
         # create rich table
         tb_fields = df.columns
         tb = apply_setting(
@@ -670,8 +672,10 @@ class TabularRenderer:
             return tb
 
         # collect each column's none replacing string
-        col_none_str = {col_name: getattr(df[col_name].drop_nulls()[0], "none_str", "-") 
-                        for col_name in df.schema}  # fmt: skip
+        col_none_str = {
+            col_name: getattr(df[col_name].drop_nulls()[0], "none_str", "-") if not col_type.is_(pl_null) else "-"
+            for col_name, col_type in df.schema.items()
+        }  # fmt: skip
 
         # fill table
         for vals_dict in df.iter_rows(named=True):
