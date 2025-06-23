@@ -158,15 +158,15 @@ def universal_tabular_renderer():
 @pytest.fixture
 def example_df():
     """
-    ┌─────────┬──────┬───────────┬───────────┬─────────────┐
-    │ numeric ┆ text ┆ list_col  ┆ nomal_obj ┆ self_obj    │
-    │ ---     ┆ ---  ┆ ---       ┆ ---       ┆ ---         │
-    │ i64     ┆ str  ┆ list[i64] ┆ object    ┆ object      │
-    ╞═════════╪══════╪═══════════╪═══════════╪═════════════╡
-    │ 1       ┆ a    ┆ [1, 2]    ┆ example   ┆ 100 K       │
-    │ 2       ┆ null ┆ [3]       ┆ dataframe ┆ null        │
-    │ null    ┆ c    ┆ null      ┆ null      ┆ 0.00 ± 0.00 │
-    └─────────┴──────┴───────────┴───────────┴─────────────┘
+    ┌─────────┬──────┬───────────┬──────────┬───────────┐
+    │ numeric ┆ text ┆ list_col  ┆ null_col ┆ nomal_obj │
+    │ ---     ┆ ---  ┆ ---       ┆ ---      ┆ ---       │
+    │ i64     ┆ str  ┆ list[i64] ┆ null     ┆ object    │
+    ╞═════════╪══════╪═══════════╪══════════╪═══════════╡
+    │ 1       ┆ a    ┆ [1, 2]    ┆ null     ┆ example   │
+    │ 2       ┆ null ┆ [3]       ┆ null     ┆ dataframe │
+    │ null    ┆ c    ┆ null      ┆ null     ┆ null      │
+    └─────────┴──────┴───────────┴──────────┴───────────┘
     """
 
     from polars import Object as pl_obj
@@ -175,6 +175,7 @@ def example_df():
         "numeric": [1, 2, None],
         "text": ["a", None, "c"],
         "list_col": [[1, 2], [3], None],
+        "null_col": [None, None, None],
         "nomal_obj": [
             Text("example"),
             Text("dataframe"),
@@ -1339,16 +1340,16 @@ class TestTabularRenderer:
             res = simple_tabular_renderer.df2tb(example_df, show_raw=False)
 
         assert isinstance(res, Table)
-        assert len(res.columns) == 5
+        assert len(res.columns) == 6
         assert res.row_count == 3
 
         tb_headers = [col_obj.header for col_obj in res.columns]
-        assert tb_headers == ["numeric", "text", "list_col", "nomal_obj", "self_obj"]
+        assert tb_headers == ["numeric", "text", "list_col", "null_col", "nomal_obj", "self_obj"]
 
         assert str(example_df[0, 0]) == self.tbval_getter(0, 0, res)
         assert str(example_df[2, 1]) == self.tbval_getter(2, 1, res)
         assert str(example_df[1, 2].to_list()) == self.tbval_getter(1, 2, res)
-        assert str(example_df[0, 3]) == self.tbval_getter(0, 3, res)
+        assert str(example_df[0, 4]) == self.tbval_getter(0, 4, res)
 
         # 验证样式应用调用
         mock_apply.assert_any_call(
@@ -1378,11 +1379,16 @@ class TestTabularRenderer:
         # list none
         assert self.tbval_getter(2, 2, res) == "-"
 
-        # normal object none
+        # null none
+        assert self.tbval_getter(0, 3, res) == "-"
+        assert self.tbval_getter(1, 3, res) == "-"
         assert self.tbval_getter(2, 3, res) == "-"
 
+        # normal object none
+        assert self.tbval_getter(2, 4, res) == "-"
+
         # self object none
-        assert self.tbval_getter(1, 4, res) == "test none_str"
+        assert self.tbval_getter(1, 5, res) == "test none_str"
 
     def test_df2tb_show_raw(self, simple_tabular_renderer, example_df) -> None:
         """Test whether the show_raw argument works well"""
@@ -1394,17 +1400,17 @@ class TestTabularRenderer:
         assert self.tbval_getter(0, 0, noraml_res) == "1"
         assert self.tbval_getter(0, 1, noraml_res) == "a"
         assert self.tbval_getter(1, 2, noraml_res) == "[3]"
-        assert self.tbval_getter(1, 3, noraml_res) == "dataframe"
-        assert self.tbval_getter(0, 4, noraml_res) == "100 K"
-        assert self.tbval_getter(2, 4, noraml_res) == "0.00 ± 0.00"
+        assert self.tbval_getter(1, 4, noraml_res) == "dataframe"
+        assert self.tbval_getter(0, 5, noraml_res) == "100 K"
+        assert self.tbval_getter(2, 5, noraml_res) == "0.00 ± 0.00"
 
         # verify raw display
         assert self.tbval_getter(0, 0, raw_res) == "1"
         assert self.tbval_getter(0, 1, raw_res) == "a"
         assert self.tbval_getter(1, 2, raw_res) == "[3]"
-        assert self.tbval_getter(1, 3, raw_res) == "dataframe"
-        assert self.tbval_getter(0, 4, raw_res) == "100000.0"
-        assert self.tbval_getter(2, 4, raw_res) == "0.0"
+        assert self.tbval_getter(1, 4, raw_res) == "dataframe"
+        assert self.tbval_getter(0, 5, raw_res) == "100000.0"
+        assert self.tbval_getter(2, 5, raw_res) == "0.0"
 
     def test_clear(self, simple_tabular_renderer, example_df, monkeypatch) -> None:
         """Test the stat dataframe clearing logic"""
@@ -1612,7 +1618,7 @@ class TestTabularRenderer:
             col_func=lambda x: ["test"] * len(x),
             col_idx=0,
         )
-        assert new_df.shape == (3, 6)
+        assert new_df.shape == (3, 7)
         assert new_df.columns[0] == "new_col"
         assert new_df["new_col"].to_list() == ["test"] * 3
 
@@ -1623,9 +1629,9 @@ class TestTabularRenderer:
             col_func=lambda df: df.drop_in_place(name="numeric"),
             col_idx=0,
         )
-        assert new_df.shape == (3, 6)
-        assert example_df.shape == (3, 5)
-        assert example_df.columns == ["numeric", "text", "list_col", "nomal_obj", "self_obj"]
+        assert new_df.shape == (3, 7)
+        assert example_df.shape == (3, 6)
+        assert example_df.columns == ["numeric", "text", "list_col", "null_col", "nomal_obj", "self_obj"]
         assert new_df["origin_numeric"].to_list() == example_df["numeric"].to_list()
 
         # verify col_idx
@@ -1636,7 +1642,7 @@ class TestTabularRenderer:
             col_func=lambda x: ["test"] * len(x),
             col_idx=1,
         )
-        assert new_df.shape == (3, 6)
+        assert new_df.shape == (3, 7)
         assert new_df.columns[1] == "new_col"
 
         # non-negative and out of range (add last)
@@ -1646,8 +1652,8 @@ class TestTabularRenderer:
             col_func=lambda x: ["test"] * len(x),
             col_idx=8,
         )
-        assert new_df.shape == (3, 6)
-        assert new_df.columns[5] == "new_col"
+        assert new_df.shape == (3, 7)
+        assert new_df.columns[6] == "new_col"
 
         # negative and in range
         new_df = new_col(
@@ -1656,7 +1662,7 @@ class TestTabularRenderer:
             col_func=lambda x: ["test"] * len(x),
             col_idx=-1,
         )
-        assert new_df.shape == (3, 6)
+        assert new_df.shape == (3, 7)
         assert new_df.columns[-1] == "new_col"
 
         # negative and out of range (add first)
@@ -1666,7 +1672,7 @@ class TestTabularRenderer:
             col_func=lambda x: ["test"] * len(x),
             col_idx=-9,
         )
-        assert new_df.shape == (3, 6)
+        assert new_df.shape == (3, 7)
         assert new_df.columns[0] == "new_col"
 
         # verify return_type is correctly applied
