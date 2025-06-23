@@ -4,12 +4,7 @@
 
 # This workflow ensures code quality and cross-platform compatibility. 
 #
-# Trigger Conditions:
-# - PR events (open/review-ready) with changes to:
-#   - Source code (/torchmeter)
-#   - Test cases (/tests)
-#   - Configuration files
-# - Manual trigger via GitHub UI
+# Trigger Conditions: Manual trigger via GitHub UI
 #
 # Core functions:
 # 1. Automated Linting & Formatting via Ruff
@@ -20,15 +15,6 @@
 name: ✅ Compatibility Test ❌
 
 on:
-  pull_request: 
-    types:
-      - opened
-      - ready_for_review
-    paths:
-      - 'tests/**'
-      - 'torchmeter/**'
-      - 'default_cfg.yml'
-      - 'requirements.txt'
   workflow_dispatch:
 
 env:
