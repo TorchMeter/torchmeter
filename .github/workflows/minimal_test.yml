@@ -10,6 +10,7 @@
 #   - Test cases (/tests)
 #   - Configuration files (default_cfg.yml, requirements.txt)
 # - Manual trigger via GitHub UI:
+#   - PR number: the target PR number that needs to be tested
 #   - Select OS: ubuntu/macOS/windows
 #   - Choose Python version: 3.8~3.13
 #
@@ -35,6 +36,11 @@ on:
       - 'requirements.txt'
   workflow_dispatch:
     inputs:
+      pr_number:
+          description: 'Target PR Number'
+          required: true
+          type: number
+
       chosen-os:
         required: true
         type: choice
@@ -42,6 +48,7 @@ on:
           - ubuntu
           - macOS
           - windows
+
       python-version:
         required: true
         type: choice
@@ -97,6 +104,12 @@ jobs:
       - name: Fetch Code
         uses: actions/checkout@v4
 
+      - name: Checkout PR
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            gh pr checkout ${{ github.event.inputs.pr_number }}
+          fi
+          
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -179,6 +192,12 @@ jobs:
     steps:
       - name: Fetch Code
         uses: actions/checkout@v4
+      
+      - name: Checkout PR
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            gh pr checkout ${{ github.event.inputs.pr_number }}
+          fi
 
       - name: Set up Python ${{ needs.Pick-OS-Python.outputs.python_version }}
         uses: actions/setup-python@v5

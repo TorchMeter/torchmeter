@@ -16,6 +16,11 @@ name: ✅ Compatibility Test ❌
 
 on:
   workflow_dispatch:
+    inputs:
+        pr_number:
+          description: 'Target PR Number'
+          required: true
+          type: number
 
 env:
   FORCE_COLOR: 1 
@@ -34,6 +39,9 @@ jobs:
     steps:
       - name: Fetch Code
         uses: actions/checkout@v4
+      
+      - name: Checkout PR
+        run: gh pr checkout ${{ github.event.inputs.pr_number }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -129,6 +137,9 @@ jobs:
 
       - name: Fetch Code
         uses: actions/checkout@v4
+
+      - name: Checkout PR
+        run: gh pr checkout ${{ github.event.inputs.pr_number }}
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
