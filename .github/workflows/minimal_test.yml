@@ -62,6 +62,7 @@ on:
 
 env:
   FORCE_COLOR: 1 
+  GH_TOKEN: ${{ github.token }}
   
 jobs:
   Pick-OS-Python:

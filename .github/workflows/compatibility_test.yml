@@ -24,6 +24,7 @@ on:
 
 env:
   FORCE_COLOR: 1 
+  GH_TOKEN: ${{ github.token }}
 
 permissions:
   contents: write
