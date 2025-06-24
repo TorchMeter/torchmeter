@@ -815,14 +815,14 @@ Once you feel that your changes have made phased progress, you can incorporate t
     2. 🙋‍♂️ The `-u` parameter indicates that the `<your-branch-name>` branch in local repository will track the `<remote-branch-name>` branch in remote repository. Thus, when you make new commits on `<your-branch-name>` in local repository, you can easily push them to the `<remote-branch-name>` branch in remote repository with a simple `git push` command, no need to re-type the remote repository's target branch name. 
 
 2. If you have enabled the `Github Actions` for your `fork` repository, you can submit a PR to the `master` branch of the remote repository (i.e., **your `fork` repository**) to automatically trigger the compatibility test we've prepared for you:
-    1. Open the page of your fork repository. Shortly after pushing your changes, you'll find a prominent `Compare & pull request` button. (1)([Illustration](https://docs.github.com/assets/cb-34097/mw-1440/images/help/pull_requests/pull-request-compare-pull-request.webp){ data-preview }) 
+    1. Open the page of your fork repository. Shortly after pushing your changes, you'll find a prominent `Compare & pull request` button. ([Illustration](https://docs.github.com/assets/cb-34097/mw-1440/images/help/pull_requests/pull-request-compare-pull-request.webp){ data-preview }) 
     2. Click this button. In the pop-up page, select the `base` branch as the `master` branch of **your fork repository**, and select the `head` branch as the `<remote-branch-name>` branch you just pushed. {++Please double-check that the `base` branch is the `master` branch of **your `fork` repository**, not the `master` branch of the official `torchmeter` repository.++}
     3. Fill in the PR title. See [PR Title Convention :material-link-variant:](conventions.md#Pull-Request-Title){ data-preview }.
     4. Fill in the PR description. Since you are just testing, the description can be brief, no need to fill it in according to the predefined template. 
     5. Click the `Create Pull Request` button below, and you have created a PR targeting the `master` branch in your fork repository.
-    6. Click on the `Actions` tab. You will see a task named `✅ Compatibility Test ❌` is running. It is the compatibility test workflow of the `torchmeter` project.
-    7. Wait for the task to finish running. If the task fails, check the error, modify the code locally, and then re-commit to the remote repository. This will update the commit history of the PR and trigger the minimal test `✅ Minimal Test ❌`.
-    8. If the minimum test is passed, click on the `Actions` tab, select `✅ Compatibility Test ❌`, click `Run workflow`, choose your branch and run. This will re-trigger the compatibility test, do it until it is passed.
+    6. Click on the `Actions` tab. You will see a task named `✔ Minimal Test ✘ ` is running. It is the minimal test workflow of the `torchmeter` project.
+    7. Wait for the task to finish running. If the task fails, check the error, modify the code locally, and then re-commit to the remote repository. This will update the commit history of the PR and trigger the minimal test `✔ Minimal Test ✘ ` again.
+    8. If the minimum test is passed, click on the `Actions` tab, select `✅ Compatibility Test ❌`, click `Run workflow`, choose your branch and run. This will trigger the compatibility test, fix the error if any until the test is passed.
 
 [^2]: You can enable `Github Actions` for your fork repo **without worry** as we've added repository validation for sensitive operations (like package publishing), so you can rest assured to enable it.
 
@@ -1045,13 +1045,13 @@ Once your PR is created (whether draft or final), `torchmeter` uses automated wo
 
 ??? tip "Code Linting, Formatting and Compatibility Testing"
 
-    Once a PR is created, a [workflow :material-link-variant:](https://github.com/TorchMeter/torchmeter/tree/master.github/workflows/compatibility_test.yml) named `✅ Compatibility Test ❌` will be automatically triggered. It will check ^^whether the code in the PR meets the style and format requirements defined in `ruff.toml`^^. 
+    Once a PR is created, a [workflow :material-link-variant:](https://github.com/TorchMeter/torchmeter/tree/master.github/workflows/minimal_test.yml) named `✔ Minimal Test ✘ ` will be automatically triggered. It will check ^^whether the code in the PR meets the style and format requirements defined in `ruff.toml`^^. 
 
-    If both pass, compatibility tests will be conducted across platforms (`windows`, `macOs`, `linux`) and across versions (`python 3.8` to `python 3.13`). If any step fails, `torchmeter` will provide an error report on the workflow run page. Please download it, review it, and try to fix the problem. 
+    If both pass, [predefined tests :material-link-variant:](https://github.com/TorchMeter/torchmeter/tree/master/tests) will be conducted across platforms (`windows`, `macOs`, `linux`) and across versions (`python 3.8` to `python 3.13`). If any step fails, `torchmeter` will provide an error report on the workflow run page. Please download it, review it, and try to fix the problem. 
 
     You can try to solve the problem by creating a new commit for the fix in your local repository and pushing it to the remote repository. The commit history of the PR will be automatically synchronized with the history of the `head` branch. 
 
-    It should be noted that every time PR is updated like this, an automated test [workflow :material-link-variant:](https://github.com/TorchMeter/torchmeter/tree/master.github/workflows/minimal_test.yml) named `✅ Minimal Test ❌` will be triggered, which will execute the test in a randomly selected system and `python 3.8`. Without consuming a lot of time and resources like compatibility testing, this is beneficial for you to find new problems that may be introduced by new submission as soon as possible.
+    It should be noted that every time PR is updated like this, the [workflow :material-link-variant:](https://github.com/TorchMeter/torchmeter/tree/master.github/workflows/minimal_test.yml) named `✔ Minimal Test ✘` will be triggered again, which will execute the test on a randomly selected system under `python 3.8`. This is beneficial for you to find new problems that may be introduced by new submission as soon as possible.
 
 ---
 
@@ -1066,7 +1066,7 @@ Once your PR is created (whether draft or final), `torchmeter` uses automated wo
     3. **CI failures with prolonged inactivity**: PRs failing CI checks without updates for `30+` days  
     4. **Outdated scope**: When the code area involved in the PR has been refactored or cancelled
 
-1. After passing compatibility tests, your PR enters formal [review :material-link-variant:](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/reviewing-proposed-changes-in-a-pull-request#about-reviewing-pull-requests). Typical first review occurs within **5-7 business days** (may vary with maintainer availability).
+1. After passing the minimal test, your PR enters formal [review :material-link-variant:](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/reviewing-proposed-changes-in-a-pull-request#about-reviewing-pull-requests). Typical first review occurs within **5-7 business days** (may vary with maintainer availability).
 
 2. During the review process, reviewers may leave comments. If any questions arise, please ^^respond patiently and courteously^^ to clarify your implementation rationale:
     - Kindly respond to review comments as soon as possible  
@@ -1074,7 +1074,7 @@ Once your PR is created (whether draft or final), `torchmeter` uses automated wo
     - For unclear requests, ask clarifying questions like: `"Could you please elaborate on [...]?"` 
 
 3. Provided everything checks out, maintainers will: 
-    - Manually trigger compatibility tests to verify code standards, correctness, robustness, and cross-environment compatibility again.
+    - Manually trigger [compatibility tests :material-link-variant:](https://github.com/TorchMeter/torchmeter/blob/master/.github/workflows/compatibility_test.yml) to verify code standards, correctness, robustness, and cross-environment compatibility.
     - Manually execute the `🤖 Update README Badge 🔰` workflow (as mentioned in [step D.b.6](#Db-Create-a-Pull-Request-to-torchmeter)) to update the coverage badge in `README.md`
 
 4. If everything goes well，your PR will be merged into the `master` branch in `Squash` or `Merge` way. Your contribution will be officially released and acknowledged in the **next version** announcement.

@@ -60,11 +60,19 @@ When proposing new features or fixes, please follow our [Contribution Guide :mat
 
         Promise the PR has a valid title and pass the compatiability tests.
 
-    2. **Update coverage badge in `README.md` before merging**:
+    2. **Manually trigger ✅ Compatibility Test ❌** {==[Optional, do only when essential files changed]==}
+    
+        If the changes brought by the PR are related to the following aspects, manually trigger `compatibility_test.yml` workflow, and {++make sure the compatibility test passes++}:
+
+        - source code (`torchmeter/`)
+        - test code (`tests/`)
+        - configuration files(`requirements.txt`, `default_cfg.yml`, `pyproject.toml`, `setup.cfg`, `setup.py`)
+
+    3. **Update coverage badge in `README.md` before merging**:
         - Right-click coverage badge in PR's comment → Copy link  
         - Manually trigger `badge_updater.yml` workflow
 
-    3. **Sync local after merging**: `git checkout master && git pull`
+    4. **Sync local after merging**: `git checkout master && git pull`
 
 ??? tip "Fixing Issues in Current Version"
 
