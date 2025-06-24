@@ -44,6 +44,7 @@ Consistent naming rule helps us:
     | `bugfix`     | Bug corrections        | Fixing unexpected behavior   | `bugfix/div-zero-error`     |
     | `docs`       | Documentation updates  | Improving guides/comments    | `docs/add-install-notes`    |
     | `test`       | Testing improvements   | Enhancing test coverage      | `test/add-edge-cases`       |
+    | `ci`         | Workflow Modification  | Add/remove/improve workflows | `ci/change-test-pipeline`   |
     | `refactor`   | Code restructuring     | Improving code structure     | `refactor/metrics-handler`  |
     | `hotfix`     | Critical fixes         | Urgent production fixes      | `hotfix/memory-leak-patch`  |
     | `chore`      | Project maintenance    | Updating dependencies/builds | `chore/update-requirements` |

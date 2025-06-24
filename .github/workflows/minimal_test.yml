@@ -5,10 +5,9 @@
 # This workflow ensures quick code quality checks and code logic validation.
 #
 # Trigger Conditions:
-# - PR events (reopened/synchronize) with changes to:
+# - PR events (open/review-ready/reopened/synchronize) with changes to:
 #   - Source code (/torchmeter)
 #   - Test cases (/tests)
-#   - Examples (/examples)
 #   - Configuration files (default_cfg.yml, requirements.txt)
 # - Manual trigger via GitHub UI:
 #   - Select OS: ubuntu/macOS/windows
@@ -25,10 +24,11 @@ name: ✔ Minimal Test ✘
 on:
   pull_request: 
     types:
-      - reopened
+      - opened
+      - ready_for_review
       - synchronize
+      - reopened
     paths:
-      - 'examples/**'
       - 'tests/**'
       - 'torchmeter/**'
       - 'default_cfg.yml'
