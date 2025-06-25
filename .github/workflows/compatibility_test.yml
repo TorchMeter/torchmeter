@@ -177,11 +177,10 @@ jobs:
           if-no-files-found: error
       
       - name: Pytest Coverage Comment
-        if: >-
-          matrix.python-version == '3.8' && 
-          github.event_name != 'workflow_dispatch'
+        if: matrix.python-version == '3.8'
         uses: MishaKav/pytest-coverage-comment@v1
         with:
+          issue-number: ${{ github.event.inputs.pr_number }}
           title: Coverage Details on ${{ env.SHORT_OS }} under Python ${{ matrix.python-version }}
           badge-title: Coverage
           hide-badge: false
