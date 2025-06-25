@@ -10,7 +10,7 @@ green_output() {
 
 # ---------------------------------------------------------------------------------------------------
 
-PATTERN='^(depr|perf|feat|fix|doc|test|ci|chore|build|refactor|revert)(\([^ ]+\))?\!?\s?: [A-Z].*[^\.\!\?,…！？。， ]$'
+PATTERN='^(depr|perf|feat|fix|docs|test|ci|chore|build|refactor|revert)(\([^ ]+\))?\!?\s?: [A-Z].*[^\.\!\?,…！？。， ]$'
 
 if [ $# -ne 1 ]; then
   red_output "Error: There is and only needs one input, please enclose your input in '' and retry!"
