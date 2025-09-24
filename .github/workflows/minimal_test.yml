@@ -106,6 +106,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Checkout PR
+        shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             gh pr checkout ${{ github.event.inputs.pr_number }}
@@ -195,6 +196,7 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Checkout PR
+        shell: bash
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             gh pr checkout ${{ github.event.inputs.pr_number }}
