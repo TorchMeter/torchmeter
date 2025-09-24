@@ -87,7 +87,7 @@ Please refer to [Customize the Hierarchical Display](https://docs.torchmeter.top
 All the attributes that are available, as defined below, are intended to:
 
 - facilitate your acquisition of supplementary information of a tree node;
-- customize of the display of the tree structure during the rendering procedure. 
+- customize the display of the tree structure during the rendering procedure. 
 
 ### **:material-numeric-3-box: What are the available attributes of a tree node?**
 
@@ -214,23 +214,37 @@ All the attributes that are available, as defined below, are intended to:
 
 ### **:material-numeric-4-box: How to use the attributes of a tree node?**
 
-In the scenarios described below, an attribute of a tree node can be utilized as a {++placeholder++}, 
-which enables the ^^dynamic retrieval of its value^^ during the tree-rendering process.
+An attribute of a tree node can be employed as a {++placeholder++} within the value of certain configurations. This allows for the ^^**dynamic retrieval of the attribute value**^^ during the tree-rendering procedure.
 
-??? info "Global Configuration"
+The configurations/scenario supporting the tree node attribute as a placeholder are listed below.
 
-    > About the `<level-index>` shown below, please refer to [Tree Level Index :material-link-variant:](#Tree-Level-Index).
+|           configuration/scenario           |                                                    Default Value                                                    |
+|:------------------------------------------:|:-------------------------------------------------------------------------------------------------------------------:|
+| `tree_levels_args.[level-index].label`[^1] |                         `'[b gray35](<node_id>) [green]<name>[/green] [cyan]<type>[/]'`[^2]                         |
+|       `tree_repeat_block_args.title`       |                                    `'[i]Repeat [[b]<repeat_time>[/b]] Times[/]'`                                    |
+|       `tree_renderer.repeat_footer`        | Support text and function, see [Customize the footer :material-link-variant:](demo.ipynb#fb23-customize-the-footer) | 
 
-    |             configuration              |                          default value                          |
-    |:--------------------------------------:|:---------------------------------------------------------------:|
-    |        `tree_repeat_block_args`        |          `'[i]Repeat [[b]<repeat_time>[/b]] Times[/]'`          |
-    |    `tree_levels_args.default.label`    | `'[b gray35](<node_id>) [green]<name>[/green] [cyan]<type>[/]'` |
-    |       `tree_levels_args.0.label`       |                  `'[b light_coral]<name>[/]'`                   |
-    | `tree_levels_args.<level-index>.label` |  same as the `tree_levels_args.default.label` if not specified  |
+[^1]: As for the value of `[level-index]`, please refer to [Tree Level Index :material-link-variant:](#Tree-Level-Index).
+[^2]: The [style markup :material-link-variant:](https://rich.readthedocs.io/en/latest/markup.html) and its [abbreviation :material-link-variant:](https://rich.readthedocs.io/en/latest/style.html#defining-styles) in `rich` is supported in writing value content.
 
-??? info "Repeat Block Footer"
+??? info "Usage Example"
 
-    Please refer to [Customize the footer](demo.ipynb#fb23-customize-the-footer){ .md-button } for more details.
+    For example, if you want to unify the titles of all repeated blocks into bold `My Repeat Title`, then you can do this
+
+    ```python linenums="0"
+    from rich import print
+    from torchmeter import Meter
+    from torchvision import models
+
+    resnet18 = models.resnet18()
+    model = Meter(resnet18)
+
+    model.tree_repeat_block_args.title = '[b]My Repeat Title[/b]' #(1)
+
+    print(model.structure) 
+    ```
+
+    1. 🙋‍♂️ That's all, then you can see the titles in all repeat blocks have been changed
 
 ---
 
