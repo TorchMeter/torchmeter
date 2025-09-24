@@ -868,7 +868,7 @@ class IttpMeter(Statistics):
                     cuda_sync()  # WAIT FOR GPU SYNC
                     it = start_event.elapsed_time(end_event) * 1e-3  # ms -> s    # type: ignore
 
-                tp = 1 / it  
+                tp = 1 / it
                 self.__InferTime.append(it)
                 self.__Throughput.append(tp)
 
