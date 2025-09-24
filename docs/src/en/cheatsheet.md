@@ -66,7 +66,7 @@ A valid level index empowers you to customize the operation tree with meticulous
 
 1. **A non-negative integer (e.g. `0`, `1`, `2`, ...)**: The configurations under a specific index apply only to the corresponding level.
 2. **`default`**: The configurations under this index will be applied to all undefined levels.
-3. **`all`**: The configurations under this index will be applied to all levels.
+3. **`all`**: The configurations under this index will **override** those at any other level, and will be applied with the highest priority **across all levels**. 
 
 Please refer to [Customize the Hierarchical Display](https://docs.torchmeter.top/latest/demo/#fb1-customize-the-hierarchical-display){ .md-button } for specific usage scenarios.
 
@@ -87,7 +87,7 @@ Please refer to [Customize the Hierarchical Display](https://docs.torchmeter.top
 All the attributes that are available, as defined below, are intended to:
 
 - facilitate your acquisition of supplementary information of a tree node;
-- customize of the display of the tree structure during the rendering procedure. 
+- customize the display of the tree structure during the rendering procedure. 
 
 ### **:material-numeric-3-box: What are the available attributes of a tree node?**
 
@@ -214,23 +214,37 @@ All the attributes that are available, as defined below, are intended to:
 
 ### **:material-numeric-4-box: How to use the attributes of a tree node?**
 
-In the scenarios described below, an attribute of a tree node can be utilized as a {++placeholder++}, 
-which enables the ^^dynamic retrieval of its value^^ during the tree-rendering process.
+An attribute of a tree node can be employed as a {++placeholder++} within the value of certain configurations. This allows for the ^^**dynamic retrieval of the attribute value**^^ during the tree-rendering procedure.
 
-??? info "Global Configuration"
+The configurations/scenario supporting the tree node attribute as a placeholder are listed below.
 
-    > About the `<level-index>` shown below, please refer to [Tree Level Index :material-link-variant:](#Tree-Level-Index).
+|           configuration/scenario           |                                                    Default Value                                                    |
+|:------------------------------------------:|:-------------------------------------------------------------------------------------------------------------------:|
+| `tree_levels_args.[level-index].label`[^1] |                         `'[b gray35](<node_id>) [green]<name>[/green] [cyan]<type>[/]'`[^2]                         |
+|       `tree_repeat_block_args.title`       |                                    `'[i]Repeat [[b]<repeat_time>[/b]] Times[/]'`                                    |
+|       `tree_renderer.repeat_footer`        | Support text and function, see [Customize the footer :material-link-variant:](demo.ipynb#fb23-customize-the-footer) | 
 
-    |             configuration              |                          default value                          |
-    |:--------------------------------------:|:---------------------------------------------------------------:|
-    |        `tree_repeat_block_args`        |          `'[i]Repeat [[b]<repeat_time>[/b]] Times[/]'`          |
-    |    `tree_levels_args.default.label`    | `'[b gray35](<node_id>) [green]<name>[/green] [cyan]<type>[/]'` |
-    |       `tree_levels_args.0.label`       |                  `'[b light_coral]<name>[/]'`                   |
-    | `tree_levels_args.<level-index>.label` |  same as the `tree_levels_args.default.label` if not specified  |
+[^1]: As for the value of `[level-index]`, please refer to [Tree Level Index :material-link-variant:](#Tree-Level-Index).
+[^2]: The [style markup :material-link-variant:](https://rich.readthedocs.io/en/latest/markup.html) and its [abbreviation :material-link-variant:](https://rich.readthedocs.io/en/latest/style.html#defining-styles) in `rich` is supported in writing value content.
 
-??? info "Repeat Block Footer"
+??? info "Usage Example"
 
-    Please refer to [Customize the footer](demo.ipynb#fb23-customize-the-footer){ .md-button } for more details.
+    For example, if you want to unify the titles of all repeated blocks into bold `My Repeat Title`, then you can do this
+
+    ```python linenums="0"
+    from rich import print
+    from torchmeter import Meter
+    from torchvision import models
+
+    resnet18 = models.resnet18()
+    model = Meter(resnet18)
+
+    model.tree_repeat_block_args.title = '[b]My Repeat Title[/b]' #(1)
+
+    print(model.structure) 
+    ```
+
+    1. 🙋‍♂️ That's all, then you can see the titles in all repeat blocks have been changed
 
 ---
 
@@ -270,6 +284,21 @@ There are four types of units in `torchmeter`, listed as follows:
 
     > Used by `ittp` - inference time
 
+    ??? question "Why do I obtain different results with different attempts or inputs?"
+        Don't worry, it's a normal phenomenon.
+
+        **Different results with different attempts**
+
+        :   Inference latency is measured in **real-time** because it is related to dynamic factors such as the ^^real-time load of the machine^^ and the ^^device where the model is located^^. Therefore, each time the `ittp` attribute (i.e., `Meter(your_model).ittp`) is accessed, the inference latency and throughput will be **re-measured** to reflect the model performance under the current working conditions.
+
+        **Different results with different inputs**
+
+        :   The meaning of inference latency is ^^`the time it takes for the model to complete one forward propagation with the given input`^^. Therefore, **different inputs will bring different workloads to the model**, resulting in differences in inference lantency.
+        
+        :   In `TorchMete`, the measurement of inference latency and throughput will be based on the input received by the model in the **most recent** forward propagation. Hence, **different input batches** or **different sample shape**, combined with **differences in machine load** at different times, will lead to changes in inference latency.
+        
+        > It should be additionally mentioned that due to automatic device synchronization, the input will be synchronized to the device where the model is located before the forward propagation is executed, so the results obtained from two inputs of the same content on different devices will be very similar.
+
     | unit  | explanation |    tag     | example                             |
     |:-----:|:-----------:|:----------:|:----------------------------------- |
     | `ns`  | nanosecond  |            | `5 ns`: $5 \times 10^{-9}$  seconds |
@@ -283,10 +312,71 @@ There are four types of units in `torchmeter`, listed as follows:
 
     > Used by `ittp` - throughput
 
+    ??? question "What is the meaning of `Input` in the table below?"
+        `Input` refers to {++all the inputs++} received by the model in your **last** execution of forward propagation. `Torchmeter` will treat these inputs as a ^^**standard unit**^^ to calculate the inference latency and throughput.
+
+        To facilitate comparisons between models, we call for using the same input *(such as a single sample with `batch_size=1`)* for different models when measuring all statistics, in order to obtain more universally comparable results.
+        
+        In the following example, `Input` in `Case 1` refers to `x=torch.randn(1, 3, 224, 224); y=0.1`, while in `Case 2`, it refers to `x=torch.randn(100, 3, 224, 224); y=0.1`. You can see the difference between two cases from the results: the inference latency when `batch_size=100` is significantly higher than that when `batch_size=1`.
+
+        ```python linenums="0"
+        import torch
+        import torch.nn as nn
+        from rich import print
+        from torchmeter import Meter
+        from torchvision import models
+
+        class ExampleModel(nn.Module):
+            def __init__(self):
+                super(ExampleModel, self).__init__()
+                self.backbone = models.resnet18()
+            
+            def forward(self, x: torch.Tensor, y: int):
+                return self.backbone(x) + y
+
+        model = Meter(ExampleModel(), device="cuda")
+        
+        # case1: batch size = 1 ------------------------------
+        ipt = torch.randn(1, 3, 224, 224)
+        model(ipt, 0.1)
+        print(model.ittp)
+
+        # case2: batch size = 100 ------------------------------
+        ipt = torch.randn(100, 3, 224, 224)
+        model(ipt, 0.1)
+        print(model.ittp)
+        ```
+
+        <div class="result" markdown>
+
+        === "Result of Case 1"
+
+            ```plaintext title="" linenums="0"
+            InferTime_Throughput_INFO
+            •   Operation_Id = 0
+            • Operation_Name = ExampleModel
+            • Operation_Type = ExampleModel
+            •     Infer_Time = 2.20 ms ± 19.53 us
+            •     Throughput = 454.31 IPS ± 4.03 IPS
+            ```
+
+        === "Result of Case 2"
+
+            ```plaintext title="" linenums="0"
+            InferTime_Throughput_INFO
+            •   Operation_Id = 0
+            • Operation_Name = ExampleModel
+            • Operation_Type = ExampleModel
+            •     Infer_Time = 11.38 ms ± 8.30 us
+            •     Throughput = 87.86 IPS ± 0.06
+            ```
+
+        </div>
+
     |  unit  |   explanation    |    tag     | example                                                 |
     |:------:|:----------------:|:----------:|:------------------------------------------------------- |
     | `IPS`  | Input Per Second | `raw-data` | `5 IPS`: process `5` inputs per second                  |
-    | `KIPS` |    $10^3$ `IPS`    |            | `5 KIPS`: process `5,000` inputs per second             |
-    | `MIPS` |    $10^6$ `IPS`    |            | `5 MIPS`: process `5,000,000` inputs per second         |
-    | `GIPS` |    $10^9$ `IPS`    |            | `5 GIPS`: process `5,000,000,000` inputs per second     |
-    | `TIPS` |  $10^{12}$ `IPS`   |            | `5 TIPS`: process `5,000,000,000,000` inputs per second | 
+    | `KIPS` |    $10^3$ `IPS`  |            | `5 KIPS`: process `5,000` inputs per second             |
+    | `MIPS` |    $10^6$ `IPS`  |            | `5 MIPS`: process `5,000,000` inputs per second         |
+    | `GIPS` |    $10^9$ `IPS`  |            | `5 GIPS`: process `5,000,000,000` inputs per second     |
+    | `TIPS` |  $10^{12}$ `IPS` |            | `5 TIPS`: process `5,000,000,000,000` inputs per second | 
