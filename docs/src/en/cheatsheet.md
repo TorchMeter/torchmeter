@@ -66,7 +66,7 @@ A valid level index empowers you to customize the operation tree with meticulous
 
 1. **A non-negative integer (e.g. `0`, `1`, `2`, ...)**: The configurations under a specific index apply only to the corresponding level.
 2. **`default`**: The configurations under this index will be applied to all undefined levels.
-3. **`all`**: The configurations under this index will be applied to all levels.
+3. **`all`**: The configurations under this index will **override** those at any other level, and will be applied with the highest priority **across all levels**. 
 
 Please refer to [Customize the Hierarchical Display](https://docs.torchmeter.top/latest/demo/#fb1-customize-the-hierarchical-display){ .md-button } for specific usage scenarios.
 
