@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+# TorchMeter, AGPL-3.0 license
+# Author: Ahzyuan
+# Repo: https://github.com/TorchMeter/torchmeter
+
+# ---------------------------- Colorful Output ----------------------------
 cyan_output() {
     echo -e "\033[36m$1\033[0m"
 }
@@ -16,6 +21,15 @@ red_output() {
     echo -e "\033[31m$1\033[0m"
 }
 
+# ---------------------------- Helper Functions ----------------------------
+
+# Interactively activate a conda environment
+# This function lists all available conda environments and allows user to select one
+# Usage: activate_conda_env
+# Dependencies: conda must be installed and available in PATH
+# Side effects: 
+#   - Activates the selected conda environment
+#   - Exits with code 1 if activation fails or conda is not available
 activate_conda_env() {
     eval "$(conda shell.bash hook)"
 
@@ -39,6 +53,16 @@ activate_conda_env() {
     done
 }
 
+# Find the root directory containing a specific file or directory
+# Searches upward from the script's location until it finds the target or reaches root
+# Usage: find_dir "target_file_or_directory"
+# Args:
+#   $1: target_path - The file or directory name to search for
+# Returns:
+#   The absolute path of the directory containing the target
+# Exit codes:
+#   0: Success (target found)
+#   1: Failure (target not found, reached filesystem root)
 find_dir() {
     local target_path=$1
     local current_path found_path

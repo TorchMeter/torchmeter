@@ -1,5 +1,9 @@
 #! /usr/bin/env bash
 
+# TorchMeter, AGPL-3.0 license
+# Author: Ahzyuan
+# Repo: https://github.com/TorchMeter/torchmeter
+
 source "$(dirname "$0")/utils.sh"
 
 check_py_dependencies() {
