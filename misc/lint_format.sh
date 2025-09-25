@@ -1,65 +1,22 @@
 #!/usr/bin/env bash
 
-green_output() {
-    echo -e "\033[32m$1\033[0m"
-}
+# TorchMeter, AGPL-3.0 license
+# Author: Ahzyuan
+# Repo: https://github.com/TorchMeter/torchmeter
 
-cyan_output() {
-    echo -e "\033[36m\033[0m"
-}
+source "$(dirname "$0")/utils.sh"
 
-find_dir() {
-    local target_path=$1
-    local current_path=$(realpath $(dirname $0))
-    local found_path=""
-
-    while [ "$current_path" != "/" ]; do
-        if [ -d "$current_path/$target_path" ]; then
-            found_path="$current_path"
-            break
-        elif [ -f "$current_path/$target_path" ]; then
-            found_path="$current_path"
-            break
-        fi
-        current_path=$(dirname "$current_path")
-    done
-
-    if [ -z "$found_path" ]; then 
-        echo "Error: $target_path not found!"
-        exit 1
-    else 
-        echo $found_path
-    fi
-}
-
-# ---------------------------------------------------------------------------------------------------
-
-ROOT=$(find_dir 'torchmeter')
-if [[ $? -ne 0 ]]; then 
+if ! ROOT="$(find_dir 'torchmeter')"; then 
     exit 1
 else
-    cd $ROOT
+    cd "$ROOT" || {
+        red_output "Error: Cannot enter $ROOT"
+        exit 1
+    }
 fi
 
 # -------------------------------------- Activate Virtual Env ---------------------------------------
-
-eval "$(conda shell.bash hook)"
-
-envs=$(conda env list | grep -v "#" | cut -d " " -f1)
-
-cyan_output "Available conda environments:"
-PS3="Choose your Python env: "
-select env in $envs
-do
-    if [ -n "$env" ]; then
-        cyan_output "$env selected."
-	conda activate "$env"
-	green_output "$env activated.\n"
-        break
-    else
-        red_output "Invalid selection. Please try again."
-    fi
-done
+activate_conda_env || exit 1
 
 # --------------------------------------------- Format -----------------------------------------------
 
@@ -71,10 +28,10 @@ exit_code=$?
 set -e
 
 if [[ $exit_code -eq 0 ]]; then
-  echo -e "✅ Formatting finish! 🎉\n"
+  green_output "✅ Formatting finish! 🎉\n"
 else
-  echo -e "❌ Formatting failed! Some code does not meet the format requirements!s" >&2
-  echo -e "❌ Ruff terminates abnormally due to invalid configuration, invalid CLI options, or an internal error" >&2
+  red_output "❌ Formatting failed! Some code does not meet the format requirements!s" >&2
+  red_output "❌ Ruff terminates abnormally due to invalid configuration, invalid CLI options, or an internal error" >&2
   exit 1
 fi
 
@@ -91,8 +48,8 @@ exit_code=$?
 set -e
 
 if [[ $exit_code -eq 0 ]]; then
-  echo -e "✅ Linting passed! Code quality check successful! 🎉\n"
+  green_output "✅ Linting passed! Code quality check successful! 🎉\n"
 else
-  echo -e "❌ Linting failed! Some code does not meet the linting rules!\n" >&2
+  red_output "❌ Linting failed! Some code does not meet the linting rules!\n" >&2
   exit 1
 fi

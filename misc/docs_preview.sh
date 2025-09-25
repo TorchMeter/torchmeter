@@ -1,44 +1,10 @@
 #! /usr/bin/env bash
 
-cyan_output() {
-    echo -e "\033[36m$1\033[0m"
-}
+# TorchMeter, AGPL-3.0 license
+# Author: Ahzyuan
+# Repo: https://github.com/TorchMeter/torchmeter
 
-yellow_output() {
-    echo -e "\033[33m$1\033[0m"
-}
-
-green_output() {
-    echo -e "\033[32m$1\033[0m"
-}
-
-red_output() {
-    echo -e "\033[31m$1\033[0m"
-}
-
-find_dir() {
-    local target_path=$1
-    local current_path=$(realpath $(dirname $0))
-    local found_path=""
-
-    while [ "$current_path" != "/" ]; do
-        if [ -d "$current_path/$target_path" ]; then
-            found_path="$current_path"
-            break
-        elif [ -f "$current_path/$target_path" ]; then
-            found_path="$current_path"
-            break
-        fi
-        current_path=$(dirname "$current_path")
-    done
-
-    if [ -z "$found_path" ]; then 
-        echo "Error: $target_path not found!"
-        exit 1
-    else 
-        echo $found_path
-    fi
-}
+source "$(dirname "$0")/utils.sh"
 
 check_py_dependencies() {
 
@@ -54,30 +20,32 @@ try:
     deps = config["options.extras_require"]["docs"].strip()
     for dep in deps.split('\n'):
         dep = re.findall(r"(\w+)(\[.+\])?", dep)[0][0]
-        if os.system(f"pip list | grep '{dep}'"):
+        if os.system(f"pip list | grep '{dep}' > /dev/null"):
             print(dep)
 except KeyError:
     sys.exit("Error: Missing [options.extras_require] or docs dependencies in setup.cfg")
 EOF
 )
 
+    # shellcheck disable=SC2181
     if [[ $? -ne 0 ]]; then
         red_output "Failed to parse setup.cfg"
         exit 1
-    else 
-        LACK=($LACK)
     fi
 
-    for dep in "${Deps[@]}"; do
-        if [[ -z "$dep" ]]; then
-            continue
-        fi
-        
-        pip install "$dep" || {
-            red_output "Failed to install $dep"
-            exit 1
-        }
-    done
+    if [[ -n "$LACK" ]]; then
+        LACK=("$LACK")
+        for dep in "${LACK[@]}"; do
+            if [[ -z "$dep" ]]; then
+                continue
+            fi
+            
+            pip install "$dep" || {
+                red_output "Failed to install $dep"
+                exit 1
+            }
+        done
+    fi
     green_output "All docs dependencies have been installed."
 
 }
@@ -129,11 +97,13 @@ while [[ "$#" -gt 0 ]]; do
 done
 
 # navigate to project root
-ROOT=$(find_dir 'torchmeter')
-if [[ $? -ne 0 ]]; then 
+if ! ROOT="$(find_dir 'torchmeter')"; then 
     exit 1
 else
-    cd $ROOT
+    cd "$ROOT" || {
+        red_output "Error: Cannot enter $ROOT"
+        exit 1
+    }
 fi
 
 if [[ -d "$ROOT/dist" ]]; then 
@@ -141,23 +111,7 @@ if [[ -d "$ROOT/dist" ]]; then
 fi
 
 # activate conda env
-eval "$(conda shell.bash hook)"
-
-envs=$(conda env list | grep -v "#" | cut -d " " -f1)
-
-cyan_output "Available conda environments:"
-PS3="Choose your Python env: "
-select env in $envs
-do
-    if [ -n "$env" ]; then
-        cyan_output "$env selected."
-	conda activate "$env"
-	green_output "$env activated."
-        break
-    else
-        red_output "Invalid selection. Please try again."
-    fi
-done
+activate_conda_env || exit 1
 
 # check dependencies
 if [ "$QUICK_MODE" = false ]; then
@@ -166,13 +120,13 @@ if [ "$QUICK_MODE" = false ]; then
     cyan_output "\nChecking Python dependencies..."
     check_py_dependencies
 
-    # Check Drawio
-    cyan_output "\nChecking drawio..."
-    check_drawio
+    # # Check Drawio
+    # cyan_output "\nChecking drawio..."
+    # check_drawio
 
-    # Check xvfb
-    cyan_output "\nChecking xvfb..."
-    check_xvfb
+    # # Check xvfb
+    # cyan_output "\nChecking xvfb..."
+    # check_xvfb
     
 else
     yellow_output "Quick mode enabled: skipping all dependency checks."
